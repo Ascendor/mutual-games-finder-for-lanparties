@@ -1,0 +1,27 @@
+html {
+  overflow-y: auto;
+}
+
+body {
+  margin: 0;
+  background: #f7f8f3;
+}
+
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.metric {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.compact-table {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+}
+

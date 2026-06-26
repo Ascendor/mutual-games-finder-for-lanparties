@@ -1,0 +1,35 @@
+services:
+  gateway:
+    build: ./gateway
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-lanparty}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-QC4lF93bYgwTHRT4xRynsAIz3San1lDW}
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - gateway-certs:/etc/nginx/certs
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: sqlite:////data/lan_party_game_finder.db
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,https://localhost:8443,https://127.0.0.1:8443
+      STEAM_API_KEY: ${STEAM_API_KEY:-}
+      PROVIDER_AUTH_ROOT: /provider-auth
+    volumes:
+      - backend-data:/data
+      - provider-auth:/provider-auth
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+
+volumes:
+  gateway-certs:
+  backend-data:
+  provider-auth:

@@ -1,0 +1,108 @@
+﻿from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from app.db.session import get_db
+from app.models import Game, Ownership, Participant
+from app.schemas import GameCreate, GameOwnerRead, GameRead, GameUpdate
+from app.services.normalization import normalize_title
+
+router = APIRouter()
+
+
+@router.get("", response_model=list[GameRead])
+def list_games(search: str | None = None, db: Session = Depends(get_db)):
+    stmt = select(Game).order_by(Game.title)
+    if search:
+        stmt = stmt.where(Game.normalized_title.contains(normalize_title(search)))
+    return db.scalars(stmt).all()
+
+
+@router.get("/{game_id}/owners", response_model=list[GameOwnerRead])
+def list_game_owners(game_id: int, present_only: bool = True, db: Session = Depends(get_db)):
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "game not found")
+    stmt = (
+        select(Ownership)
+        .join(Ownership.participant)
+        .where(Ownership.game_id == game_id)
+        .options(selectinload(Ownership.participant), selectinload(Ownership.account))
+    )
+    if present_only:
+        stmt = stmt.where(Participant.present == True)  # noqa: E712
+    ownerships = db.scalars(stmt).all()
+    by_participant: dict[int, dict] = {}
+    for ownership in ownerships:
+        item = by_participant.setdefault(
+            ownership.participant_id,
+            {
+                "participant": ownership.participant,
+                "platforms": set(),
+                "account_names": set(),
+                "total_playtime_minutes": 0,
+                "last_seen": None,
+            },
+        )
+        item["platforms"].add(ownership.platform)
+        if ownership.account.display_name:
+            item["account_names"].add(ownership.account.display_name)
+        elif ownership.account.account_id:
+            item["account_names"].add(ownership.account.account_id)
+        item["total_playtime_minutes"] += ownership.playtime_minutes or 0
+        if item["last_seen"] is None or ownership.last_seen > item["last_seen"]:
+            item["last_seen"] = ownership.last_seen
+    return [
+        {
+            "participant": item["participant"],
+            "platforms": sorted(item["platforms"]),
+            "account_names": sorted(item["account_names"]),
+            "total_playtime_minutes": item["total_playtime_minutes"],
+            "last_seen": item["last_seen"],
+        }
+        for item in sorted(
+            by_participant.values(),
+            key=lambda value: (-value["total_playtime_minutes"], value["participant"].nickname.casefold()),
+        )
+    ]
+
+
+@router.post("", response_model=GameRead, status_code=201)
+def create_game(payload: GameCreate, db: Session = Depends(get_db)):
+    game = Game(**payload.model_dump(), normalized_title=normalize_title(payload.title))
+    db.add(game)
+    db.commit()
+    db.refresh(game)
+    return game
+
+
+@router.get("/{game_id}", response_model=GameRead)
+def get_game(game_id: int, db: Session = Depends(get_db)):
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "game not found")
+    return game
+
+
+@router.patch("/{game_id}", response_model=GameRead)
+def update_game(game_id: int, payload: GameUpdate, db: Session = Depends(get_db)):
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "game not found")
+    data = payload.model_dump(exclude_unset=True)
+    for key, value in data.items():
+        setattr(game, key, value)
+    if "title" in data:
+        game.normalized_title = normalize_title(game.title)
+    db.commit()
+    db.refresh(game)
+    return game
+
+
+@router.delete("/{game_id}", status_code=204)
+def delete_game(game_id: int, db: Session = Depends(get_db)):
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "game not found")
+    db.delete(game)
+    db.commit()

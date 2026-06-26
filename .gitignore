@@ -1,0 +1,8 @@
+﻿__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+lan_party_game_finder.db
+node_modules/
+dist/
+.env
