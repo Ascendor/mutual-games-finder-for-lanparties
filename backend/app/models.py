@@ -126,11 +126,12 @@ class SyncRun(Base):
     __tablename__ = "sync_runs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(40), default="account", nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
     success: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     message: Mapped[str] = mapped_column(Text, default="", nullable=False)
     imported_games: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    account: Mapped[Account] = relationship(back_populates="sync_runs")
+    account: Mapped[Account | None] = relationship(back_populates="sync_runs")

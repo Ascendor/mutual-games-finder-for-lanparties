@@ -1,8 +1,10 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import accounts, games, imports, ownerships, participants, provider_auth, recommendations, sync
 from app.core.config import settings
+from app.db.session import SessionLocal
+from app.services.metadata_service import close_interrupted_metadata_runs
 
 app = FastAPI(title="LAN Party Game Finder", version="0.1.0")
 
@@ -24,8 +26,15 @@ app.include_router(recommendations.router, prefix="/api/recommendations", tags=[
 app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
 
 
+@app.on_event("startup")
+def close_interrupted_syncs_on_startup() -> None:
+    db = SessionLocal()
+    try:
+        close_interrupted_metadata_runs(db)
+    finally:
+        db.close()
+
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
-

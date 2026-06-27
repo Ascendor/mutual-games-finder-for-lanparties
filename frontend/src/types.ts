@@ -86,7 +86,8 @@ export interface MetadataSyncResult {
 }
 export interface SyncRun {
   id: number
-  account_id: number
+  account_id?: number | null
+  kind: 'account' | 'metadata' | string
   started_at: string
   finished_at?: string | null
   success: boolean

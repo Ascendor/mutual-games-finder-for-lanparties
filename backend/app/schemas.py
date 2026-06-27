@@ -153,7 +153,8 @@ class PlayniteImportRead(BaseModel):
 
 class SyncRunRead(BaseModel):
     id: int
-    account_id: int
+    account_id: int | None
+    kind: str
     started_at: datetime
     finished_at: datetime | None
     success: bool

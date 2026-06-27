@@ -1,15 +1,19 @@
 ﻿from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from datetime import datetime
+from threading import Lock
+from typing import Any, Callable
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
-from app.models import Game, Platform, PlatformGameMapping
+from app.db.session import SessionLocal
+from app.models import Game, Platform, PlatformGameMapping, SyncRun
 from app.services.import_providers import _game_from_mapping, _steam_metadata_from_details
 from app.services.sync_service import _merge_game_metadata
 
@@ -26,6 +30,7 @@ FEATURE_FIELDS = (
     "max_players",
     "feature_metadata_known",
 )
+METADATA_SYNC_LOCK = Lock()
 
 @dataclass
 class MetadataSyncResult:
@@ -33,6 +38,78 @@ class MetadataSyncResult:
     updated_games: int = 0
     failed_games: int = 0
     message: str = "metadata sync completed"
+
+
+def create_metadata_sync_run(db: Session) -> SyncRun:
+    if not METADATA_SYNC_LOCK.acquire(blocking=False):
+        raise RuntimeError("Eine Metadatensynchronisation läuft bereits")
+    try:
+        run = SyncRun(kind="metadata", message="Metadatensynchronisation wartet auf Start")
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+        return run
+    except Exception:
+        METADATA_SYNC_LOCK.release()
+        raise
+
+
+def close_interrupted_metadata_runs(db: Session) -> None:
+    runs = db.scalars(
+        select(SyncRun).where(SyncRun.kind == "metadata", SyncRun.finished_at.is_(None))
+    ).all()
+    if not runs:
+        return
+    now = datetime.utcnow()
+    for run in runs:
+        run.success = False
+        run.finished_at = now
+        run.message = "Metadatensynchronisation wurde durch einen Serverneustart abgebrochen"
+    db.commit()
+
+
+def run_metadata_sync(run_id: int) -> None:
+    db = SessionLocal()
+    try:
+        run = db.get(SyncRun, run_id)
+        if not run:
+            return
+        run.message = "Metadaten werden geprüft"
+        db.commit()
+
+        def update_progress(scanned: int, updated: int, failed: int) -> None:
+            progress_run = db.get(SyncRun, run_id)
+            if progress_run:
+                progress_run.imported_games = updated
+                progress_run.message = (
+                    f"{scanned} Spiele geprüft, {updated} aktualisiert"
+                    + (f", {failed} Fehler" if failed else "")
+                )
+                db.commit()
+
+        result = enrich_all_game_metadata(db, progress_callback=update_progress)
+        run = db.get(SyncRun, run_id)
+        if not run:
+            return
+        run.success = result.failed_games == 0
+        run.finished_at = datetime.utcnow()
+        run.imported_games = result.updated_games
+        run.message = (
+            f"{result.updated_games} von {result.scanned_games} Spielen aktualisiert"
+            + (f", {result.failed_games} Fehler" if result.failed_games else "")
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        run = db.get(SyncRun, run_id)
+        if run:
+            run.success = False
+            run.finished_at = datetime.utcnow()
+            run.message = f"Metadatensynchronisation fehlgeschlagen: {exc}"
+            db.commit()
+    finally:
+        db.close()
+        METADATA_SYNC_LOCK.release()
 
 
 def _descriptive_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -117,27 +194,56 @@ def _rawg_metadata(title: str) -> dict[str, Any] | None:
     }
 
 
-def enrich_all_game_metadata(db: Session) -> MetadataSyncResult:
+def _fetch_game_metadata(job: tuple[int, str, list[tuple[Platform, str]]]) -> tuple[int, list[tuple[dict[str, Any], bool]]]:
+    game_id, title, mappings = job
+    payloads: list[tuple[dict[str, Any], bool]] = []
+    for platform, platform_game_id in mappings:
+        if platform == Platform.steam:
+            metadata = _steam_appdetails(platform_game_id)
+            if metadata:
+                payloads.append((metadata, True))
+    rawg = _rawg_metadata(title)
+    if rawg:
+        payloads.append((rawg, False))
+    return game_id, payloads
+
+
+def enrich_all_game_metadata(
+    db: Session,
+    progress_callback: Callable[[int, int, int], None] | None = None,
+) -> MetadataSyncResult:
     result = MetadataSyncResult()
     games = db.scalars(select(Game).options(selectinload(Game.mappings)).order_by(Game.title)).unique().all()
     result.scanned_games = len(games)
-    for game in games:
-        changed = False
-        try:
-            for mapping in game.mappings:
-                if mapping.platform == Platform.steam:
-                    metadata = _steam_appdetails(mapping.platform_game_id)
-                    if metadata:
-                        changed = _apply_payload(game, metadata, trusted_features=True) or changed
-            rawg = _rawg_metadata(game.title)
-            if rawg:
-                changed = _apply_payload(game, rawg) or changed
-            if changed:
-                result.updated_games += 1
-                db.flush()
-        except Exception:
-            result.failed_games += 1
+    games_by_id = {game.id: game for game in games}
+    jobs = [
+        (
+            game.id,
+            game.title,
+            [(mapping.platform, mapping.platform_game_id) for mapping in game.mappings],
+        )
+        for game in games
+    ]
+    with ThreadPoolExecutor(max_workers=8, thread_name_prefix="metadata-fetch") as executor:
+        fetched = executor.map(_fetch_game_metadata, jobs)
+        for scanned, (game_id, payloads) in enumerate(fetched, start=1):
+            game = games_by_id[game_id]
+            changed = False
+            try:
+                for payload, trusted_features in payloads:
+                    changed = _apply_payload(game, payload, trusted_features=trusted_features) or changed
+                if changed:
+                    result.updated_games += 1
+                    db.flush()
+            except Exception:
+                result.failed_games += 1
+            if scanned % 25 == 0:
+                db.commit()
+                if progress_callback:
+                    progress_callback(scanned, result.updated_games, result.failed_games)
     db.commit()
+    if progress_callback:
+        progress_callback(result.scanned_games, result.updated_games, result.failed_games)
     if result.failed_games:
         result.message = f"metadata sync completed with {result.failed_games} failed games"
     return result

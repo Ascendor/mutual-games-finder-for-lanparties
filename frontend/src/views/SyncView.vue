@@ -2,7 +2,7 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 class="text-h4">Synchronisation</h1>
-      <div class="d-flex ga-2 flex-wrap"><v-btn color="secondary" variant="tonal" prepend-icon="mdi-database-sync-outline" :loading="metadataLoading" @click="syncMetadata">Metadaten aktualisieren</v-btn><v-btn color="secondary" variant="tonal" prepend-icon="mdi-wrench-outline" :loading="repairLoading" @click="repairMetadata">Metadaten reparieren</v-btn><v-btn to="/accounts" color="primary" variant="tonal" prepend-icon="mdi-account-key">Accounts</v-btn></div>
+      <div class="d-flex ga-2 flex-wrap"><v-btn color="secondary" variant="tonal" prepend-icon="mdi-database-sync-outline" :loading="metadataLoading" :disabled="metadataRunning" @click="syncMetadata">Metadaten aktualisieren</v-btn><v-btn color="secondary" variant="tonal" prepend-icon="mdi-wrench-outline" :loading="repairLoading" :disabled="metadataRunning" @click="repairMetadata">Metadaten reparieren</v-btn><v-btn to="/accounts" color="primary" variant="tonal" prepend-icon="mdi-account-key">Accounts</v-btn></div>
     </div>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
@@ -22,9 +22,9 @@
         </v-card>
       </v-col>
       <v-col cols="12" md="7">
-        <v-data-table class="compact-table" :headers="headers" :items="rows" :items-per-page="-1" density="compact" hide-default-footer>
+        <v-data-table class="compact-table" :headers="headers" :items="rows" :loading="store.loading" loading-text="Synchronisationsprotokoll wird geladen..." :items-per-page="-1" density="compact" hide-default-footer>
           <template #item.status="{ item }">
-            <v-chip :color="item.success ? 'secondary' : 'error'" size="small">{{ item.status }}</v-chip>
+            <v-chip :color="item.statusColor" size="small">{{ item.status }}</v-chip>
           </template>
         </v-data-table>
       </v-col>
@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../api'
 import { useLanStore } from '../store'
 
@@ -53,11 +53,20 @@ const headers = [
 const rows = computed(() =>
   store.syncRuns.map((run) => ({
     ...run,
-    account: accountLabel(run.account_id),
-    status: run.success ? 'OK' : 'Fehler'
+    account: run.kind === 'metadata' ? 'Metadaten' : accountLabel(run.account_id),
+    status: !run.finished_at ? 'Läuft' : run.success ? 'OK' : 'Fehler',
+    statusColor: !run.finished_at ? 'primary' : run.success ? 'secondary' : 'error'
   }))
 )
-onMounted(() => store.refresh())
+const metadataRunning = computed(() => store.syncRuns.some((run) => run.kind === 'metadata' && !run.finished_at))
+let pollTimer: number | undefined
+
+onMounted(async () => {
+  await store.refresh()
+  schedulePoll()
+})
+
+onBeforeUnmount(() => window.clearTimeout(pollTimer))
 
 async function sync(id: number) {
   loading.value = id
@@ -80,8 +89,8 @@ async function syncMetadata() {
   metadataMessage.value = ''
   try {
     const result = await api.syncMetadata()
-    metadataMessage.value = `${result.updated_games} von ${result.scanned_games} Spielen aktualisiert${result.failed_games ? `, ${result.failed_games} Fehler` : ''}`
-    await store.refresh()
+    metadataMessage.value = `Metadatensynchronisation #${result.id} wurde gestartet.`
+    await refreshRuns()
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -95,17 +104,30 @@ async function repairMetadata() {
   metadataMessage.value = ''
   try {
     const result = await api.repairMetadata()
-    metadataMessage.value = result.message
-    await store.refresh()
+    metadataMessage.value = `Metadatenprüfung #${result.id} wurde gestartet.`
+    await refreshRuns()
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
     repairLoading.value = false
   }
 }
-function accountLabel(id: number) {
+function accountLabel(id?: number | null) {
+  if (!id) return '-'
   const account = store.accounts.find((item) => item.id === id)
   return account ? `${account.platform}: ${account.display_name || account.account_id}` : id
+}
+
+async function refreshRuns() {
+  store.syncRuns = await api.syncRuns()
+  schedulePoll()
+}
+
+function schedulePoll() {
+  window.clearTimeout(pollTimer)
+  if (store.syncRuns.some((run) => !run.finished_at)) {
+    pollTimer = window.setTimeout(refreshRuns, 2000)
+  }
 }
 </script>
 

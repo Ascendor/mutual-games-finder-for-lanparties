@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, Game, GameOwner, MetadataSyncResult, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SyncRun } from './types'
+import type { Account, Game, GameOwner, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -47,8 +47,8 @@ export const api = {
   coop: (players: number[]) => request<Recommendation[]>(`/recommendations/coop?${players.map((id) => `players=${id}`).join('&')}`),
   lanForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/lan?${players.map((id) => `players=${id}`).join('&')}`),
   syncAccount: (id: number) => request<SyncRun>(`/sync/accounts/${id}`, { method: 'POST' }),
-  syncMetadata: () => request<MetadataSyncResult>('/sync/metadata', { method: 'POST' }),
-  repairMetadata: () => request<MetadataSyncResult>('/sync/metadata/repair', { method: 'POST' }),
+  syncMetadata: () => request<SyncRun>('/sync/metadata', { method: 'POST' }),
+  repairMetadata: () => request<SyncRun>('/sync/metadata/repair', { method: 'POST' }),
   syncRuns: () => request<SyncRun[]>('/sync/runs'),
   importPlaynite: async (participantId: number, file: File) => {
     const form = new FormData()
