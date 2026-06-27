@@ -16,6 +16,18 @@ class Platform(StrEnum):
     xbox = "xbox"
     ubisoft = "ubisoft"
     ea = "ea"
+    amazon = "amazon"
+    battle_net = "battle_net"
+    bethesda = "bethesda"
+    gamejolt = "gamejolt"
+    humble = "humble"
+    itch = "itch"
+    legacy = "legacy"
+    nintendo = "nintendo"
+    playstation = "playstation"
+    riot = "riot"
+    rockstar = "rockstar"
+    local = "local"
 
 
 class TimestampMixin:
@@ -122,4 +134,3 @@ class SyncRun(Base):
     imported_games: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     account: Mapped[Account] = relationship(back_populates="sync_runs")
-

@@ -3,6 +3,7 @@ set -eu
 
 : "${BASIC_AUTH_USER:=lanparty}"
 : "${BASIC_AUTH_PASSWORD:=QC4lF93bYgwTHRT4xRynsAIz3San1lDW}"
+: "${LAN_UPLOAD_LIMIT:=2g}"
 
 mkdir -p /etc/nginx/auth /etc/nginx/certs
 

@@ -56,6 +56,12 @@ GOG erwartet einen Auth-Cache unter `/config/heroic_gogdl/auth.json`, persistent
 
 Xbox, Ubisoft Connect und EA App sind im Code als eigene Provider angelegt, aber ihre direkten API-/Auth-Adapter sind noch offen.
 
+## Playnite-Import
+
+Auf der Seite `Accounts und Logins` kann pro Teilnehmer ein Playnite-JSON-Export oder ein Playnite-Backup-ZIP importiert werden. Der Gateway erlaubt Uploads bis 2 GB; der Wert kann in `.env` ueber `LAN_UPLOAD_LIMIT` angepasst werden, z.B. `LAN_UPLOAD_LIMIT=4g`. Der Import ordnet erkannte Quellen den vorhandenen Plattformen zu (`steam`, `epic`, `gog`, `ubisoft`, `ea`, `xbox` und weitere Playnite-Quellen) und nutzt vorhandene Accounts wieder, damit keine doppelten Ownerships neben direkten Provider-Syncs entstehen. Spiele ohne erkennbare Plattform werden als `local` importiert.
+
+Direkte Provider-Syncs bleiben die bevorzugte Quelle fuer aktuelle Metadaten. Der Playnite-Import setzt deshalb nur vorsichtige Metadaten und ueberschreibt keine vertrauenswuerdigen Feature-Daten.
+
 ## Entwicklung ohne Docker
 
 Backend:

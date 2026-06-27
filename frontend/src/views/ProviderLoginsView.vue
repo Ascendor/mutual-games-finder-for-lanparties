@@ -23,6 +23,12 @@
             <v-chip size="small" variant="tonal">{{ connectedCount(group.slots) }} / {{ group.slots.length }} verbunden</v-chip>
           </v-card-title>
           <v-card-text>
+            <div class="playnite-import mb-4">
+              <v-file-input v-model="playniteFiles[group.participant.id]" accept="application/json,.json,application/zip,.zip" label="Playnite JSON-Export oder Backup-ZIP" prepend-icon="mdi-file-upload-outline" density="compact" hide-details="auto" />
+              <v-btn color="primary" variant="tonal" prepend-icon="mdi-import" :loading="busy === `playnite-import:${group.participant.id}`" :disabled="!selectedPlayniteFile(group.participant.id)" @click="importPlaynite(group.participant.id)">
+                Playnite importieren
+              </v-btn>
+            </div>
             <div v-for="slot in group.slots" :key="slot.key" class="provider-row">
               <div class="provider-main">
                 <div class="d-flex align-center ga-2 flex-wrap">
@@ -45,8 +51,15 @@
                 </div>
 
                 <template v-else-if="slot.platform === 'steam'">
+                  <div v-if="isPlaynitePlaceholder(slot.account)" class="d-flex flex-column ga-2">
+                    <v-text-field v-model="accountInputs[slot.key].accountId" label="SteamID64" density="compact" hide-details="auto" />
+                    <v-text-field v-model="accountInputs[slot.key].displayName" label="Anzeigename optional" density="compact" hide-details="auto" />
+                    <v-btn color="primary" variant="tonal" prepend-icon="mdi-content-save-outline" :loading="busy === `create:${slot.key}`" @click="createProviderAccount(slot)">
+                      SteamID speichern
+                    </v-btn>
+                  </div>
                   <div class="d-flex flex-wrap ga-2 justify-end">
-                    <v-btn color="primary" variant="tonal" prepend-icon="mdi-sync" :loading="busy === `${slot.account.id}:sync`" @click="sync(slot.account.id)">
+                    <v-btn color="primary" variant="tonal" prepend-icon="mdi-sync" :disabled="isPlaynitePlaceholder(slot.account)" :loading="busy === `${slot.account.id}:sync`" @click="sync(slot.account.id)">
                       Synchronisieren
                     </v-btn>
                   </div>
@@ -150,6 +163,7 @@ const loading = ref(false)
 const busy = ref<string | number | null>(null)
 const error = ref('')
 const message = ref('')
+const playniteFiles = reactive<Record<number, File | File[] | null>>({})
 
 const slotsByParticipant = computed(() =>
   [...store.participants].sort((left, right) => {
@@ -206,6 +220,7 @@ function statusFor(accountId: number) {
 
 function statusColor(account?: Account) {
   if (!account) return 'grey'
+  if (isPlaynitePlaceholder(account)) return 'warning'
   if (account.platform === 'steam') return account.account_id ? 'secondary' : 'warning'
   const status = statusFor(account.id)
   if (status?.authenticated) return 'secondary'
@@ -215,6 +230,7 @@ function statusColor(account?: Account) {
 
 function statusLabel(account?: Account) {
   if (!account) return 'Nicht angelegt'
+  if (isPlaynitePlaceholder(account)) return 'Aus Playnite importiert'
   if (account.platform === 'steam') return account.account_id ? 'Steam-ID hinterlegt' : 'Steam-ID fehlt'
   const status = statusFor(account.id)
   if (status?.authenticated) return 'Verbunden'
@@ -226,9 +242,13 @@ function connectedCount(slots: ProviderSlot[]) {
   return slots.filter((slot) => slot.account && statusFor(slot.account.id)?.authenticated).length
 }
 
+function isPlaynitePlaceholder(account?: Account) {
+  return Boolean(account?.account_id.startsWith('playnite:'))
+}
+
 function platformTitle(platform: Platform) {
-  const titles: Record<Platform, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App' }
-  return titles[platform]
+  const titles: Record<string, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App', amazon: 'Amazon Games', battle_net: 'Battle.net', bethesda: 'Bethesda', gamejolt: 'Game Jolt', humble: 'Humble', itch: 'itch.io', legacy: 'Legacy Games', nintendo: 'Nintendo', playstation: 'PlayStation', riot: 'Riot', rockstar: 'Rockstar', local: 'Lokal' }
+  return titles[platform] ?? platform
 }
 
 function helpText(platform: Platform) {
@@ -290,6 +310,31 @@ async function createProviderAccount(slot: ProviderSlot) {
     message.value = `${platformTitle(slot.platform)} fuer ${slot.participant.nickname} angelegt.`
     input.accountId = ''
     input.displayName = ''
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    busy.value = null
+  }
+}
+
+function selectedPlayniteFile(participantId: number) {
+  const value = playniteFiles[participantId]
+  return Array.isArray(value) ? value[0] : value
+}
+
+async function importPlaynite(participantId: number) {
+  const file = selectedPlayniteFile(participantId)
+  if (!file) return
+  busy.value = `playnite-import:${participantId}`
+  error.value = ''
+  message.value = ''
+  try {
+    const participant = store.participants.find((item) => item.id === participantId)
+    const result = await api.importPlaynite(participantId, file)
+    message.value = `${result.message}. Plattformen: ${result.platforms.join(', ') || 'keine'}; übersprungen: ${result.skipped_games}.`
+    if (participant) message.value = `${participant.nickname}: ${message.value}`
+    playniteFiles[participantId] = null
     await load()
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
@@ -425,8 +470,19 @@ async function logout(accountId: number) {
   width: 100%;
 }
 
+.playnite-import {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
 @media (max-width: 760px) {
   .provider-row {
+    grid-template-columns: 1fr;
+  }
+
+  .playnite-import {
     grid-template-columns: 1fr;
   }
 }

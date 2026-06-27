@@ -9,6 +9,7 @@ export const useLanStore = defineStore('lan', {
     games: [] as Game[],
     ownerships: [] as Ownership[],
     popular: [] as Recommendation[],
+    newForGroup: [] as Recommendation[],
     lan: [] as Recommendation[],
     present: [] as Recommendation[],
     syncRuns: [] as SyncRun[],
@@ -24,17 +25,18 @@ export const useLanStore = defineStore('lan', {
       this.loading = true
       this.error = ''
       try {
-        const [participants, accounts, games, ownerships, popular, lan, present, syncRuns] = await Promise.all([
+        const [participants, accounts, games, ownerships, popular, newForGroup, lan, present, syncRuns] = await Promise.all([
           api.participants(),
           api.accounts(),
           api.games(),
           api.ownerships(),
           api.recommendations('popular'),
+          api.recommendations('new'),
           api.recommendations('lan'),
           api.recommendations('present'),
           api.syncRuns()
         ])
-        Object.assign(this, { participants, accounts, games, ownerships, popular, lan, present, syncRuns })
+        Object.assign(this, { participants, accounts, games, ownerships, popular, newForGroup, lan, present, syncRuns })
       } catch (error) {
         this.error = error instanceof Error ? error.message : String(error)
       } finally {

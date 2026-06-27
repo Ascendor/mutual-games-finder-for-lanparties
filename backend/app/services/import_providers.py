@@ -310,7 +310,17 @@ def _parse_datetime(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         return value
     if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value)
+        timestamp = float(value)
+        # BSON dates use milliseconds; tolerate microseconds from other importers too.
+        while abs(timestamp) > 32_503_680_000:
+            timestamp /= 1000
+        try:
+            parsed = datetime.fromtimestamp(timestamp)
+        except (OverflowError, OSError, ValueError):
+            return None
+        if not 1970 <= parsed.year <= 2200:
+            return None
+        return parsed
     text = str(value).strip()
     for suffix in ("Z", "+00:00"):
         if text.endswith(suffix):

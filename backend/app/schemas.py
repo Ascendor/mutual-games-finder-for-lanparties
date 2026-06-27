@@ -142,6 +142,15 @@ class MetadataSyncRead(BaseModel):
     failed_games: int
     message: str
 
+
+class PlayniteImportRead(BaseModel):
+    imported_games: int
+    skipped_games: int
+    created_accounts: int
+    updated_ownerships: int
+    platforms: list[str]
+    message: str
+
 class SyncRunRead(BaseModel):
     id: int
     account_id: int

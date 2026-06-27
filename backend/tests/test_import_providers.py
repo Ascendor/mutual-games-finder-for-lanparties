@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import app.services.import_providers as import_providers
 from app.models import Account, Platform
-from app.services.import_providers import EAProvider, EpicProvider, GOG_CLIENT_ID, GOGProvider, UbisoftProvider, XboxProvider
+from app.services.import_providers import EAProvider, EpicProvider, GOG_CLIENT_ID, GOGProvider, SteamProvider, UbisoftProvider, XboxProvider
 
 
 class FakeResponse:
@@ -109,6 +109,32 @@ def test_gog_provider_uses_auth_cache_and_direct_api(monkeypatch, tmp_path):
 
 
 
+def test_steam_provider_uses_playtime_forever(monkeypatch):
+    provider = SteamProvider()
+    account = Account(id=5, participant_id=1, platform=Platform.steam, account_id="7656119")
+
+    class SteamClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, params=None, headers=None):
+            return FakeResponse({"response": {"games": [{"appid": 620, "name": "Portal 2", "playtime_forever": 345}]}})
+
+    monkeypatch.setattr(import_providers.settings, "steam_api_key", "key")
+    monkeypatch.setattr(import_providers.settings, "steam_metadata_limit", 0)
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: SteamClient(**kwargs))
+
+    games = provider.sync_account(account)
+
+    assert games[0].playtime_minutes == 345
+
+
 def test_xbox_provider_parses_title_history(monkeypatch, tmp_path):
     monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
     import_providers.save_provider_auth_json(
@@ -136,11 +162,15 @@ def test_ea_provider_parses_configured_library_endpoint(monkeypatch, tmp_path):
         10,
         {"access_token": "token", "library_url": "https://ea.example/library"},
     )
-    monkeypatch.setattr(
-        import_providers.httpx,
-        "get",
-        lambda *args, **kwargs: FakeResponse({"games": [{"productId": "ea-1", "title": "Mass Effect"}]}),
-    )
+    class EAClient(FakeClient):
+        def get(self, url):
+            if url.endswith("/pids/me"):
+                return FakeResponse({"pid": {"pidId": "123"}})
+            if url == "https://ea.example/library":
+                return FakeResponse({"games": [{"productId": "ea-1", "title": "Mass Effect"}]})
+            return FakeResponse({}, ok=False)
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: EAClient(**kwargs))
 
     games = EAProvider().sync_account(Account(id=10, participant_id=1, platform=Platform.ea, account_id="ea"))
 

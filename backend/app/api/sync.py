@@ -27,3 +27,8 @@ def sync_single_account(account_id: int, db: Session = Depends(get_db)):
 @router.post("/metadata", response_model=MetadataSyncRead)
 def metadata_all(db: Session = Depends(get_db)):
     return enrich_all_game_metadata(db)
+
+
+@router.post("/metadata/repair", response_model=MetadataSyncRead)
+def repair_metadata(db: Session = Depends(get_db)):
+    return enrich_all_game_metadata(db)

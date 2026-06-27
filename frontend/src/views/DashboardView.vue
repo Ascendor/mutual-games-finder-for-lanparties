@@ -35,15 +35,19 @@
     <v-row class="mt-2">
       <v-col cols="12" lg="6">
         <h2 class="text-h6 mb-2">Beliebteste Spiele</h2>
-        <RecommendationTable :items="store.popular.slice(0, 8)" />
+        <RecommendationTable :items="store.popular.slice(0, 8)" :loading="store.loading" />
       </v-col>
       <v-col cols="12" lg="6">
         <h2 class="text-h6 mb-2">Beste LAN-Spiele</h2>
-        <RecommendationTable :items="store.lan.slice(0, 8)" />
+        <RecommendationTable :items="store.lan.slice(0, 8)" :loading="store.loading" />
+      </v-col>
+      <v-col cols="12" lg="6">
+        <h2 class="text-h6 mb-2">Neu für die Gruppe</h2>
+        <RecommendationTable :items="store.newForGroup.slice(0, 8)" :loading="store.loading" />
       </v-col>
       <v-col cols="12">
         <h2 class="text-h6 mb-2">Gemeinsame Spiele der Anwesenden</h2>
-        <RecommendationTable :items="store.present.slice(0, 12)" />
+        <RecommendationTable :items="store.present.slice(0, 12)" :loading="store.loading" />
       </v-col>
     </v-row>
   </div>
@@ -57,4 +61,3 @@ import { useLanStore } from '../store'
 const store = useLanStore()
 onMounted(() => store.refresh())
 </script>
-

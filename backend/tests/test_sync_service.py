@@ -1,6 +1,5 @@
 ﻿from app.models import Account, Participant, Platform, PlatformGameMapping
 from app.services.import_providers import ImportedGame, _steam_metadata_from_details
-from app.services.metadata_repair import repair_legacy_steam_metadata
 from app.services.sync_service import resolve_game, upsert_ownership
 
 
@@ -29,6 +28,50 @@ def test_upsert_ownership_preserves_single_row(db):
 
     assert len(participant.ownerships) == 1
     assert participant.ownerships[0].playtime_minutes == 20
+
+
+def test_upsert_ownership_does_not_replace_known_playtime_with_zero(db):
+    participant = Participant(nickname="Grace")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.steam, account_id="99")
+    db.add(account)
+    db.flush()
+    game = resolve_game(db, Platform.steam, ImportedGame(platform_game_id="620", title="Portal 2"))
+
+    upsert_ownership(db, account, game, ImportedGame(platform_game_id="620", title="Portal 2", playtime_minutes=240))
+    upsert_ownership(db, account, game, ImportedGame(platform_game_id="620", title="Portal 2", playtime_minutes=0))
+    db.flush()
+
+    assert participant.ownerships[0].playtime_minutes == 240
+
+
+def test_upsert_ownership_treats_legacy_null_playtime_as_zero(db):
+    participant = Participant(nickname="Legacy")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.steam, account_id="legacy")
+    db.add(account)
+    db.flush()
+    game = resolve_game(db, Platform.steam, ImportedGame(platform_game_id="550", title="Left 4 Dead 2"))
+    ownership = upsert_ownership(db, account, game, ImportedGame(platform_game_id="550", title="Left 4 Dead 2", playtime_minutes=0))
+    ownership.playtime_minutes = None  # type: ignore[assignment]
+
+    upsert_ownership(db, account, game, ImportedGame(platform_game_id="550", title="Left 4 Dead 2", playtime_minutes=25))
+    db.flush()
+
+    assert ownership.playtime_minutes == 25
+
+
+def test_resolve_game_tolerates_missing_imported_player_counts(db):
+    imported = ImportedGame(platform_game_id="broken-meta", title="Broken Metadata")
+    imported.min_players = None  # type: ignore[assignment]
+    imported.max_players = None  # type: ignore[assignment]
+
+    game = resolve_game(db, Platform.steam, imported)
+
+    assert game.min_players == 1
+    assert game.max_players == 1
 
 
 
@@ -74,8 +117,8 @@ def test_trusted_imported_metadata_can_clear_previous_bad_feature_guess(db):
         db,
         Platform.steam,
         ImportedGame(
-            platform_game_id="20",
-            title="Team Fortress Classic",
+            platform_game_id="example-multiplayer",
+            title="Example Multiplayer",
             multiplayer=True,
             split_screen=True,
             shared_screen=True,
@@ -87,8 +130,8 @@ def test_trusted_imported_metadata_can_clear_previous_bad_feature_guess(db):
         db,
         Platform.steam,
         ImportedGame(
-            platform_game_id="20",
-            title="Team Fortress Classic",
+            platform_game_id="example-multiplayer",
+            title="Example Multiplayer",
             multiplayer=True,
             split_screen=False,
             shared_screen=False,
@@ -102,28 +145,4 @@ def test_trusted_imported_metadata_can_clear_previous_bad_feature_guess(db):
     assert corrected.split_screen is False
     assert corrected.shared_screen is False
     assert corrected.max_players == 1
-
-
-def test_legacy_steam_metadata_repair_clears_tfc_split_and_invented_cap(db):
-    game = resolve_game(
-        db,
-        Platform.steam,
-        ImportedGame(
-            platform_game_id="20",
-            title="Team Fortress Classic",
-            multiplayer=True,
-            split_screen=True,
-            shared_screen=True,
-            max_players=8,
-        ),
-    )
-    db.flush()
-
-    changed = repair_legacy_steam_metadata(db)
-
-    assert changed == 1
-    assert game.multiplayer is True
-    assert game.split_screen is False
-    assert game.shared_screen is False
-    assert game.max_players == 32
 

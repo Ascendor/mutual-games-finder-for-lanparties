@@ -2,30 +2,29 @@
   <div class="page">
     <h1 class="text-h4 mb-4">Was können wir spielen?</h1>
     <v-row class="mb-4">
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="9">
         <v-select v-model="selected" :items="store.participants" item-title="nickname" item-value="id" label="Ausgewählte Spieler" multiple chips density="compact" />
       </v-col>
-      <v-col cols="12" md="3">
-        <v-text-field v-model.number="groupSize" label="Gruppengröße" type="number" density="compact" />
-      </v-col>
       <v-col cols="12" md="3" class="d-flex align-center">
-        <v-btn color="primary" prepend-icon="mdi-star-search-outline" @click="load">Berechnen</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-star-search-outline" :loading="loading" :disabled="selected.length === 0" @click="load">Berechnen</v-btn>
       </v-col>
     </v-row>
+
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
     <v-tabs v-model="tab" color="primary">
       <v-tab value="common">Gemeinsam</v-tab>
       <v-tab value="coop">Koop</v-tab>
       <v-tab value="lan">LAN</v-tab>
-      <v-tab value="size">Gruppengröße</v-tab>
       <v-tab value="popular">Beliebt</v-tab>
+      <v-tab value="new">Neu für die Gruppe</v-tab>
     </v-tabs>
     <v-window v-model="tab" class="mt-4">
-      <v-window-item value="common"><RecommendationTable :items="common" /></v-window-item>
-      <v-window-item value="coop"><RecommendationTable :items="coop" /></v-window-item>
-      <v-window-item value="lan"><RecommendationTable :items="store.lan" /></v-window-item>
-      <v-window-item value="size"><RecommendationTable :items="sized" /></v-window-item>
-      <v-window-item value="popular"><RecommendationTable :items="store.popular" /></v-window-item>
+      <v-window-item value="common"><RecommendationTable :items="common" :loading="loading" /></v-window-item>
+      <v-window-item value="coop"><RecommendationTable :items="coop" :loading="loading" /></v-window-item>
+      <v-window-item value="lan"><RecommendationTable :items="lan" :loading="loading" /></v-window-item>
+      <v-window-item value="popular"><RecommendationTable :items="store.popular" :loading="loading || store.loading" /></v-window-item>
+      <v-window-item value="new"><RecommendationTable :items="newForGroup" :loading="loading" /></v-window-item>
     </v-window>
   </div>
 </template>
@@ -41,11 +40,13 @@ import type { Recommendation } from '../types'
 const store = useLanStore()
 const route = useRoute()
 const selected = ref<number[]>([])
-const groupSize = ref(4)
 const tab = ref('common')
 const common = ref<Recommendation[]>([])
 const coop = ref<Recommendation[]>([])
-const sized = ref<Recommendation[]>([])
+const lan = ref<Recommendation[]>([])
+const newForGroup = ref<Recommendation[]>([])
+const loading = ref(false)
+const error = ref('')
 
 onMounted(async () => {
   await store.refresh()
@@ -56,10 +57,25 @@ onMounted(async () => {
 })
 
 async function load() {
-  await store.refresh()
-  common.value = await api.common(selected.value)
-  coop.value = await api.coop(selected.value)
-  sized.value = await api.groupSize(groupSize.value)
+  if (!selected.value.length) return
+  loading.value = true
+  error.value = ''
+  try {
+    const [commonGames, coopGames, lanGames, newGames] = await Promise.all([
+      api.common(selected.value),
+      api.coop(selected.value),
+      api.lanForGroup(selected.value),
+      api.newForGroup(selected.value)
+    ])
+    common.value = commonGames
+    coop.value = coopGames
+    lan.value = lanGames
+    newForGroup.value = newGames
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

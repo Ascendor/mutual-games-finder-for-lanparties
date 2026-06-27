@@ -13,7 +13,20 @@
           <v-card-text>
             <div class="inline-action">
               <span>Ich will</span>
-              <v-text-field v-model="gameName" label="Spiel" prepend-inner-icon="mdi-gamepad-variant-outline" density="comfortable" hide-details="auto" @keyup.enter="findPlayers" />
+              <v-autocomplete
+                v-model="gameName"
+                :items="store.games"
+                item-title="title"
+                item-value="title"
+                label="Spiel"
+                prepend-inner-icon="mdi-gamepad-variant-outline"
+                density="comfortable"
+                hide-details="auto"
+                clearable
+                auto-select-first
+                :loading="store.loading"
+                @keyup.enter="findPlayers"
+              />
               <span>spielen.</span>
             </div>
           </v-card-text>
@@ -52,7 +65,7 @@
 
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
-          <v-card-title>Meine Spiele hinzufuegen</v-card-title>
+          <v-card-title>Meine Spiele hinzufügen</v-card-title>
           <v-card-text>
             <v-combobox v-model="participant.nickname" :items="participantNicknames" label="Nickname" prepend-inner-icon="mdi-account-outline" density="comfortable" hide-details="auto" class="mb-3" auto-select-first />
             <v-text-field v-model="participant.real_name" label="Real Name optional" density="comfortable" hide-details="auto" />

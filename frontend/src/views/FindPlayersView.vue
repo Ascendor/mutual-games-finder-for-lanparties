@@ -19,16 +19,17 @@
           clearable
           hide-details
           no-filter
+          :loading="gamesLoading"
           @update:search="loadGames"
           @update:model-value="loadOwners"
         />
       </v-col>
       <v-col cols="12" md="4" class="d-flex align-center ga-2">
-        <v-btn color="primary" prepend-icon="mdi-account-search-outline" :disabled="!selectedGameId" @click="loadOwners">Suchen</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-account-search-outline" :disabled="!selectedGameId" :loading="loading" @click="loadOwners">Suchen</v-btn>
       </v-col>
     </v-row>
 
-    <v-data-table class="compact-table" density="compact" :headers="headers" :items="rows" :items-per-page="-1" hide-default-footer>
+    <v-data-table class="compact-table" density="compact" :headers="headers" :items="rows" :loading="loading" loading-text="Besitzer werden geladen..." :items-per-page="-1" hide-default-footer>
       <template #item.participant_name="{ item }">
             <div class="d-flex align-center ga-2">
               <v-icon :color="item.present ? 'success' : 'medium-emphasis'" size="small">mdi-circle</v-icon>
@@ -57,6 +58,7 @@ const selectedGameId = ref<number | null>(null)
 const search = ref('')
 const presentOnly = ref(true)
 const loading = ref(false)
+const gamesLoading = ref(false)
 const headers = [
   { title: 'Teilnehmer', key: 'participant_name' },
   { title: 'Plattformen', key: 'platforms' },
@@ -80,7 +82,12 @@ let searchTimer: number | undefined
 onMounted(async () => {
   const initialGame = typeof route.query.game === 'string' ? route.query.game : ''
   search.value = initialGame
-  games.value = await api.games(initialGame)
+  gamesLoading.value = true
+  try {
+    games.value = await api.games(initialGame)
+  } finally {
+    gamesLoading.value = false
+  }
   if (initialGame) {
     const normalized = initialGame.trim().toLocaleLowerCase()
     const match = games.value.find((game) => game.title.toLocaleLowerCase() === normalized) ?? games.value[0]
@@ -100,7 +107,12 @@ watch(selectedGameId, () => {
 function loadGames(value: string) {
   window.clearTimeout(searchTimer)
   searchTimer = window.setTimeout(async () => {
-    games.value = await api.games(value || '')
+    gamesLoading.value = true
+    try {
+      games.value = await api.games(value || '')
+    } finally {
+      gamesLoading.value = false
+    }
   }, 180)
 }
 
@@ -122,14 +134,26 @@ function hours(minutes: number) {
 }
 
 function platformLabel(platform: Platform) {
-  const labels: Record<Platform, string> = {
+  const labels: Record<string, string> = {
     steam: 'Steam',
     epic: 'Epic',
     gog: 'GOG',
     xbox: 'Xbox',
     ubisoft: 'Ubisoft',
-    ea: 'EA'
+    ea: 'EA',
+    amazon: 'Amazon',
+    battle_net: 'Battle.net',
+    bethesda: 'Bethesda',
+    gamejolt: 'Game Jolt',
+    humble: 'Humble',
+    itch: 'itch.io',
+    legacy: 'Legacy',
+    nintendo: 'Nintendo',
+    playstation: 'PlayStation',
+    riot: 'Riot',
+    rockstar: 'Rockstar',
+    local: 'Lokal'
   }
-  return labels[platform]
+  return labels[platform] ?? platform
 }
 </script>

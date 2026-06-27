@@ -59,7 +59,10 @@ def create_account(payload: AccountCreate, db: Session = Depends(get_db)):
         )
     )
     if existing:
-        if data.get("account_id") and existing.account_id.startswith(f"local-{_platform_value(existing.platform)}-"):
+        if data.get("account_id") and (
+            existing.account_id.startswith(f"local-{_platform_value(existing.platform)}-")
+            or existing.account_id.startswith("playnite:")
+        ):
             existing.account_id = data["account_id"]
         if data.get("display_name"):
             existing.display_name = data["display_name"]

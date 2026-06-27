@@ -16,6 +16,15 @@ MATCH_THRESHOLD = 88
 SYNC_LOCK = Lock()
 
 
+def _player_count(value: int | None, default: int = 1) -> int:
+    if value in (None, ""):
+        return default
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
 def _numeric_tokens(normalized_title: str) -> tuple[str, ...]:
     return tuple(re.findall(r"\d+", normalized_title))
 
@@ -39,16 +48,20 @@ def _merge_game_metadata(game: Game, imported: ImportedGame) -> None:
         "split_screen",
         "shared_screen",
     ]
+    imported_min_players = _player_count(imported.min_players)
+    imported_max_players = max(imported_min_players, _player_count(imported.max_players, imported_min_players))
+    existing_min_players = _player_count(game.min_players, imported_min_players)
+    existing_max_players = max(existing_min_players, _player_count(game.max_players, imported_max_players))
     if imported.feature_metadata_known:
         for field in feature_fields:
             setattr(game, field, bool(getattr(imported, field)))
-        game.min_players = imported.min_players or 1
-        game.max_players = imported.max_players or 1
+        game.min_players = imported_min_players
+        game.max_players = imported_max_players
         return
     for field in feature_fields:
         setattr(game, field, bool(getattr(game, field) or getattr(imported, field)))
-    game.min_players = min(game.min_players or imported.min_players, imported.min_players or 1)
-    game.max_players = max(game.max_players or imported.max_players, imported.max_players or 1)
+    game.min_players = min(existing_min_players, imported_min_players)
+    game.max_players = max(existing_max_players, imported_max_players)
 
 
 def _find_or_create_game(db: Session, imported: ImportedGame, exclude_game_id: int | None = None) -> Game:
@@ -143,7 +156,9 @@ def upsert_ownership(db: Session, account: Account, game: Game, imported: Import
             platform=account.platform,
         )
         db.add(ownership)
-    ownership.playtime_minutes = imported.playtime_minutes
+    current_playtime = ownership.playtime_minutes or 0
+    if imported.playtime_minutes > 0 or current_playtime <= 0:
+        ownership.playtime_minutes = imported.playtime_minutes
     ownership.owned_since = imported.owned_since or ownership.owned_since
     ownership.last_seen = datetime.utcnow()
     return ownership

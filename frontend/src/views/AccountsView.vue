@@ -65,7 +65,7 @@
           <template #item.actions="{ item }">
             <div class="actions-cell">
               <v-btn v-if="canLogin(item.platform)" size="small" variant="tonal" prepend-icon="mdi-key" :loading="busy === `login-${item.id}`" @click="startExistingLogin(item.id)">Login</v-btn>
-              <v-btn size="small" color="primary" variant="text" prepend-icon="mdi-sync" :loading="busy === `sync-${item.id}`" @click="sync(item.id)">Sync</v-btn>
+              <v-btn v-if="canSync(item.platform)" size="small" color="primary" variant="text" prepend-icon="mdi-sync" :loading="busy === `sync-${item.id}`" @click="sync(item.id)">Sync</v-btn>
             </div>
           </template>
         </v-data-table>
@@ -111,9 +111,13 @@ function canLogin(platform: Platform) {
   return platform === 'epic' || platform === 'gog'
 }
 
+function canSync(platform: Platform) {
+  return ['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'ea'].includes(platform)
+}
+
 function platformTitle(platform: Platform) {
-  const titles: Record<Platform, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App / Origin' }
-  return titles[platform]
+  const titles: Record<string, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App / Origin', amazon: 'Amazon Games', battle_net: 'Battle.net', bethesda: 'Bethesda', gamejolt: 'Game Jolt', humble: 'Humble', itch: 'itch.io', legacy: 'Legacy Games', nintendo: 'Nintendo', playstation: 'PlayStation', riot: 'Riot', rockstar: 'Rockstar', local: 'Lokal' }
+  return titles[platform] ?? platform
 }
 
 async function create() {

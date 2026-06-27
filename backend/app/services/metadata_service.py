@@ -13,18 +13,19 @@ from app.models import Game, Platform, PlatformGameMapping
 from app.services.import_providers import _game_from_mapping, _steam_metadata_from_details
 from app.services.sync_service import _merge_game_metadata
 
-STEAM_GAME_OVERRIDES: dict[str, dict[str, Any]] = {
-    "20": {
-        "title": "Team Fortress Classic",
-        "multiplayer": True,
-        "split_screen": False,
-        "shared_screen": False,
-        "min_players": 1,
-        "max_players": 32,
-        "feature_metadata_known": True,
-    }
-}
-
+FEATURE_FIELDS = (
+    "singleplayer",
+    "multiplayer",
+    "lan",
+    "local_coop",
+    "online_coop",
+    "hotseat",
+    "split_screen",
+    "shared_screen",
+    "min_players",
+    "max_players",
+    "feature_metadata_known",
+)
 
 @dataclass
 class MetadataSyncResult:
@@ -34,7 +35,13 @@ class MetadataSyncResult:
     message: str = "metadata sync completed"
 
 
-def _apply_payload(game: Game, payload: dict[str, Any]) -> bool:
+def _descriptive_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in payload.items() if key not in FEATURE_FIELDS}
+
+
+def _apply_payload(game: Game, payload: dict[str, Any], *, trusted_features: bool = False) -> bool:
+    if not trusted_features:
+        payload = _descriptive_payload(payload)
     imported = _game_from_mapping({"title": game.title, "platform_game_id": str(game.id), **payload})
     if not imported:
         return False
@@ -107,14 +114,6 @@ def _rawg_metadata(title: str) -> dict[str, Any] | None:
         "cover_url": data.get("background_image"),
         "release_date": data.get("released"),
         "genres": genres,
-        "singleplayer": "singleplayer" in tags or "single player" in tags,
-        "multiplayer": "multiplayer" in tags,
-        "lan": "lan" in tags,
-        "local_coop": "local co-op" in tags or "local coop" in tags,
-        "online_coop": "co-op" in tags or "coop" in tags or "online co-op" in tags,
-        "split_screen": "split screen" in tags or "split-screen" in tags,
-        "shared_screen": "shared/split screen" in tags or "shared screen" in tags,
-        "feature_metadata_known": bool(tags),
     }
 
 
@@ -127,12 +126,9 @@ def enrich_all_game_metadata(db: Session) -> MetadataSyncResult:
         try:
             for mapping in game.mappings:
                 if mapping.platform == Platform.steam:
-                    override = STEAM_GAME_OVERRIDES.get(mapping.platform_game_id)
-                    if override:
-                        changed = _apply_payload(game, override) or changed
                     metadata = _steam_appdetails(mapping.platform_game_id)
                     if metadata:
-                        changed = _apply_payload(game, metadata) or changed
+                        changed = _apply_payload(game, metadata, trusted_features=True) or changed
             rawg = _rawg_metadata(game.title)
             if rawg:
                 changed = _apply_payload(game, rawg) or changed

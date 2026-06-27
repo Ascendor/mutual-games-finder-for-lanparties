@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Game, Ownership, Participant
 from app.schemas import RecommendationRead
 
-RecommendationMode = Literal["common", "coop", "lan", "popular", "group_size"]
+RecommendationMode = Literal["common", "coop", "lan", "popular", "group_size", "new"]
 
 
 def _score(game: Game, owner_count: int, participant_count: int, total: int, median_playtime: float, mode: RecommendationMode, group_size: int | None) -> float:
@@ -28,6 +28,9 @@ def _score(game: Game, owner_count: int, participant_count: int, total: int, med
         return owner_count * 1200 + capacity_fit + playtime + (300 if game.lan else 0)
     if mode == "group_size":
         return owner_count * 1000 + capacity_fit + playtime + (150 if game.multiplayer or game.lan or game.online_coop else 0)
+    if mode == "new":
+        freshness = max(0, 5000 - median_playtime) / 10
+        return owner_count * 1500 + freshness + capacity_fit - min(total, 20000) / 200
     return coverage * 5000 + playtime + typical_playtime
 
 
@@ -41,6 +44,8 @@ def _sort_key(item: RecommendationRead, mode: RecommendationMode) -> tuple:
         return (item.owner_count, game.max_players, item.total_playtime_minutes, game.title.casefold())
     if mode == "group_size":
         return (item.owner_count, item.total_playtime_minutes, game.max_players, game.title.casefold())
+    if mode == "new":
+        return (item.owner_count, -item.median_playtime_minutes, -item.average_playtime_minutes, game.max_players, game.title.casefold())
     return (item.owner_count, item.median_playtime_minutes, item.total_playtime_minutes, game.title.casefold())
 
 
@@ -107,7 +112,11 @@ def find_common_games(db: Session, players: list[int]) -> list[RecommendationRea
 
 
 def find_common_coop_games(db: Session, players: list[int]) -> list[RecommendationRead]:
-    return _recommendations_for_participants(db, players, mode="coop", require_all=True, coop=True, group_size=len(set(players)) or None)
+    return _recommendations_for_participants(db, players, mode="coop", require_all=True, coop=True)
+
+
+def find_common_lan_games(db: Session, players: list[int]) -> list[RecommendationRead]:
+    return _recommendations_for_participants(db, players, mode="lan", require_all=True, lan=True)
 
 
 def find_games_for_present_players(db: Session) -> list[RecommendationRead]:
@@ -122,6 +131,11 @@ def find_best_lan_games(db: Session) -> list[RecommendationRead]:
 def find_most_popular_games(db: Session) -> list[RecommendationRead]:
     participant_ids = list(db.scalars(select(Participant.id)))
     return _recommendations_for_participants(db, participant_ids, mode="popular", require_all=False)
+
+
+def find_new_for_group_games(db: Session, players: list[int] | None = None) -> list[RecommendationRead]:
+    participant_ids = players or present_participant_ids(db)
+    return _recommendations_for_participants(db, participant_ids, mode="new", require_all=False)
 
 
 def find_games_for_group_size(db: Session, size: int) -> list[RecommendationRead]:

@@ -8,12 +8,15 @@
       </v-list>
     </v-navigation-drawer>
     <v-main>
+      <v-progress-linear v-if="pendingRequests > 0" indeterminate color="primary" class="global-loader" aria-label="Daten werden geladen" />
       <router-view />
     </v-main>
   </v-app>
 </template>
 
 <script setup lang="ts">
+import { pendingRequests } from './api'
+
 const items = [
   { title: 'Start', icon: 'mdi-home-outline', to: '/' },
   { title: 'Dashboard', icon: 'mdi-view-dashboard-outline', to: '/dashboard' },
@@ -27,5 +30,12 @@ const items = [
 ]
 </script>
 
+<style scoped>
+.global-loader {
+  position: fixed;
+  z-index: 1000;
+  width: calc(100% - 260px);
+}
+</style>
 
 

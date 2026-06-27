@@ -7,6 +7,7 @@ services:
     environment:
       BASIC_AUTH_USER: ${BASIC_AUTH_USER:-lanparty}
       BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-QC4lF93bYgwTHRT4xRynsAIz3San1lDW}
+      LAN_UPLOAD_LIMIT: ${LAN_UPLOAD_LIMIT:-2g}
     ports:
       - "8080:80"
       - "8443:443"

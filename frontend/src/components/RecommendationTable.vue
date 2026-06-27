@@ -4,6 +4,8 @@
     density="compact"
     :headers="headers"
     :items="rows"
+    :loading="loading"
+    loading-text="Spiele werden geladen..."
     :items-per-page="-1"
     hide-default-footer
   >
@@ -27,7 +29,9 @@
 import { computed } from 'vue'
 import type { Game, Recommendation } from '../types'
 
-const props = defineProps<{ items: Recommendation[] }>()
+const props = withDefaults(defineProps<{ items: Recommendation[]; loading?: boolean }>(), {
+  loading: false
+})
 
 const headers = [
   { title: 'Spiel', key: 'title' },

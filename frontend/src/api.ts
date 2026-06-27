@@ -1,19 +1,26 @@
-﻿import type { Account, Game, GameOwner, MetadataSyncResult, Ownership, Participant, ProviderAuthStatus, ProviderLoginStart, Recommendation, SyncRun } from './types'
+import { ref } from 'vue'
+import type { Account, Game, GameOwner, MetadataSyncResult, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SyncRun } from './types'
 
 const base = '/api'
+export const pendingRequests = ref(0)
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${base}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
-    ...options
-  })
-  if (!response.ok) {
-    throw new Error(await response.text())
+  pendingRequests.value += 1
+  try {
+    const response = await fetch(`${base}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
+      ...options
+    })
+    if (!response.ok) {
+      throw new Error(await response.text())
+    }
+    if (response.status === 204) {
+      return undefined as T
+    }
+    return response.json() as Promise<T>
+  } finally {
+    pendingRequests.value -= 1
   }
-  if (response.status === 204) {
-    return undefined as T
-  }
-  return response.json() as Promise<T>
 }
 
 export const api = {
@@ -34,13 +41,30 @@ export const api = {
   createOwnership: (payload: Partial<Ownership>) =>
     request<Ownership>('/ownerships', { method: 'POST', body: JSON.stringify(payload) }),
   deleteOwnership: (id: number) => request<void>(`/ownerships/${id}`, { method: 'DELETE' }),
-  recommendations: (kind: 'popular' | 'lan' | 'present') => request<Recommendation[]>(`/recommendations/${kind}`),
+  recommendations: (kind: 'popular' | 'lan' | 'present' | 'new') => request<Recommendation[]>(`/recommendations/${kind}`),
+  newForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/new${players.length ? `?${players.map((id) => `players=${id}`).join('&')}` : ''}`),
   common: (players: number[]) => request<Recommendation[]>(`/recommendations/common?${players.map((id) => `players=${id}`).join('&')}`),
   coop: (players: number[]) => request<Recommendation[]>(`/recommendations/coop?${players.map((id) => `players=${id}`).join('&')}`),
-  groupSize: (size: number) => request<Recommendation[]>(`/recommendations/group-size/${size}`),
+  lanForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/lan?${players.map((id) => `players=${id}`).join('&')}`),
   syncAccount: (id: number) => request<SyncRun>(`/sync/accounts/${id}`, { method: 'POST' }),
   syncMetadata: () => request<MetadataSyncResult>('/sync/metadata', { method: 'POST' }),
+  repairMetadata: () => request<MetadataSyncResult>('/sync/metadata/repair', { method: 'POST' }),
   syncRuns: () => request<SyncRun[]>('/sync/runs'),
+  importPlaynite: async (participantId: number, file: File) => {
+    const form = new FormData()
+    form.append('participant_id', String(participantId))
+    form.append('file', file)
+    pendingRequests.value += 1
+    try {
+      const response = await fetch(`${base}/imports/playnite`, { method: 'POST', body: form })
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+      return response.json() as Promise<PlayniteImportResult>
+    } finally {
+      pendingRequests.value -= 1
+    }
+  },
   providerAuthStatus: () => request<ProviderAuthStatus[]>('/provider-auth/status'),
   startProviderLogin: (accountId: number) => request<ProviderLoginStart>(`/provider-auth/accounts/${accountId}/start`),
   completeProviderLogin: (accountId: number, payload: { code?: string; email?: string; password?: string; two_factor_code?: string; access_token?: string; cookie?: string; pid?: string }) =>

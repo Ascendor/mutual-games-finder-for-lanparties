@@ -24,7 +24,9 @@ def present_games(db: Session = Depends(get_db)):
 
 
 @router.get("/lan", response_model=list[RecommendationRead])
-def lan_games(db: Session = Depends(get_db)):
+def lan_games(players: list[int] | None = Query(None), db: Session = Depends(get_db)):
+    if players:
+        return engine.find_common_lan_games(db, players)
     return engine.find_best_lan_games(db)
 
 
@@ -33,7 +35,11 @@ def popular_games(db: Session = Depends(get_db)):
     return engine.find_most_popular_games(db)
 
 
+@router.get("/new", response_model=list[RecommendationRead])
+def new_for_group_games(players: list[int] | None = Query(None), db: Session = Depends(get_db)):
+    return engine.find_new_for_group_games(db, players)
+
+
 @router.get("/group-size/{size}", response_model=list[RecommendationRead])
 def group_size(size: int, db: Session = Depends(get_db)):
     return engine.find_games_for_group_size(db, size)
-

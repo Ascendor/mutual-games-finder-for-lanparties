@@ -1,4 +1,4 @@
-﻿export type Platform = 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea'
+export type Platform = string
 
 export interface Participant {
   id: number
@@ -68,6 +68,15 @@ export interface Recommendation {
   owners: Participant[]
 }
 
+
+export interface PlayniteImportResult {
+  imported_games: number
+  skipped_games: number
+  created_accounts: number
+  updated_ownerships: number
+  platforms: string[]
+  message: string
+}
 
 export interface MetadataSyncResult {
   scanned_games: number

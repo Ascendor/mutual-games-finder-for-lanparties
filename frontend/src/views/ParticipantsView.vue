@@ -15,7 +15,7 @@
         </v-card>
       </v-col>
       <v-col cols="12" md="8">
-        <v-data-table class="compact-table" :headers="headers" :items="rows" :items-per-page="-1" density="compact" hide-default-footer>
+        <v-data-table class="compact-table" :headers="headers" :items="rows" :loading="store.loading" loading-text="Teilnehmer werden geladen..." :items-per-page="-1" density="compact" hide-default-footer>
           <template #item.present="{ item }">
             <v-switch :model-value="item.present" color="primary" hide-details @update:model-value="toggle(item.id, Boolean($event))" />
           </template>

@@ -1,6 +1,6 @@
 ﻿from app.models import Account, Game, Ownership, Participant, Platform
 from app.services.normalization import normalize_title
-from app.services.recommendations import find_best_lan_games, find_common_coop_games, find_common_games, find_games_for_group_size, find_most_popular_games
+from app.services.recommendations import find_best_lan_games, find_common_coop_games, find_common_games, find_common_lan_games, find_games_for_group_size, find_most_popular_games, find_new_for_group_games
 
 
 def add_owned(db, participant, game, minutes=0):
@@ -64,5 +64,43 @@ def test_recommendation_views_have_distinct_filters(db):
     db.commit()
 
     assert [item.game.title for item in find_common_coop_games(db, [ada.id, linus.id])] == ["Coop Cave"]
+    assert [item.game.title for item in find_common_lan_games(db, [ada.id, linus.id])] == ["LAN Arena"]
     assert [item.game.title for item in find_best_lan_games(db)] == ["LAN Arena"]
     assert "Popular Solo" in [item.game.title for item in find_most_popular_games(db)]
+
+
+def test_common_coop_does_not_hide_games_because_store_has_no_reliable_capacity(db):
+    players = [Participant(nickname=f"Player {index}", present=True) for index in range(5)]
+    game = Game(
+        title="Unknown Coop Capacity",
+        normalized_title=normalize_title("Unknown Coop Capacity"),
+        multiplayer=True,
+        online_coop=True,
+        min_players=1,
+        max_players=1,
+    )
+    db.add_all([*players, game])
+    db.flush()
+    for player in players:
+        add_owned(db, player, game)
+    db.commit()
+
+    assert [item.game.title for item in find_common_coop_games(db, [player.id for player in players])] == [
+        "Unknown Coop Capacity"
+    ]
+
+
+def test_new_for_group_prefers_broadly_owned_low_playtime_games(db):
+    ada = Participant(nickname="Ada", present=True)
+    linus = Participant(nickname="Linus", present=True)
+    grace = Participant(nickname="Grace", present=True)
+    fresh = Game(title="Fresh Coop", normalized_title=normalize_title("Fresh Coop"), multiplayer=True, min_players=1, max_players=4)
+    exhausted = Game(title="Exhausted Classic", normalized_title=normalize_title("Exhausted Classic"), multiplayer=True, min_players=1, max_players=4)
+    db.add_all([ada, linus, grace, fresh, exhausted])
+    db.flush()
+    for participant in (ada, linus, grace):
+        add_owned(db, participant, fresh, 5)
+        add_owned(db, participant, exhausted, 5000)
+    db.commit()
+
+    assert [item.game.title for item in find_new_for_group_games(db)][:2] == ["Fresh Coop", "Exhausted Classic"]

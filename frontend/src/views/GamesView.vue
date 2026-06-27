@@ -25,7 +25,7 @@
         </v-card>
       </v-col>
       <v-col cols="12" md="8">
-        <v-data-table class="compact-table" :headers="headers" :items="rows" :items-per-page="-1" density="compact" hide-default-footer>
+        <v-data-table class="compact-table" :headers="headers" :items="rows" :loading="loading || store.loading" loading-text="Spiele werden geladen..." :items-per-page="-1" density="compact" hide-default-footer>
           <template #item.title="{ item }">
             <strong>{{ item.title }}</strong>
             <div class="text-caption text-medium-emphasis">{{ item.description }}</div>
@@ -50,6 +50,7 @@ import type { Game } from '../types'
 const store = useLanStore()
 const search = ref('')
 const games = ref<Game[]>([])
+const loading = ref(false)
 const form = reactive({
   title: '',
   description: '',
@@ -90,7 +91,12 @@ onMounted(async () => {
 })
 
 async function load() {
-  games.value = await api.games(search.value)
+  loading.value = true
+  try {
+    games.value = await api.games(search.value)
+  } finally {
+    loading.value = false
+  }
 }
 
 async function create() {

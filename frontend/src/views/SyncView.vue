@@ -2,7 +2,7 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 class="text-h4">Synchronisation</h1>
-      <div class="d-flex ga-2"><v-btn color="secondary" variant="tonal" prepend-icon="mdi-database-sync-outline" :loading="metadataLoading" @click="syncMetadata">Metadaten aktualisieren</v-btn><v-btn to="/accounts" color="primary" variant="tonal" prepend-icon="mdi-account-key">Accounts</v-btn></div>
+      <div class="d-flex ga-2 flex-wrap"><v-btn color="secondary" variant="tonal" prepend-icon="mdi-database-sync-outline" :loading="metadataLoading" @click="syncMetadata">Metadaten aktualisieren</v-btn><v-btn color="secondary" variant="tonal" prepend-icon="mdi-wrench-outline" :loading="repairLoading" @click="repairMetadata">Metadaten reparieren</v-btn><v-btn to="/accounts" color="primary" variant="tonal" prepend-icon="mdi-account-key">Accounts</v-btn></div>
     </div>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
@@ -40,6 +40,7 @@ import { useLanStore } from '../store'
 const store = useLanStore()
 const loading = ref<number | null>(null)
 const metadataLoading = ref(false)
+const repairLoading = ref(false)
 const error = ref('')
 const metadataMessage = ref('')
 const headers = [
@@ -85,6 +86,21 @@ async function syncMetadata() {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
     metadataLoading.value = false
+  }
+}
+
+async function repairMetadata() {
+  repairLoading.value = true
+  error.value = ''
+  metadataMessage.value = ''
+  try {
+    const result = await api.repairMetadata()
+    metadataMessage.value = result.message
+    await store.refresh()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    repairLoading.value = false
   }
 }
 function accountLabel(id: number) {
