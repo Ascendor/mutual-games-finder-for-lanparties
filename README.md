@@ -62,6 +62,18 @@ Auf der Seite `Accounts und Logins` kann pro Teilnehmer ein Playnite-JSON-Export
 
 Direkte Provider-Syncs bleiben die bevorzugte Quelle fuer aktuelle Metadaten. Der Playnite-Import setzt deshalb nur vorsichtige Metadaten und ueberschreibt keine vertrauenswuerdigen Feature-Daten.
 
+## Spielmetadaten
+
+IGDB ist die primaere Quelle fuer Spielmodi, Spielerzahlen, Koop, LAN, Splitscreen, Genres und Basisdaten. RAWG wird nur verwendet, wenn IGDB kein passendes Spiel oder unvollstaendige Angaben liefert. Lege dafuer folgende Werte in `.env` ab:
+
+```env
+IGDB_CLIENT_ID=...
+IGDB_CLIENT_SECRET=...
+RAWG_API_KEY=...
+```
+
+Die IGDB-Zugangsdaten stammen aus einer Twitch-Developer-Anwendung. Anschliessend werden alle bestehenden Spiele ueber `Synchronisation` -> `Metadaten aktualisieren` neu bewertet.
+
 ## Entwicklung ohne Docker
 
 Backend:

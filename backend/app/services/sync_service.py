@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Account, Game, Ownership, PlatformGameMapping, SyncRun
 from app.services.import_providers import ImportedGame, PROVIDERS
+from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
 
 MATCH_THRESHOLD = 88
@@ -37,7 +38,7 @@ def _merge_game_metadata(game: Game, imported: ImportedGame) -> None:
     game.description = game.description or imported.description
     game.cover_url = game.cover_url or imported.cover_url
     game.release_date = game.release_date or imported.release_date
-    game.genres = sorted(set(game.genres or []) | set(imported.genres or []))
+    game.genres = sanitize_genres([*(game.genres or []), *(imported.genres or [])])
     feature_fields = [
         "singleplayer",
         "multiplayer",

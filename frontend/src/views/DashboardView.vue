@@ -35,19 +35,19 @@
     <v-row class="mt-2">
       <v-col cols="12" lg="6">
         <h2 class="text-h6 mb-2">Beliebteste Spiele</h2>
-        <RecommendationTable :items="store.popular.slice(0, 8)" :loading="store.loading" />
+        <RecommendationTable :items="store.popular" :loading="store.loading" :limit="8" />
       </v-col>
       <v-col cols="12" lg="6">
         <h2 class="text-h6 mb-2">Beste LAN-Spiele</h2>
-        <RecommendationTable :items="store.lan.slice(0, 8)" :loading="store.loading" />
+        <RecommendationTable :items="store.lan" :loading="store.loading" :limit="8" />
       </v-col>
       <v-col cols="12" lg="6">
         <h2 class="text-h6 mb-2">Neu für die Gruppe</h2>
-        <RecommendationTable :items="store.newForGroup.slice(0, 8)" :loading="store.loading" />
+        <RecommendationTable :items="store.newForGroup" :loading="store.loading" :limit="8" />
       </v-col>
       <v-col cols="12">
         <h2 class="text-h6 mb-2">Gemeinsame Spiele der Anwesenden</h2>
-        <RecommendationTable :items="store.present.slice(0, 12)" :loading="store.loading" />
+        <RecommendationTable :items="store.present" :loading="store.loading" :limit="12" />
       </v-col>
     </v-row>
   </div>

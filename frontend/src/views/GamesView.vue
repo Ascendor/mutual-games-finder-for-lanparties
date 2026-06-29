@@ -2,7 +2,6 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 class="text-h4">Spiele</h1>
-      <v-text-field v-model="search" prepend-inner-icon="mdi-magnify" label="Suche" density="compact" hide-details style="max-width: 340px" @keyup.enter="load" />
     </div>
     <v-row>
       <v-col cols="12" md="4">
@@ -25,7 +24,8 @@
         </v-card>
       </v-col>
       <v-col cols="12" md="8">
-        <v-data-table class="compact-table" :headers="headers" :items="rows" :loading="loading || store.loading" loading-text="Spiele werden geladen..." :items-per-page="-1" density="compact" hide-default-footer>
+        <GameFilterBar v-model="filters" :games="games" />
+        <v-data-table class="compact-table" :headers="headers" :items="rows" :loading="loading || store.loading" loading-text="Spiele werden geladen..." no-data-text="Keine Spiele entsprechen den Filtern." :items-per-page="-1" density="compact" hide-default-footer>
           <template #item.title="{ item }">
             <strong>{{ item.title }}</strong>
             <div class="text-caption text-medium-emphasis">{{ item.description }}</div>
@@ -44,13 +44,15 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '../api'
+import GameFilterBar from '../components/GameFilterBar.vue'
+import { createGameFilterState, matchesGameFilters } from '../gameFilters'
 import { useLanStore } from '../store'
 import type { Game } from '../types'
 
 const store = useLanStore()
-const search = ref('')
 const games = ref<Game[]>([])
 const loading = ref(false)
+const filters = ref(createGameFilterState())
 const form = reactive({
   title: '',
   description: '',
@@ -67,11 +69,12 @@ const headers = [
   { title: 'Genres', key: 'genres' },
   { title: 'Spieler', key: 'players' },
   { title: 'Features', key: 'featureText' },
+  { title: 'Quelle', key: 'metadata_source' },
   { title: 'Besitzer', key: 'owner_count' }
 ]
 
 const rows = computed(() =>
-  games.value.map((game) => ({
+  games.value.filter((game) => matchesGameFilters(game, filters.value)).map((game) => ({
     id: game.id,
     title: game.title,
     description: game.description,
@@ -81,6 +84,7 @@ const rows = computed(() =>
     lan: game.lan,
     coop: game.local_coop || game.online_coop,
     multiplayer: game.multiplayer,
+    metadata_source: game.metadata_source || '-',
     owner_count: owners(game.id)
   }))
 )
@@ -93,7 +97,7 @@ onMounted(async () => {
 async function load() {
   loading.value = true
   try {
-    games.value = await api.games(search.value)
+    games.value = await api.games()
   } finally {
     loading.value = false
   }
@@ -107,27 +111,9 @@ async function create() {
 }
 
 
-function hasKnownPlayerMetadata(game: Game) {
-  return Boolean(
-    game.singleplayer ||
-      game.multiplayer ||
-      game.lan ||
-      game.local_coop ||
-      game.online_coop ||
-      game.hotseat ||
-      game.split_screen ||
-      game.shared_screen ||
-      game.description ||
-      game.genres.length > 0
-  )
-}
-
 function playerLabel(game: Game) {
-  if (game.min_players === 1 && game.max_players === 1 && !hasKnownPlayerMetadata(game)) {
-    return '?'
-  }
-  if (game.min_players === 1 && game.max_players === 1 && game.multiplayer) {
-    return 'MP'
+  if (!game.player_count_known) {
+    return game.multiplayer ? 'MP (?)' : '?'
   }
   if (game.min_players === 1 && game.max_players === 1) {
     return 'Solo'
@@ -135,7 +121,17 @@ function playerLabel(game: Game) {
   return `${game.min_players}-${game.max_players}`
 }
 function featureText(game: Game) {
-  return [game.lan ? 'LAN' : '', game.local_coop || game.online_coop ? 'Coop' : '', game.multiplayer ? 'MP' : ''].filter(Boolean).join(', ')
+  return [
+    game.singleplayer ? 'SP' : '',
+    game.multiplayer ? 'MP' : '',
+    game.lan ? 'LAN' : '',
+    game.local_coop ? 'Local Coop' : '',
+    game.online_coop ? 'Online Coop' : '',
+    game.campaign_coop ? 'Campaign Coop' : '',
+    game.split_screen ? 'Split' : '',
+    game.hotseat ? 'Hotseat' : '',
+    game.versus ? 'VS' : ''
+  ].filter(Boolean).join(', ')
 }
 const owners = (gameId: number) => new Set(store.ownerships.filter((own) => own.game_id === gameId).map((own) => own.participant_id)).size
 </script>

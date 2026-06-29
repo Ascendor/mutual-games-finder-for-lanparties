@@ -34,8 +34,21 @@ export interface Game {
   hotseat: boolean
   split_screen: boolean
   shared_screen: boolean
+  campaign_coop: boolean
+  drop_in: boolean
+  versus: boolean
   min_players: number
   max_players: number
+  offline_max_players?: number | null
+  online_max_players?: number | null
+  offline_coop_max_players?: number | null
+  online_coop_max_players?: number | null
+  multiplayer_metadata_known: boolean
+  player_count_known: boolean
+  metadata_source?: string | null
+  metadata_external_id?: string | null
+  metadata_sources: Record<string, string>
+  metadata_updated_at?: string | null
 }
 
 export interface Ownership {

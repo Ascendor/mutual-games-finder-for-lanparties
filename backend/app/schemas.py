@@ -69,8 +69,21 @@ class GameBase(BaseModel):
     hotseat: bool = False
     split_screen: bool = False
     shared_screen: bool = False
+    campaign_coop: bool = False
+    drop_in: bool = False
+    versus: bool = False
     min_players: int = 1
     max_players: int = 1
+    offline_max_players: int | None = None
+    online_max_players: int | None = None
+    offline_coop_max_players: int | None = None
+    online_coop_max_players: int | None = None
+    multiplayer_metadata_known: bool = False
+    player_count_known: bool = False
+    metadata_source: str | None = None
+    metadata_external_id: str | None = None
+    metadata_sources: dict[str, str] = Field(default_factory=dict)
+    metadata_updated_at: datetime | None = None
 
 
 class GameCreate(GameBase):
@@ -91,8 +104,17 @@ class GameUpdate(BaseModel):
     hotseat: bool | None = None
     split_screen: bool | None = None
     shared_screen: bool | None = None
+    campaign_coop: bool | None = None
+    drop_in: bool | None = None
+    versus: bool | None = None
     min_players: int | None = None
     max_players: int | None = None
+    offline_max_players: int | None = None
+    online_max_players: int | None = None
+    offline_coop_max_players: int | None = None
+    online_coop_max_players: int | None = None
+    multiplayer_metadata_known: bool | None = None
+    player_count_known: bool | None = None
 
 
 class GameRead(GameBase):

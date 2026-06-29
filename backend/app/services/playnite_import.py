@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Account, Platform
 from app.services.import_providers import ImportedGame, _as_int, _as_list, _parse_date, _parse_datetime
+from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
 from app.services.sync_service import resolve_game, upsert_ownership
 
@@ -591,8 +592,8 @@ def _names_from_collection(value: Any) -> list[str]:
                     names.append(str(name))
             elif str(item).strip():
                 names.append(str(item).strip())
-        return sorted(set(names))
-    return _as_list(value)
+        return sanitize_genres(names)
+    return sanitize_genres(_as_list(value))
 
 
 def _first_deep(data: Any, *keys: str) -> Any:

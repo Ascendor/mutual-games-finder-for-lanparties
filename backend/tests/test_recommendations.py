@@ -90,6 +90,26 @@ def test_common_coop_does_not_hide_games_because_store_has_no_reliable_capacity(
     ]
 
 
+def test_group_size_excludes_games_with_known_insufficient_capacity(db):
+    players = [Participant(nickname=f"Known {index}", present=True) for index in range(5)]
+    game = Game(
+        title="Four Player Coop",
+        normalized_title=normalize_title("Four Player Coop"),
+        multiplayer=True,
+        online_coop=True,
+        min_players=1,
+        max_players=4,
+        player_count_known=True,
+    )
+    db.add_all([*players, game])
+    db.flush()
+    for player in players:
+        add_owned(db, player, game)
+    db.commit()
+
+    assert find_games_for_group_size(db, 5) == []
+
+
 def test_new_for_group_prefers_broadly_owned_low_playtime_games(db):
     ada = Participant(nickname="Ada", present=True)
     linus = Participant(nickname="Linus", present=True)

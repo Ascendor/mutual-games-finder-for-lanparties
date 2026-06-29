@@ -53,11 +53,9 @@
 
         <v-col cols="12">
           <v-card variant="flat">
-            <v-card-title class="d-flex align-center justify-space-between">
-              <span>Spiele</span>
-              <v-text-field v-model="gameSearch" label="Suchen" density="compact" hide-details="auto" prepend-inner-icon="mdi-magnify" class="game-search" />
-            </v-card-title>
+            <v-card-title>Spiele</v-card-title>
             <v-card-text>
+              <GameFilterBar v-model="gameFilters" :games="store.games" />
               <v-data-table class="compact-table" :headers="gameHeaders" :items="gameRows" :items-per-page="-1" density="compact" hide-default-footer>
                 <template #item.actions="{ item }">
                   <div class="text-right">
@@ -76,6 +74,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api } from '../api'
+import GameFilterBar from '../components/GameFilterBar.vue'
+import { createGameFilterState, matchesGameFilters } from '../gameFilters'
 import { useLanStore } from '../store'
 import type { Platform } from '../types'
 
@@ -87,7 +87,7 @@ const loading = ref(false)
 const busy = ref('')
 const error = ref('')
 const message = ref('')
-const gameSearch = ref('')
+const gameFilters = ref(createGameFilterState())
 const participantHeaders = [
   { title: 'Nickname', key: 'nickname' },
   { title: 'Status', key: 'status' },
@@ -125,9 +125,7 @@ const accountRows = computed(() =>
 )
 
 const filteredGames = computed(() => {
-  const search = gameSearch.value.trim().toLocaleLowerCase()
-  const games = search ? store.games.filter((game) => game.title.toLocaleLowerCase().includes(search)) : store.games
-  return games.slice(0, 100)
+  return store.games.filter((game) => matchesGameFilters(game, gameFilters.value)).slice(0, 100)
 })
 
 const gameRows = computed(() =>
@@ -223,7 +221,4 @@ async function runDelete(key: string, action: () => Promise<void>, success: stri
   max-width: 420px;
 }
 
-.game-search {
-  max-width: 320px;
-}
 </style>

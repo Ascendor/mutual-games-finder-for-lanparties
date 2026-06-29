@@ -1,14 +1,17 @@
 <template>
-  <v-data-table
-    class="compact-table"
-    density="compact"
-    :headers="headers"
-    :items="rows"
-    :loading="loading"
-    loading-text="Spiele werden geladen..."
-    :items-per-page="-1"
-    hide-default-footer
-  >
+  <div>
+    <GameFilterBar v-model="filters" :games="games" />
+    <v-data-table
+      class="compact-table"
+      density="compact"
+      :headers="headers"
+      :items="rows"
+      :loading="loading"
+      loading-text="Spiele werden geladen..."
+      :items-per-page="-1"
+      hide-default-footer
+      no-data-text="Keine Spiele entsprechen den Filtern."
+    >
     <template #item.title="{ item }">
       <strong>{{ item.title }}</strong>
       <div class="text-caption text-medium-emphasis">{{ item.players }}</div>
@@ -20,17 +23,28 @@
       <v-chip v-if="item.lan" size="small" color="primary" class="mr-1">LAN</v-chip>
       <v-chip v-if="item.coop" size="small" color="secondary" class="mr-1">Coop</v-chip>
       <v-chip v-if="item.split" size="small" color="accent" class="mr-1">Split</v-chip>
+      <v-chip v-if="item.versus" size="small" variant="tonal" class="mr-1">VS</v-chip>
       <span v-if="!item.features" class="text-medium-emphasis">-</span>
     </template>
-  </v-data-table>
+    </v-data-table>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import GameFilterBar from './GameFilterBar.vue'
+import { createGameFilterState, matchesGameFilters } from '../gameFilters'
 import type { Game, Recommendation } from '../types'
 
-const props = withDefaults(defineProps<{ items: Recommendation[]; loading?: boolean }>(), {
-  loading: false
+const props = withDefaults(defineProps<{ items: Recommendation[]; loading?: boolean; limit?: number }>(), {
+  loading: false,
+  limit: 0
+})
+const filters = ref(createGameFilterState())
+const games = computed(() => props.items.map((item) => item.game))
+const filteredItems = computed(() => {
+  const filtered = props.items.filter((item) => matchesGameFilters(item.game, filters.value))
+  return props.limit > 0 ? filtered.slice(0, props.limit) : filtered
 })
 
 const headers = [
@@ -44,7 +58,7 @@ const headers = [
 ]
 
 const rows = computed(() =>
-  props.items.map((rec) => ({
+  filteredItems.value.map((rec) => ({
     id: rec.game.id,
     title: rec.game.title,
     players: playerLabel(rec.game),
@@ -55,6 +69,7 @@ const rows = computed(() =>
     lan: rec.game.lan,
     coop: rec.game.local_coop || rec.game.online_coop,
     split: rec.game.split_screen,
+    versus: rec.game.versus,
     features: featureText(rec.game),
     platforms: rec.platforms.join(', ')
   }))
@@ -73,8 +88,8 @@ function featureText(game: Game) {
 }
 
 function playerLabel(game: Game) {
-  if (game.min_players === 1 && game.max_players === 1 && game.multiplayer) {
-    return 'MP'
+  if (!game.player_count_known) {
+    return game.multiplayer ? 'MP, Spielerzahl unbekannt' : 'Spielerzahl unbekannt'
   }
   if (game.min_players === 1 && game.max_players === 1) {
     return 'Solo'

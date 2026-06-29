@@ -18,7 +18,7 @@ def _score(game: Game, owner_count: int, participant_count: int, total: int, med
     typical_playtime = min(median_playtime, 5000) / 100
     capacity_fit = 0
     target_size = group_size or participant_count
-    if target_size and game.min_players <= target_size <= game.max_players:
+    if target_size and game.player_count_known and game.min_players <= target_size <= game.max_players:
         capacity_fit = 300
     if mode == "common":
         return typical_playtime * 2 + playtime + capacity_fit + (150 if game.multiplayer else 0)
@@ -72,7 +72,17 @@ def _recommendations_for_participants(
     if lan:
         query = query.where(Game.lan == True)  # noqa: E712
     if group_size is not None:
-        query = query.where(Game.min_players <= group_size, Game.max_players >= group_size)
+        query = query.where(
+            (Game.player_count_known == False)  # noqa: E712
+            | ((Game.min_players <= group_size) & (Game.max_players >= group_size))
+        )
+        if group_size > 1:
+            query = query.where(
+                (Game.multiplayer == True)  # noqa: E712
+                | (Game.lan == True)  # noqa: E712
+                | (Game.local_coop == True)  # noqa: E712
+                | (Game.online_coop == True)  # noqa: E712
+            )
     query = query.where(Ownership.participant_id.in_(participant_ids))
     if require_all:
         query = query.having(func.count(func.distinct(Ownership.participant_id)) == len(participant_ids))
