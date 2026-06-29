@@ -291,6 +291,7 @@ class ImportedGame:
     min_players: int = 1
     max_players: int = 1
     feature_metadata_known: bool = False
+    player_count_known: bool = False
 
     @property
     def normalized_title(self) -> str:
@@ -427,6 +428,8 @@ def _game_from_mapping(data: dict[str, Any], fallback_platform_id: str | None = 
         playtime = _as_int(float(data["playtime_hours"]) * 60)
     if "playtime_seconds" in data:
         playtime = _as_int(float(data["playtime_seconds"]) / 60)
+    raw_min_players = _first(data, "min_players", "minPlayers", default=None)
+    raw_max_players = _first(data, "max_players", "maxPlayers", default=None)
     return ImportedGame(
         platform_game_id=platform_game_id,
         title=str(title),
@@ -444,9 +447,17 @@ def _game_from_mapping(data: dict[str, Any], fallback_platform_id: str | None = 
         hotseat=_as_bool(_first(data, "hotseat", default=False)),
         split_screen=_as_bool(_first(data, "split_screen", "splitScreen", default=False)),
         shared_screen=_as_bool(_first(data, "shared_screen", "sharedScreen", default=False)),
-        min_players=max(1, _as_int(_first(data, "min_players", "minPlayers", default=1), 1)),
-        max_players=max(1, _as_int(_first(data, "max_players", "maxPlayers", default=1), 1)),
+        min_players=max(1, _as_int(raw_min_players, 1)),
+        max_players=max(1, _as_int(raw_max_players, 1)),
         feature_metadata_known=_as_bool(_first(data, "feature_metadata_known", "featureMetadataKnown", default=False)),
+        player_count_known=_as_bool(
+            _first(
+                data,
+                "player_count_known",
+                "playerCountKnown",
+                default=raw_min_players is not None or raw_max_players is not None,
+            )
+        ),
     )
 
 
@@ -491,6 +502,7 @@ def _steam_metadata_from_details(appid: int, details: dict[str, Any]) -> dict[st
         "min_players": 1,
         "max_players": 1,
         "feature_metadata_known": True,
+        "player_count_known": False,
     }
 
 
@@ -505,6 +517,7 @@ def _merge_dicts(*payloads: dict[str, Any]) -> dict[str, Any]:
 
 class SteamProvider:
     platform = Platform.steam
+    authoritative_library = True
 
     def sync_account(self, account: Account) -> list[ImportedGame]:
         if not settings.steam_api_key:
@@ -546,6 +559,7 @@ class SteamProvider:
                     min_players=metadata.get("min_players", 1),
                     max_players=metadata.get("max_players", 1),
                     feature_metadata_known=metadata.get("feature_metadata_known", False),
+                    player_count_known=metadata.get("player_count_known", False),
                 )
             )
         return imported_games

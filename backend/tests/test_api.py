@@ -30,6 +30,41 @@ def test_participant_api_roundtrip():
     app.dependency_overrides.clear()
 
 
+def test_game_options_are_compact_searchable_and_cacheable():
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_db():
+        db = Session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_db
+    db = Session()
+    db.add_all(
+        [
+            models.Game(title="Portal", normalized_title="portal"),
+            models.Game(title="Portal 2", normalized_title="portal 2"),
+            models.Game(title="Quake", normalized_title="quake"),
+        ]
+    )
+    db.commit()
+    client = TestClient(app)
+
+    response = client.get("/api/games/options?search=portal")
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()] == ["Portal", "Portal 2"]
+    assert set(response.json()[0]) == {"id", "title"}
+    assert response.headers["cache-control"].startswith("private, max-age=300")
+
+    cached = client.get("/api/games/options", headers={"If-None-Match": response.headers["etag"]})
+    assert cached.status_code == 304
+    app.dependency_overrides.clear()
+
+
 
 
 def test_game_owners_endpoint_returns_present_deduplicated_owners():

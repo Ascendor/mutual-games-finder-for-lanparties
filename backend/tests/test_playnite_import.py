@@ -165,6 +165,33 @@ def test_playnite_import_ignores_truncated_litedb_false_positives(db):
     assert result.platforms == ["gog"]
 
 
+def test_playnite_import_ignores_object_values_misread_as_titles(db):
+    participant = Participant(nickname="CleanTitles", present=True)
+    db.add(participant)
+    db.commit()
+
+    payload = {
+        "Games": [
+            {
+                "Name": {"Field": 55, "Visible": True, "Width": 374.5},
+                "GameId": "layout-setting",
+                "Source": {"Name": "Manual"},
+            },
+            {
+                "Name": "while True: learn()",
+                "GameId": "real-game",
+                "Source": {"Name": "Steam"},
+            },
+        ]
+    }
+
+    result = import_playnite_export(db, participant.id, json.dumps(payload))
+
+    assert result.imported_games == 1
+    assert result.skipped_games == 0
+    assert [ownership.game.title for ownership in participant.ownerships] == ["while True: learn()"]
+
+
 def test_playnite_import_reads_bson_dates_as_milliseconds(db):
     participant = Participant(nickname="BsonDate", present=True)
     db.add(participant)

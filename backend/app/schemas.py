@@ -123,6 +123,12 @@ class GameRead(GameBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class GameOptionRead(BaseModel):
+    id: int
+    title: str
+    model_config = ConfigDict(from_attributes=True)
+
+
 class OwnershipCreate(BaseModel):
     participant_id: int
     account_id: int

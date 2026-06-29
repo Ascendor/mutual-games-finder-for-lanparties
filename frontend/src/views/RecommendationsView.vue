@@ -23,7 +23,7 @@
       <v-window-item value="common"><RecommendationTable :items="common" :loading="loading" /></v-window-item>
       <v-window-item value="coop"><RecommendationTable :items="coop" :loading="loading" /></v-window-item>
       <v-window-item value="lan"><RecommendationTable :items="lan" :loading="loading" /></v-window-item>
-      <v-window-item value="popular"><RecommendationTable :items="store.popular" :loading="loading || store.loading" /></v-window-item>
+      <v-window-item value="popular"><RecommendationTable :items="popular" :loading="loading || store.loading" /></v-window-item>
       <v-window-item value="new"><RecommendationTable :items="newForGroup" :loading="loading" /></v-window-item>
     </v-window>
   </div>
@@ -44,12 +44,13 @@ const tab = ref('common')
 const common = ref<Recommendation[]>([])
 const coop = ref<Recommendation[]>([])
 const lan = ref<Recommendation[]>([])
+const popular = ref<Recommendation[]>([])
 const newForGroup = ref<Recommendation[]>([])
 const loading = ref(false)
 const error = ref('')
 
 onMounted(async () => {
-  await store.refresh()
+  await store.refreshParticipants()
   const queryPlayers = typeof route.query.players === 'string' ? route.query.players.split(',').map((item) => Number(item)).filter(Boolean) : []
   selected.value = queryPlayers.length ? queryPlayers : store.presentParticipants.map((participant) => participant.id)
   if (typeof route.query.tab === 'string') tab.value = route.query.tab
@@ -61,15 +62,17 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [commonGames, coopGames, lanGames, newGames] = await Promise.all([
+    const [commonGames, coopGames, lanGames, popularGames, newGames] = await Promise.all([
       api.common(selected.value),
       api.coop(selected.value),
       api.lanForGroup(selected.value),
+      api.recommendations('popular'),
       api.newForGroup(selected.value)
     ])
     common.value = commonGames
     coop.value = coopGames
     lan.value = lanGames
+    popular.value = popularGames
     newForGroup.value = newGames
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)

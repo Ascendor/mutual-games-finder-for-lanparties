@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, Game, GameOwner, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SyncRun } from './types'
+import type { Account, Game, GameOption, GameOwner, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -34,6 +34,13 @@ export const api = {
   createAccount: (payload: Partial<Account>) => request<Account>('/accounts', { method: 'POST', body: JSON.stringify(payload) }),
   deleteAccount: (id: number) => request<void>(`/accounts/${id}`, { method: 'DELETE' }),
   games: (search = '') => request<Game[]>(`/games${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  gameOptions: (search = '', limit?: number) => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (limit) params.set('limit', String(limit))
+    const query = params.toString()
+    return request<GameOption[]>(`/games/options${query ? `?${query}` : ''}`)
+  },
   createGame: (payload: Partial<Game>) => request<Game>('/games', { method: 'POST', body: JSON.stringify(payload) }),
   deleteGame: (id: number) => request<void>(`/games/${id}`, { method: 'DELETE' }),
   gameOwners: (gameId: number, presentOnly = true) => request<GameOwner[]>(`/games/${gameId}/owners?present_only=${presentOnly}`),
@@ -41,7 +48,8 @@ export const api = {
   createOwnership: (payload: Partial<Ownership>) =>
     request<Ownership>('/ownerships', { method: 'POST', body: JSON.stringify(payload) }),
   deleteOwnership: (id: number) => request<void>(`/ownerships/${id}`, { method: 'DELETE' }),
-  recommendations: (kind: 'popular' | 'lan' | 'present' | 'new') => request<Recommendation[]>(`/recommendations/${kind}`),
+  recommendations: (kind: 'popular' | 'lan' | 'present' | 'new', limit?: number) =>
+    request<Recommendation[]>(`/recommendations/${kind}${limit ? `?limit=${limit}` : ''}`),
   newForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/new${players.length ? `?${players.map((id) => `players=${id}`).join('&')}` : ''}`),
   common: (players: number[]) => request<Recommendation[]>(`/recommendations/common?${players.map((id) => `players=${id}`).join('&')}`),
   coop: (players: number[]) => request<Recommendation[]>(`/recommendations/coop?${players.map((id) => `players=${id}`).join('&')}`),

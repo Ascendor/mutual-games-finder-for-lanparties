@@ -1,6 +1,5 @@
 ﻿from __future__ import annotations
 
-import re
 from datetime import datetime
 from threading import Lock
 
@@ -8,13 +7,24 @@ from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Game, Ownership, PlatformGameMapping, SyncRun
+from app.models import Account, Game, Ownership, Platform, PlatformGameMapping, SyncRun
 from app.services.import_providers import ImportedGame, PROVIDERS
 from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
 
-MATCH_THRESHOLD = 88
 SYNC_LOCK = Lock()
+ROMAN_NUMERALS = {
+    "i": 1,
+    "ii": 2,
+    "iii": 3,
+    "iv": 4,
+    "v": 5,
+    "vi": 6,
+    "vii": 7,
+    "viii": 8,
+    "ix": 9,
+    "x": 10,
+}
 
 
 def _player_count(value: int | None, default: int = 1) -> int:
@@ -26,12 +36,29 @@ def _player_count(value: int | None, default: int = 1) -> int:
         return default
 
 
-def _numeric_tokens(normalized_title: str) -> tuple[str, ...]:
-    return tuple(re.findall(r"\d+", normalized_title))
+def _sequence_tokens(normalized_title: str) -> tuple[int, ...]:
+    values: list[int] = []
+    for token in normalized_title.split():
+        if token.isdigit():
+            values.append(int(token))
+        elif token in ROMAN_NUMERALS:
+            values.append(ROMAN_NUMERALS[token])
+    return tuple(values)
 
 
 def _compatible_for_fuzzy_match(existing_normalized: str, imported_normalized: str) -> bool:
-    return _numeric_tokens(existing_normalized) == _numeric_tokens(imported_normalized)
+    if existing_normalized == imported_normalized:
+        return True
+    if _sequence_tokens(existing_normalized) != _sequence_tokens(imported_normalized):
+        return False
+    existing_tokens = set(existing_normalized.split())
+    imported_tokens = set(imported_normalized.split())
+    if existing_tokens < imported_tokens or imported_tokens < existing_tokens:
+        return False
+    return max(
+        fuzz.ratio(existing_normalized, imported_normalized),
+        fuzz.token_sort_ratio(existing_normalized, imported_normalized),
+    ) >= 92
 
 
 def _merge_game_metadata(game: Game, imported: ImportedGame) -> None:
@@ -49,25 +76,53 @@ def _merge_game_metadata(game: Game, imported: ImportedGame) -> None:
         "split_screen",
         "shared_screen",
     ]
-    imported_min_players = _player_count(imported.min_players)
-    imported_max_players = max(imported_min_players, _player_count(imported.max_players, imported_min_players))
-    existing_min_players = _player_count(game.min_players, imported_min_players)
-    existing_max_players = max(existing_min_players, _player_count(game.max_players, imported_max_players))
+    authoritative_fields = set(game.metadata_sources or {})
     if imported.feature_metadata_known:
         for field in feature_fields:
-            setattr(game, field, bool(getattr(imported, field)))
-        game.min_players = imported_min_players
-        game.max_players = imported_max_players
-        return
-    for field in feature_fields:
-        setattr(game, field, bool(getattr(game, field) or getattr(imported, field)))
-    game.min_players = min(existing_min_players, imported_min_players)
-    game.max_players = max(existing_max_players, imported_max_players)
+            if field not in authoritative_fields:
+                setattr(game, field, bool(getattr(imported, field)))
+        if "multiplayer_metadata_known" not in authoritative_fields:
+            game.multiplayer_metadata_known = True
+    else:
+        for field in feature_fields:
+            if field not in authoritative_fields:
+                setattr(game, field, bool(getattr(game, field) or getattr(imported, field)))
+
+    if imported.player_count_known:
+        imported_min_players = _player_count(imported.min_players)
+        imported_max_players = max(imported_min_players, _player_count(imported.max_players, imported_min_players))
+        if "min_players" not in authoritative_fields:
+            game.min_players = imported_min_players
+        if "max_players" not in authoritative_fields:
+            game.max_players = imported_max_players
+        if "player_count_known" not in authoritative_fields:
+            game.player_count_known = True
 
 
-def _find_or_create_game(db: Session, imported: ImportedGame, exclude_game_id: int | None = None) -> Game:
+def _is_numeric_steam_app_id(platform: str, platform_game_id: str) -> bool:
+    return str(platform) == Platform.steam and str(platform_game_id).isdigit()
+
+
+def _steam_mapping_conflicts(db: Session, imported: ImportedGame) -> list[int]:
+    rows = db.execute(
+        select(PlatformGameMapping.game_id, PlatformGameMapping.platform_game_id).where(
+            PlatformGameMapping.platform == Platform.steam,
+            PlatformGameMapping.platform_game_id != imported.platform_game_id,
+        )
+    )
+    return [game_id for game_id, platform_game_id in rows if str(platform_game_id).isdigit()]
+
+
+def _find_or_create_game(
+    db: Session,
+    platform: str,
+    imported: ImportedGame,
+    exclude_game_id: int | None = None,
+) -> Game:
     normalized = imported.normalized_title
     exact_query = select(Game).where(Game.normalized_title == normalized)
+    if _is_numeric_steam_app_id(platform, imported.platform_game_id):
+        exact_query = exact_query.where(Game.id.not_in(_steam_mapping_conflicts(db, imported)))
     if exclude_game_id is not None:
         exact_query = exact_query.where(Game.id != exclude_game_id)
     exact = db.scalar(exact_query)
@@ -75,6 +130,8 @@ def _find_or_create_game(db: Session, imported: ImportedGame, exclude_game_id: i
         return exact
 
     candidates_query = select(Game)
+    if _is_numeric_steam_app_id(platform, imported.platform_game_id):
+        candidates_query = candidates_query.where(Game.id.not_in(_steam_mapping_conflicts(db, imported)))
     if exclude_game_id is not None:
         candidates_query = candidates_query.where(Game.id != exclude_game_id)
     candidates = [
@@ -82,8 +139,15 @@ def _find_or_create_game(db: Session, imported: ImportedGame, exclude_game_id: i
         for game in db.scalars(candidates_query).all()
         if _compatible_for_fuzzy_match(game.normalized_title, normalized)
     ]
-    best = max(candidates, key=lambda item: fuzz.token_set_ratio(item.normalized_title, normalized), default=None)
-    if best and fuzz.token_set_ratio(best.normalized_title, normalized) >= MATCH_THRESHOLD:
+    best = max(
+        candidates,
+        key=lambda item: max(
+            fuzz.ratio(item.normalized_title, normalized),
+            fuzz.token_sort_ratio(item.normalized_title, normalized),
+        ),
+        default=None,
+    )
+    if best and _compatible_for_fuzzy_match(best.normalized_title, normalized):
         return best
 
     game = Game(title=imported.title, normalized_title=normalized)
@@ -102,8 +166,23 @@ def resolve_game(db: Session, platform: str, imported: ImportedGame) -> Game:
     )
     if mapping:
         mapped_game = mapping.game
-        if mapped_game.normalized_title != normalized and not _compatible_for_fuzzy_match(mapped_game.normalized_title, normalized):
-            mapped_game = _find_or_create_game(db, imported, exclude_game_id=mapping.game_id)
+        primary_steam_mapping_id = None
+        if _is_numeric_steam_app_id(platform, imported.platform_game_id):
+            numeric_mapping_ids = [
+                mapping_id
+                for mapping_id, platform_game_id in db.execute(
+                    select(PlatformGameMapping.id, PlatformGameMapping.platform_game_id).where(
+                        PlatformGameMapping.game_id == mapping.game_id,
+                        PlatformGameMapping.platform == Platform.steam,
+                    )
+                )
+                if str(platform_game_id).isdigit()
+            ]
+            if numeric_mapping_ids:
+                primary_steam_mapping_id = min(numeric_mapping_ids)
+        steam_id_collision = primary_steam_mapping_id is not None and mapping.id != primary_steam_mapping_id
+        if steam_id_collision or not _compatible_for_fuzzy_match(mapped_game.normalized_title, normalized):
+            mapped_game = _find_or_create_game(db, platform, imported, exclude_game_id=mapping.game_id)
             mapping.game_id = mapped_game.id
             mapping.platform_title = imported.title
             mapping.normalized_title = normalized
@@ -111,7 +190,7 @@ def resolve_game(db: Session, platform: str, imported: ImportedGame) -> Game:
         _merge_game_metadata(mapped_game, imported)
         return mapped_game
 
-    game = _find_or_create_game(db, imported)
+    game = _find_or_create_game(db, platform, imported)
     _merge_game_metadata(game, imported)
     db.add(
         PlatformGameMapping(
@@ -165,6 +244,17 @@ def upsert_ownership(db: Session, account: Account, game: Game, imported: Import
     return ownership
 
 
+def _reconcile_account_ownerships(db: Session, account: Account, imported_game_ids: set[int]) -> None:
+    stmt = select(Ownership).where(
+        Ownership.account_id == account.id,
+        Ownership.platform == account.platform,
+    )
+    if imported_game_ids:
+        stmt = stmt.where(Ownership.game_id.not_in(imported_game_ids))
+    for ownership in db.scalars(stmt).all():
+        db.delete(ownership)
+
+
 def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
     account = db.get(Account, account_id)
     if not account:
@@ -175,9 +265,13 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
     try:
         provider = PROVIDERS[account.platform]
         imported_games = provider.sync_account(account)
+        imported_game_ids: set[int] = set()
         for imported in imported_games:
             game = resolve_game(db, account.platform, imported)
             upsert_ownership(db, account, game, imported)
+            imported_game_ids.add(game.id)
+        if getattr(provider, "authoritative_library", False):
+            _reconcile_account_ownerships(db, account, imported_game_ids)
         account.last_successful_sync = datetime.utcnow()
         account.last_error = None
         run.success = True

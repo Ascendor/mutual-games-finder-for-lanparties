@@ -219,18 +219,38 @@ def _numeric_tokens(value: str) -> tuple[str, ...]:
     return tuple(re.findall(r"\d+", normalize_title(value)))
 
 
-def _select_igdb_game(title: str, candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _candidate_platform_families(candidate: dict[str, Any]) -> set[str]:
+    families: set[str] = set()
+    for platform in candidate.get("platforms") or []:
+        if not isinstance(platform, dict):
+            continue
+        family = _mode_platform_family({"platform": platform})
+        if family:
+            families.add(family)
+    return families
+
+
+def _select_igdb_game(
+    title: str,
+    candidates: list[dict[str, Any]],
+    platforms: list[Platform] | None = None,
+) -> dict[str, Any] | None:
     normalized = normalize_title(title)
     compatible = [
         item
         for item in candidates
         if item.get("name") and _numeric_tokens(str(item["name"])) == _numeric_tokens(title)
     ]
-    best = max(
-        compatible,
-        key=lambda item: fuzz.WRatio(normalized, normalize_title(str(item["name"]))),
-        default=None,
-    )
+    expected_families = _platform_families(platforms or [])
+
+    def candidate_score(item: dict[str, Any]) -> float:
+        title_score = fuzz.WRatio(normalized, normalize_title(str(item["name"])))
+        candidate_families = _candidate_platform_families(item)
+        if not expected_families or not candidate_families:
+            return title_score
+        return title_score + (8 if expected_families & candidate_families else -8)
+
+    best = max(compatible, key=candidate_score, default=None)
     if not best:
         return None
     score = fuzz.WRatio(normalized, normalize_title(str(best["name"])))
@@ -289,7 +309,7 @@ def _positive_max(modes: list[dict[str, Any]], field_name: str) -> int | None:
 def _igdb_record(title: str, platforms: list[Platform], token: str) -> MetadataRecord | None:
     fields = (
         "id,name,summary,first_release_date,"
-        "cover.image_id,genres.name,game_modes.name,"
+        "cover.image_id,genres.name,game_modes.name,platforms.name,"
         "multiplayer_modes.campaigncoop,multiplayer_modes.dropin,"
         "multiplayer_modes.lancoop,multiplayer_modes.offlinecoop,"
         "multiplayer_modes.offlinecoopmax,multiplayer_modes.offlinemax,"
@@ -298,7 +318,7 @@ def _igdb_record(title: str, platforms: list[Platform], token: str) -> MetadataR
         "multiplayer_modes.splitscreenonline,multiplayer_modes.platform.name"
     )
     query = f"search {json.dumps(title)}; fields {fields}; limit 10;"
-    data = _select_igdb_game(title, _igdb_post("games", query, token))
+    data = _select_igdb_game(title, _igdb_post("games", query, token), platforms)
     if not data:
         return None
 
@@ -558,10 +578,14 @@ def _apply_metadata_record(game: Game, record: MetadataRecord) -> bool:
 def enrich_all_game_metadata(
     db: Session,
     progress_callback: Callable[[int, int, int, int], None] | None = None,
+    game_ids: set[int] | None = None,
 ) -> MetadataSyncResult:
     token = _igdb_access_token()
     result = MetadataSyncResult()
-    games = db.scalars(select(Game).options(selectinload(Game.mappings)).order_by(Game.title)).unique().all()
+    games_query = select(Game).options(selectinload(Game.mappings)).order_by(Game.title)
+    if game_ids is not None:
+        games_query = games_query.where(Game.id.in_(game_ids))
+    games = db.scalars(games_query).unique().all()
     result.scanned_games = len(games)
     games_by_id = {game.id: game for game in games}
     jobs = [

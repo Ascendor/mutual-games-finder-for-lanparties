@@ -1,10 +1,11 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import Query, Request, Response
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
 from app.models import Game, Ownership, Participant
-from app.schemas import GameCreate, GameOwnerRead, GameRead, GameUpdate
+from app.schemas import GameCreate, GameOptionRead, GameOwnerRead, GameRead, GameUpdate
 from app.services.normalization import normalize_title
 
 router = APIRouter()
@@ -16,6 +17,32 @@ def list_games(search: str | None = None, db: Session = Depends(get_db)):
     if search:
         stmt = stmt.where(Game.normalized_title.contains(normalize_title(search)))
     return db.scalars(stmt).all()
+
+
+@router.get("/options", response_model=list[GameOptionRead])
+def list_game_options(
+    request: Request,
+    response: Response,
+    search: str | None = None,
+    limit: int | None = Query(None, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    count, latest_update = db.execute(select(func.count(Game.id), func.max(Game.updated_at))).one()
+    etag = f'"games-{count}-{latest_update.isoformat() if latest_update else "empty"}"'
+    cache_headers = {
+        "Cache-Control": "private, max-age=300, stale-while-revalidate=60",
+        "ETag": etag,
+    }
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=cache_headers)
+
+    stmt = select(Game.id, Game.title).order_by(Game.title)
+    if search:
+        stmt = stmt.where(Game.normalized_title.contains(normalize_title(search)))
+    if limit:
+        stmt = stmt.limit(limit)
+    response.headers.update(cache_headers)
+    return [{"id": game_id, "title": title} for game_id, title in db.execute(stmt)]
 
 
 @router.get("/{game_id}/owners", response_model=list[GameOwnerRead])

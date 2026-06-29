@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { api } from './api'
-import type { Account, Game, Ownership, Participant, Recommendation, SyncRun } from './types'
+import type { Account, Game, GameOption, Ownership, Participant, Recommendation, SyncRun } from './types'
 
 export const useLanStore = defineStore('lan', {
   state: () => ({
     participants: [] as Participant[],
     accounts: [] as Account[],
     games: [] as Game[],
+    gameOptions: [] as GameOption[],
     ownerships: [] as Ownership[],
     popular: [] as Recommendation[],
     newForGroup: [] as Recommendation[],
@@ -21,6 +22,32 @@ export const useLanStore = defineStore('lan', {
     totalPlaytime: (state) => state.ownerships.reduce((sum, own) => sum + own.playtime_minutes, 0)
   },
   actions: {
+    async refreshParticipants() {
+      this.loading = true
+      this.error = ''
+      try {
+        this.participants = await api.participants()
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : String(error)
+      } finally {
+        this.loading = false
+      }
+    },
+    async refreshHome() {
+      this.loading = true
+      this.error = ''
+      try {
+        const [participants, gameOptions] = await Promise.all([
+          api.participants(),
+          api.gameOptions()
+        ])
+        Object.assign(this, { participants, gameOptions })
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : String(error)
+      } finally {
+        this.loading = false
+      }
+    },
     async refresh() {
       this.loading = true
       this.error = ''
@@ -30,10 +57,10 @@ export const useLanStore = defineStore('lan', {
           api.accounts(),
           api.games(),
           api.ownerships(),
-          api.recommendations('popular'),
-          api.recommendations('new'),
-          api.recommendations('lan'),
-          api.recommendations('present'),
+          api.recommendations('popular', 100),
+          api.recommendations('new', 100),
+          api.recommendations('lan', 100),
+          api.recommendations('present', 100),
           api.syncRuns()
         ])
         Object.assign(this, { participants, accounts, games, ownerships, popular, newForGroup, lan, present, syncRuns })
@@ -45,4 +72,3 @@ export const useLanStore = defineStore('lan', {
     }
   }
 })
-

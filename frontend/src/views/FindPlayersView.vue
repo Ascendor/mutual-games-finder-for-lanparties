@@ -49,10 +49,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { useRoute } from 'vue-router'
-import type { Game, GameOwner, Platform } from '../types'
+import type { GameOption, GameOwner, Platform } from '../types'
 
 const route = useRoute()
-const games = ref<Game[]>([])
+const games = ref<GameOption[]>([])
 const owners = ref<GameOwner[]>([])
 const selectedGameId = ref<number | null>(null)
 const search = ref('')
@@ -84,7 +84,7 @@ onMounted(async () => {
   search.value = initialGame
   gamesLoading.value = true
   try {
-    games.value = await api.games(initialGame)
+    games.value = await api.gameOptions(initialGame, 100)
   } finally {
     gamesLoading.value = false
   }
@@ -109,7 +109,7 @@ function loadGames(value: string) {
   searchTimer = window.setTimeout(async () => {
     gamesLoading.value = true
     try {
-      games.value = await api.games(value || '')
+      games.value = await api.gameOptions(value || '', value ? 100 : 500)
     } finally {
       gamesLoading.value = false
     }

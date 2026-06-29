@@ -89,7 +89,9 @@ def _append_unique_playnite_entry(
     seen_keys: set[tuple[str, str, str]],
     entry: dict[str, Any],
 ) -> None:
-    title = str(_first_deep(entry, "Name", "name", "Title", "title") or "")
+    title = _playnite_title(entry)
+    if not title:
+        return
     source = str(_first_deep(entry, "Source", "source", "SourceName", "sourceName", "Provider", "provider") or "")
     game_id = str(_first_deep(entry, "GameId", "gameId", "Id", "id") or "")
     key = (normalize_title(title), source.casefold(), game_id)
@@ -122,10 +124,10 @@ def _extract_litedb_entries_from_zip(archive: zipfile.ZipFile) -> list[dict[str,
         if not _looks_like_game(document):
             continue
         game_key = str(_first_deep(document, "Id", "_id", "id", "GameId", "gameId") or "")
-        title = _first_deep(document, "Name", "name", "Title", "title")
+        title = _playnite_title(document)
         if not title:
             continue
-        unique_key = game_key or normalize_title(str(title))
+        unique_key = game_key or normalize_title(title)
         if unique_key in seen_ids:
             continue
         seen_ids.add(unique_key)
@@ -371,7 +373,7 @@ def _extract_game_entries(payload: Any) -> list[dict[str, Any]]:
 
 
 def _looks_like_game(value: Any) -> bool:
-    if not isinstance(value, dict) or not _first_shallow(value, "Name", "name", "Title", "title"):
+    if not isinstance(value, dict) or not _playnite_title(value):
         return False
     game_keys = {
         "Added",
@@ -415,12 +417,12 @@ def _looks_like_game(value: Any) -> bool:
 
 
 def _imported_game_from_playnite_entry(entry: dict[str, Any]) -> tuple[ImportedGame | None, Platform]:
-    title = _first_deep(entry, "Name", "name", "Title", "title")
+    title = _playnite_title(entry)
     if not title:
         return None, Platform.local
 
     platform = _detect_platform(entry)
-    platform_game_id = _detect_platform_game_id(entry, platform, str(title))
+    platform_game_id = _detect_platform_game_id(entry, platform, title)
     playtime_minutes = _playtime_minutes(entry)
     release_date = _parse_date(_first_deep(entry, "ReleaseDate", "releaseDate", "Released", "released"))
     owned_since = _parse_datetime(_first_deep(entry, "Added", "added", "DateAdded", "dateAdded", "InstallDate", "installDate"))
@@ -430,7 +432,7 @@ def _imported_game_from_playnite_entry(entry: dict[str, Any]) -> tuple[ImportedG
     return (
         ImportedGame(
             platform_game_id=platform_game_id,
-            title=str(title),
+            title=title,
             playtime_minutes=playtime_minutes,
             owned_since=owned_since,
             cover_url=str(cover_url) if cover_url else None,
@@ -617,3 +619,13 @@ def _first_shallow(data: Any, *keys: str) -> Any:
         if key in data and data[key] not in (None, ""):
             return data[key]
     return None
+
+
+def _playnite_title(entry: dict[str, Any]) -> str | None:
+    value = _first_shallow(entry, "Name", "name", "Title", "title")
+    if not isinstance(value, str):
+        return None
+    title = value.strip()
+    if not title or len(title) > 255:
+        return None
+    return title

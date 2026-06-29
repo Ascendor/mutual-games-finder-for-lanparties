@@ -51,6 +51,11 @@ export interface Game {
   metadata_updated_at?: string | null
 }
 
+export interface GameOption {
+  id: number
+  title: string
+}
+
 export interface Ownership {
   id: number
   participant_id: number

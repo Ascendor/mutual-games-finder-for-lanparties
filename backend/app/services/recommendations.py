@@ -64,7 +64,11 @@ def _recommendations_for_participants(
     query = (
         select(Game)
         .join(Ownership)
-        .options(selectinload(Game.ownerships).selectinload(Ownership.participant))
+        .options(
+            selectinload(
+                Game.ownerships.and_(Ownership.participant_id.in_(participant_ids))
+            ).selectinload(Ownership.participant)
+        )
         .group_by(Game.id)
     )
     if coop:
@@ -89,7 +93,7 @@ def _recommendations_for_participants(
     games = db.scalars(query).unique().all()
     recs = []
     for game in games:
-        relevant = [own for own in game.ownerships if own.participant_id in participant_ids]
+        relevant = game.ownerships
         owner_ids = {own.participant_id for own in relevant}
         total = sum(own.playtime_minutes for own in relevant)
         owner_count = len(owner_ids)

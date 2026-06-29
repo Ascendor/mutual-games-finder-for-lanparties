@@ -6,7 +6,7 @@ Die Anwendung ist fuer ein vertrautes LAN gedacht. Innerhalb der Anwendung gibt 
 
 ## Stack
 
-- Backend: Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, SQLite
+- Backend: Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL
 - Frontend: Vue 3, TypeScript, Pinia, Vue Router, Vuetify
 - Deployment: Docker Compose
 
@@ -38,7 +38,15 @@ BASIC_AUTH_PASSWORD=QC4lF93bYgwTHRT4xRynsAIz3San1lDW
 
 Backend und Frontend werden im Docker-Compose-Betrieb nicht mehr direkt veroeffentlicht. Der Zugriff laeuft ueber den Gateway, damit TLS und Basic Auth nicht umgangen werden.
 
-Die SQLite-Datenbank wird im Docker-Volume `backend-data` gespeichert.
+PostgreSQL speichert seine Daten im Docker-Volume `postgres-data`. Beim ersten Start nach der Umstellung kopiert das Backend eine vorhandene SQLite-Datenbank aus dem bisherigen Volume `backend-data` automatisch und transaktional nach PostgreSQL. Das SQLite-Volume bleibt danach unverändert als Rueckfallkopie erhalten.
+
+Die PostgreSQL-Zugangsdaten koennen in `.env` angepasst werden:
+
+```env
+POSTGRES_DB=lanparty
+POSTGRES_USER=lanparty
+POSTGRES_PASSWORD=lanparty
+```
 
 ## Direkte Provider
 
@@ -80,6 +88,7 @@ Backend:
 
 ```bash
 cd backend
+set DATABASE_URL=postgresql+psycopg://lanparty:lanparty@localhost:5432/lanparty
 python -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[dev]"

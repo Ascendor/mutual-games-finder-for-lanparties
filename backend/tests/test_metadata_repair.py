@@ -82,6 +82,22 @@ def test_igdb_matching_does_not_confuse_numbered_games():
     assert metadata_service._select_igdb_game("Alone in the Dark 2", candidates)["id"] == 2
 
 
+def test_igdb_matching_prefers_the_owned_platform_for_identical_titles():
+    candidates = [
+        {"id": 266357, "name": "Counter-Strike", "platforms": [{"name": "Xbox"}]},
+        {
+            "id": 241,
+            "name": "Counter-Strike",
+            "platforms": [{"name": "PC (Microsoft Windows)"}, {"name": "Linux"}],
+        },
+    ]
+
+    selected = metadata_service._select_igdb_game("Counter-Strike", candidates, [Platform.steam])
+
+    assert selected is not None
+    assert selected["id"] == 241
+
+
 def test_metadata_sync_applies_igdb_before_rawg(db, monkeypatch):
     game = Game(
         title="Portal 2",

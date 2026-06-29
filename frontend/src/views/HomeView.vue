@@ -15,7 +15,7 @@
               <span>Ich will</span>
               <v-autocomplete
                 v-model="gameName"
-                :items="store.games"
+                :items="store.gameOptions"
                 item-title="title"
                 item-value="title"
                 label="Spiel"
@@ -94,7 +94,7 @@ const error = ref('')
 const participant = reactive({ nickname: '', real_name: '' })
 const participantNicknames = computed(() => store.participants.map((item) => item.nickname))
 
-onMounted(() => store.refresh())
+onMounted(() => store.refreshHome())
 
 function findPlayers() {
   const game = gameName.value.trim()
@@ -124,7 +124,7 @@ async function createParticipant() {
       present: true,
       notes: ''
     })
-    await store.refresh()
+    await store.refreshHome()
     router.push({ path: '/logins', query: { participant: String(created.id) } })
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)

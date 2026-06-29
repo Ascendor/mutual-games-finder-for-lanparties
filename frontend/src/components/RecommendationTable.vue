@@ -88,7 +88,7 @@ function featureText(game: Game) {
 }
 
 function playerLabel(game: Game) {
-  if (!game.player_count_known) {
+  if (!game.player_count_known || (game.multiplayer && game.max_players <= 1)) {
     return game.multiplayer ? 'MP, Spielerzahl unbekannt' : 'Spielerzahl unbekannt'
   }
   if (game.min_players === 1 && game.max_players === 1) {
