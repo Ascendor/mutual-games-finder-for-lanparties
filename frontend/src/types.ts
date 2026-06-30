@@ -49,6 +49,7 @@ export interface Game {
   metadata_external_id?: string | null
   metadata_sources: Record<string, string>
   metadata_updated_at?: string | null
+  is_free: boolean
 }
 
 export interface GameOption {

@@ -132,6 +132,34 @@ def test_authoritative_library_reconciliation_removes_only_stale_account_ownersh
     assert [ownership.game_id for ownership in ownerships] == [current.id]
 
 
+def test_authoritative_library_reconciliation_keeps_known_free_games(db):
+    participant = Participant(nickname="Free Snapshot")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.steam, account_id="free-snapshot")
+    db.add(account)
+    db.flush()
+    free_game = resolve_game(
+        db,
+        Platform.steam,
+        ImportedGame(platform_game_id="440", title="Free Arena", is_free=True),
+    )
+    upsert_ownership(
+        db,
+        account,
+        free_game,
+        ImportedGame(platform_game_id="440", title="Free Arena", is_free=True),
+    )
+    db.flush()
+
+    _reconcile_account_ownerships(db, account, set())
+    db.flush()
+
+    ownership = db.scalar(select(Ownership).where(Ownership.account_id == account.id))
+    assert ownership is not None
+    assert ownership.game.is_free is True
+
+
 def test_resolve_game_tolerates_missing_imported_player_counts(db):
     imported = ImportedGame(platform_game_id="broken-meta", title="Broken Metadata")
     imported.min_players = None  # type: ignore[assignment]
@@ -180,6 +208,14 @@ def test_steam_metadata_does_not_invent_split_screen_or_player_cap():
     assert metadata["max_players"] == 1
     assert metadata["feature_metadata_known"] is True
     assert metadata["player_count_known"] is False
+
+
+def test_steam_metadata_marks_only_free_store_games_as_free():
+    free_game = _steam_metadata_from_details(440, {"type": "game", "is_free": True})
+    demo = _steam_metadata_from_details(999, {"type": "demo", "is_free": True})
+
+    assert free_game["is_free"] is True
+    assert demo["is_free"] is False
 
 
 def test_provider_partial_metadata_does_not_overwrite_igdb_fields(db):

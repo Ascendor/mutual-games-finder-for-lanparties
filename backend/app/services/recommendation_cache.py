@@ -6,11 +6,11 @@ from collections import OrderedDict
 from collections.abc import Callable, Hashable
 from threading import RLock
 
-from sqlalchemy import event, select
+from sqlalchemy import event, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import Game, Ownership, Participant, PlatformGameMapping
+from app.models import Game, Ownership, Participant, PlatformGameMapping, RecommendationCacheRevision
 from app.schemas import RecommendationRead
 
 
@@ -24,6 +24,7 @@ class RecommendationCache:
         self.max_entries = max_entries
         self._lock = RLock()
         self._revision = 0
+        self._database_revision: int | None = None
         self._entries: OrderedDict[
             CacheKey,
             tuple[int, float, list[RecommendationRead]],
@@ -38,6 +39,16 @@ class RecommendationCache:
         with self._lock:
             self._revision += 1
             self._entries.clear()
+
+    def observe_database_revision(self, revision: int) -> None:
+        with self._lock:
+            if self._database_revision is None:
+                self._database_revision = revision
+                return
+            if self._database_revision != revision:
+                self._database_revision = revision
+                self._revision += 1
+                self._entries.clear()
 
     def get(
         self,
@@ -67,12 +78,31 @@ class RecommendationCache:
                     self._entries.popitem(last=False)
                 return value, revision, False
 
-    def etag(self, key: CacheKey, revision: int, limit: int | None) -> str:
-        digest = hashlib.sha1(repr((key, limit)).encode("utf-8")).hexdigest()[:12]
+    def etag(
+        self,
+        key: CacheKey,
+        revision: int,
+        database_revision: int,
+        limit: int | None,
+    ) -> str:
+        digest = hashlib.sha1(
+            repr((key, database_revision, limit)).encode("utf-8")
+        ).hexdigest()[:12]
         return f'"recommendations-{revision}-{digest}"'
 
 
 recommendation_cache = RecommendationCache()
+
+
+def synchronize_recommendation_cache(db: Session) -> int:
+    revision = db.scalar(
+        select(RecommendationCacheRevision.revision).where(
+            RecommendationCacheRevision.id == 1
+        )
+    )
+    value = int(revision or 0)
+    recommendation_cache.observe_database_revision(value)
+    return value
 
 
 @event.listens_for(Session, "after_flush")
@@ -86,6 +116,17 @@ def _mark_recommendations_dirty(session: Session, _flush_context) -> None:
 def _invalidate_recommendations_after_commit(session: Session) -> None:
     if session.info.pop("recommendations_dirty", False):
         recommendation_cache.invalidate()
+        bind = session.get_bind()
+        with bind.begin() as connection:
+            result = connection.execute(
+                update(RecommendationCacheRevision)
+                .where(RecommendationCacheRevision.id == 1)
+                .values(revision=RecommendationCacheRevision.revision + 1)
+            )
+            if result.rowcount == 0:
+                connection.execute(
+                    insert(RecommendationCacheRevision).values(id=1, revision=1)
+                )
 
 
 @event.listens_for(Session, "after_rollback")
@@ -98,6 +139,7 @@ def warm_dashboard_recommendations() -> None:
 
     db = SessionLocal()
     try:
+        synchronize_recommendation_cache(db)
         present = tuple(sorted(engine.present_participant_ids(db)))
         all_participants = tuple(sorted(db.scalars(select(Participant.id)).all()))
         recommendation_cache.get(

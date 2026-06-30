@@ -66,6 +66,8 @@ def _merge_game_metadata(game: Game, imported: ImportedGame) -> None:
     game.cover_url = game.cover_url or imported.cover_url
     game.release_date = game.release_date or imported.release_date
     game.genres = sanitize_genres([*(game.genres or []), *(imported.genres or [])])
+    if imported.is_free is not None:
+        game.is_free = imported.is_free
     feature_fields = [
         "singleplayer",
         "multiplayer",
@@ -245,9 +247,14 @@ def upsert_ownership(db: Session, account: Account, game: Game, imported: Import
 
 
 def _reconcile_account_ownerships(db: Session, account: Account, imported_game_ids: set[int]) -> None:
-    stmt = select(Ownership).where(
-        Ownership.account_id == account.id,
-        Ownership.platform == account.platform,
+    stmt = (
+        select(Ownership)
+        .join(Ownership.game)
+        .where(
+            Ownership.account_id == account.id,
+            Ownership.platform == account.platform,
+            Game.is_free == False,  # noqa: E712
+        )
     )
     if imported_game_ids:
         stmt = stmt.where(Ownership.game_id.not_in(imported_game_ids))

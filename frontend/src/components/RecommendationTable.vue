@@ -16,6 +16,7 @@
       <strong>{{ item.title }}</strong>
       <div class="text-caption text-medium-emphasis">{{ item.players }}</div>
     </template>
+    <template #item.owner_count="{ item }">{{ item.owner_display }}</template>
     <template #item.total_hours="{ item }">{{ item.total_hours }} h</template>
     <template #item.median_hours="{ item }">{{ item.median_hours }} h</template>
     <template #item.average_hours="{ item }">{{ item.average_hours }} h</template>
@@ -24,6 +25,7 @@
       <v-chip v-if="item.coop" size="small" color="secondary" class="mr-1">Coop</v-chip>
       <v-chip v-if="item.split" size="small" color="accent" class="mr-1">Split</v-chip>
       <v-chip v-if="item.versus" size="small" variant="tonal" class="mr-1">VS</v-chip>
+      <v-chip v-if="item.is_free" size="small" color="success" variant="tonal" class="mr-1">Free</v-chip>
       <span v-if="!item.features" class="text-medium-emphasis">-</span>
     </template>
     </v-data-table>
@@ -63,6 +65,7 @@ const rows = computed(() =>
     title: rec.game.title,
     players: playerLabel(rec.game),
     owner_count: rec.owner_count,
+    owner_display: rec.game.is_free ? `Alle (${rec.owner_count} importiert)` : String(rec.owner_count),
     total_hours: hours(rec.total_playtime_minutes),
     median_hours: hours(rec.median_playtime_minutes),
     average_hours: hours(rec.average_playtime_minutes),
@@ -70,6 +73,7 @@ const rows = computed(() =>
     coop: rec.game.local_coop || rec.game.online_coop,
     split: rec.game.split_screen,
     versus: rec.game.versus,
+    is_free: rec.game.is_free,
     features: featureText(rec.game),
     platforms: rec.platforms.join(', ')
   }))
@@ -81,7 +85,8 @@ function featureText(game: Game) {
   return [
     game.lan ? 'LAN' : '',
     game.local_coop || game.online_coop ? 'Coop' : '',
-    game.split_screen ? 'Split' : ''
+    game.split_screen ? 'Split' : '',
+    game.is_free ? 'Free' : ''
   ]
     .filter(Boolean)
     .join(', ')

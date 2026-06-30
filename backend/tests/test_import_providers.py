@@ -131,7 +131,20 @@ def test_steam_provider_uses_playtime_forever(monkeypatch):
             return False
 
         def get(self, url, params=None, headers=None):
-            return FakeResponse({"response": {"games": [{"appid": 620, "name": "Portal 2", "playtime_forever": 345}]}})
+            return FakeResponse(
+                {
+                    "response": {
+                        "game_count": 1,
+                        "games": [
+                            {
+                                "appid": 620,
+                                "name": "Portal 2",
+                                "playtime_forever": 345,
+                            }
+                        ],
+                    }
+                }
+            )
 
     monkeypatch.setattr(import_providers.settings, "steam_api_key", "key")
     monkeypatch.setattr(import_providers.settings, "steam_metadata_limit", 0)
@@ -140,6 +153,33 @@ def test_steam_provider_uses_playtime_forever(monkeypatch):
     games = provider.sync_account(account)
 
     assert games[0].playtime_minutes == 345
+
+
+def test_steam_provider_rejects_inaccessible_library(monkeypatch):
+    account = Account(id=5, participant_id=1, platform=Platform.steam, account_id="7656119")
+
+    class PrivateSteamClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, params=None, headers=None):
+            return FakeResponse({"response": {}})
+
+    monkeypatch.setattr(import_providers.settings, "steam_api_key", "key")
+    monkeypatch.setattr(
+        import_providers.httpx,
+        "Client",
+        lambda **kwargs: PrivateSteamClient(**kwargs),
+    )
+
+    with pytest.raises(RuntimeError, match="Game details"):
+        SteamProvider().sync_account(account)
 
 
 def test_xbox_provider_parses_title_history(monkeypatch, tmp_path):

@@ -319,6 +319,7 @@ class ImportedGame:
     cover_url: str | None = None
     release_date: date | None = None
     genres: list[str] = field(default_factory=list)
+    is_free: bool | None = None
     singleplayer: bool = False
     multiplayer: bool = False
     lan: bool = False
@@ -531,6 +532,7 @@ def _steam_metadata_from_details(appid: int, details: dict[str, Any]) -> dict[st
         "cover_url": details.get("header_image") or f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg",
         "release_date": _parse_date((details.get("release_date") or {}).get("date") if isinstance(details.get("release_date"), dict) else None),
         "genres": genres,
+        "is_free": bool(details.get("is_free")) and details.get("type") == "game",
         "singleplayer": 2 in category_ids or any("single-player" in category for category in categories),
         "multiplayer": multiplayer,
         "lan": lan,
@@ -572,7 +574,13 @@ class SteamProvider:
         with httpx.Client(timeout=20) as client:
             response = client.get(url, params=params)
             response.raise_for_status()
-            games = response.json().get("response", {}).get("games", [])
+            steam_library = response.json().get("response")
+            if not isinstance(steam_library, dict) or "game_count" not in steam_library:
+                raise RuntimeError(
+                    "Steam library is not accessible. In the Steam privacy settings, "
+                    "set 'Game details' to 'Public' and try again."
+                )
+            games = steam_library.get("games") or []
 
         details_by_appid = self._load_store_metadata(games)
         imported_games: list[ImportedGame] = []
@@ -588,6 +596,7 @@ class SteamProvider:
                     cover_url=metadata.get("cover_url") or f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg",
                     release_date=metadata.get("release_date"),
                     genres=metadata.get("genres", []),
+                    is_free=metadata.get("is_free"),
                     singleplayer=metadata.get("singleplayer", False),
                     multiplayer=metadata.get("multiplayer", False),
                     lan=metadata.get("lan", False),

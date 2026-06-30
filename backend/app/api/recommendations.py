@@ -8,7 +8,11 @@ from app.models import Participant
 from app.db.session import get_db
 from app.schemas import RecommendationRead
 from app.services import recommendations as engine
-from app.services.recommendation_cache import CacheKey, recommendation_cache
+from app.services.recommendation_cache import (
+    CacheKey,
+    recommendation_cache,
+    synchronize_recommendation_cache,
+)
 
 router = APIRouter()
 
@@ -20,12 +24,14 @@ def _limited(items: list[RecommendationRead], limit: int | None) -> list[Recomme
 def _cached(
     request: Request,
     response: Response,
+    db: Session,
     key: CacheKey,
     factory: Callable[[], list[RecommendationRead]],
     limit: int | None = None,
 ):
+    database_revision = synchronize_recommendation_cache(db)
     items, revision, cache_hit = recommendation_cache.get(key, factory)
-    etag = recommendation_cache.etag(key, revision, limit)
+    etag = recommendation_cache.etag(key, revision, database_revision, limit)
     headers = {
         "Cache-Control": "private, max-age=30",
         "ETag": etag,
@@ -48,6 +54,7 @@ def common_games(
     return _cached(
         request,
         response,
+        db,
         ("common", selected),
         lambda: engine.find_common_games(db, list(selected)),
     )
@@ -69,6 +76,7 @@ def present_games(
     return _cached(
         request,
         response,
+        db,
         ("common", present),
         lambda: engine.find_common_games(db, list(present)),
         limit,
@@ -88,6 +96,7 @@ def lan_games(
         return _cached(
             request,
             response,
+            db,
             ("lan-common", selected),
             lambda: engine.find_common_lan_games(db, list(selected)),
             limit,
@@ -96,6 +105,7 @@ def lan_games(
     return _cached(
         request,
         response,
+        db,
         ("lan", present),
         lambda: engine.find_best_lan_games(db),
         limit,
@@ -113,6 +123,7 @@ def popular_games(
     return _cached(
         request,
         response,
+        db,
         ("popular", participants),
         lambda: engine.find_most_popular_games(db),
         limit,
@@ -131,6 +142,7 @@ def new_for_group_games(
     return _cached(
         request,
         response,
+        db,
         ("new", selected),
         lambda: engine.find_new_for_group_games(db, list(selected)),
         limit,

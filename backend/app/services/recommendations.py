@@ -3,10 +3,10 @@
 from statistics import median
 from typing import Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Game, Ownership, Participant
+from app.models import Game, Ownership, Participant, Platform
 from app.schemas import RecommendationRead
 
 RecommendationMode = Literal["common", "coop", "lan", "popular", "group_size", "new"]
@@ -87,9 +87,19 @@ def _recommendations_for_participants(
                 | (Game.local_coop == True)  # noqa: E712
                 | (Game.online_coop == True)  # noqa: E712
             )
-    query = query.where(Ownership.participant_id.in_(participant_ids))
+    query = query.where(
+        or_(
+            Ownership.participant_id.in_(participant_ids),
+            Game.is_free == True,  # noqa: E712
+        )
+    )
     if require_all:
-        query = query.having(func.count(func.distinct(Ownership.participant_id)) == len(participant_ids))
+        query = query.having(
+            or_(
+                Game.is_free == True,  # noqa: E712
+                func.count(func.distinct(Ownership.participant_id)) == len(participant_ids),
+            )
+        )
     games = db.scalars(query).unique().all()
     recs = []
     for game in games:
@@ -110,7 +120,10 @@ def _recommendations_for_participants(
                 average_playtime_minutes=average_playtime,
                 median_playtime_minutes=median_playtime,
                 score=_score(game, owner_count, len(participant_ids), total, median_playtime, mode, group_size),
-                platforms=sorted({own.platform for own in relevant}),
+                platforms=sorted(
+                    {own.platform for own in relevant}
+                    | ({Platform.steam} if game.is_free else set())
+                ),
                 owners=sorted({own.participant for own in relevant}, key=lambda p: p.nickname),
             )
         )

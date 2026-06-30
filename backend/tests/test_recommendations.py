@@ -47,6 +47,34 @@ def test_common_and_coop_recommendations(db):
     assert [item.game.title for item in sized] == ["Deep Rock Galactic"]
 
 
+def test_known_free_steam_game_is_available_to_every_selected_player(db):
+    owner = Participant(nickname="Owner", present=True)
+    ada = Participant(nickname="Ada", present=True)
+    linus = Participant(nickname="Linus", present=True)
+    free_game = Game(
+        title="Free Arena",
+        normalized_title=normalize_title("Free Arena"),
+        is_free=True,
+        multiplayer=True,
+    )
+    paid_game = Game(
+        title="Paid Arena",
+        normalized_title=normalize_title("Paid Arena"),
+        multiplayer=True,
+    )
+    db.add_all([owner, ada, linus, free_game, paid_game])
+    db.flush()
+    add_owned(db, owner, free_game, 120)
+    add_owned(db, owner, paid_game, 120)
+    db.commit()
+
+    common = find_common_games(db, [ada.id, linus.id])
+
+    assert [item.game.title for item in common] == ["Free Arena"]
+    assert common[0].owner_count == 0
+    assert common[0].platforms == [Platform.steam]
+
+
 
 def test_recommendation_views_have_distinct_filters(db):
     ada = Participant(nickname="Ada", present=True)

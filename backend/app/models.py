@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -75,6 +75,7 @@ class Game(TimestampMixin, Base):
     cover_url: Mapped[str | None] = mapped_column(String(800))
     release_date: Mapped[date | None] = mapped_column(Date)
     genres: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    is_free: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     singleplayer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     multiplayer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     lan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -148,3 +149,10 @@ class SyncRun(Base):
     imported_games: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     account: Mapped[Account | None] = relationship(back_populates="sync_runs")
+
+
+class RecommendationCacheRevision(Base):
+    __tablename__ = "recommendation_cache_revisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    revision: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
