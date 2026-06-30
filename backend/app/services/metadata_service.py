@@ -62,6 +62,7 @@ class MetadataSyncResult:
     failed_games: int = 0
     igdb_errors: int = 0
     rawg_errors: int = 0
+    rawg_unavailable_reason: str | None = None
     message: str = "metadata sync completed"
 
 
@@ -142,6 +143,11 @@ def run_metadata_sync(run_id: int) -> None:
             + (
                 f", Quellenfehler: IGDB {result.igdb_errors}, RAWG {result.rawg_errors}"
                 if result.failed_games
+                else ""
+            )
+            + (
+                f", RAWG: {result.rawg_unavailable_reason}"
+                if result.rawg_unavailable_reason
                 else ""
             )
         )
@@ -234,6 +240,7 @@ def _select_igdb_game(
     title: str,
     candidates: list[dict[str, Any]],
     platforms: list[Platform] | None = None,
+    platform_game_ids: set[str] | None = None,
 ) -> dict[str, Any] | None:
     normalized = normalize_title(title)
     compatible = [
@@ -242,13 +249,24 @@ def _select_igdb_game(
         if item.get("name") and _numeric_tokens(str(item["name"])) == _numeric_tokens(title)
     ]
     expected_families = _platform_families(platforms or [])
+    expected_external_ids = {
+        str(identifier).strip().casefold()
+        for identifier in platform_game_ids or set()
+        if str(identifier).strip()
+    }
 
     def candidate_score(item: dict[str, Any]) -> float:
         title_score = fuzz.WRatio(normalized, normalize_title(str(item["name"])))
+        external_ids = {
+            str(external.get("uid") or "").strip().casefold()
+            for external in item.get("external_games") or []
+            if isinstance(external, dict) and external.get("uid")
+        }
+        external_bonus = 100 if expected_external_ids & external_ids else 0
         candidate_families = _candidate_platform_families(item)
         if not expected_families or not candidate_families:
-            return title_score
-        return title_score + (8 if expected_families & candidate_families else -8)
+            return title_score + external_bonus
+        return title_score + external_bonus + (8 if expected_families & candidate_families else -8)
 
     best = max(compatible, key=candidate_score, default=None)
     if not best:
@@ -306,10 +324,15 @@ def _positive_max(modes: list[dict[str, Any]], field_name: str) -> int | None:
     return max(values, default=None)
 
 
-def _igdb_record(title: str, platforms: list[Platform], token: str) -> MetadataRecord | None:
+def _igdb_record(
+    title: str,
+    platforms: list[Platform],
+    token: str,
+    platform_game_ids: set[str] | None = None,
+) -> MetadataRecord | None:
     fields = (
         "id,name,summary,first_release_date,"
-        "cover.image_id,genres.name,game_modes.name,platforms.name,"
+        "cover.image_id,genres.name,game_modes.name,platforms.name,external_games.uid,"
         "multiplayer_modes.campaigncoop,multiplayer_modes.dropin,"
         "multiplayer_modes.lancoop,multiplayer_modes.offlinecoop,"
         "multiplayer_modes.offlinecoopmax,multiplayer_modes.offlinemax,"
@@ -318,7 +341,12 @@ def _igdb_record(title: str, platforms: list[Platform], token: str) -> MetadataR
         "multiplayer_modes.splitscreenonline,multiplayer_modes.platform.name"
     )
     query = f"search {json.dumps(title)}; fields {fields}; limit 10;"
-    data = _select_igdb_game(title, _igdb_post("games", query, token), platforms)
+    data = _select_igdb_game(
+        title,
+        _igdb_post("games", query, token),
+        platforms,
+        platform_game_ids,
+    )
     if not data:
         return None
 
@@ -481,8 +509,31 @@ def _rawg_get(client: httpx.Client, url: str, params: dict[str, Any]) -> httpx.R
             break
         time.sleep(1.0 * (attempt + 1))
     assert response is not None
-    response.raise_for_status()
+    if response.is_error:
+        raise RuntimeError(f"RAWG request failed with HTTP {response.status_code}")
     return response
+
+
+def _rawg_availability() -> tuple[bool, str | None]:
+    if not settings.rawg_api_key:
+        return False, None
+    try:
+        with httpx.Client(timeout=15) as client:
+            response = client.get(
+                "https://api.rawg.io/api/games",
+                params={
+                    "key": settings.rawg_api_key,
+                    "search": "Portal",
+                    "page_size": 1,
+                },
+            )
+    except Exception:
+        return False, "nicht erreichbar"
+    if response.status_code in (401, 403):
+        return False, f"nicht verfügbar (HTTP {response.status_code}; Monatskontingent oder Schlüssel prüfen)"
+    if response.is_error:
+        return False, f"nicht verfügbar (HTTP {response.status_code})"
+    return True, None
 
 
 def _needs_rawg(record: MetadataRecord | None) -> bool:
@@ -518,19 +569,19 @@ def _merge_records(primary: MetadataRecord | None, fallback: MetadataRecord | No
 
 
 def _fetch_game_metadata(
-    job: tuple[int, str, list[Platform], str],
+    job: tuple[int, str, list[Platform], set[str], str, bool],
 ) -> tuple[int, MetadataRecord | None, bool, bool]:
-    game_id, title, platforms, token = job
+    game_id, title, platforms, platform_game_ids, token, rawg_enabled = job
     igdb_failed = False
     rawg_failed = False
     try:
-        igdb = _igdb_record(title, platforms, token)
+        igdb = _igdb_record(title, platforms, token, platform_game_ids)
     except Exception as exc:
         igdb = None
         igdb_failed = True
         LOGGER.warning("IGDB metadata failed for %s: %s", title, exc)
     rawg = None
-    if _needs_rawg(igdb) and settings.rawg_api_key:
+    if _needs_rawg(igdb) and rawg_enabled:
         try:
             rawg = _rawg_record(title)
         except Exception as exc:
@@ -582,6 +633,12 @@ def enrich_all_game_metadata(
 ) -> MetadataSyncResult:
     token = _igdb_access_token()
     result = MetadataSyncResult()
+    rawg_enabled, rawg_unavailable_reason = _rawg_availability()
+    result.rawg_unavailable_reason = rawg_unavailable_reason
+    if rawg_unavailable_reason:
+        result.rawg_errors = 1
+        result.failed_games = 1
+        LOGGER.warning("RAWG metadata disabled for this run: %s", rawg_unavailable_reason)
     games_query = select(Game).options(selectinload(Game.mappings)).order_by(Game.title)
     if game_ids is not None:
         games_query = games_query.where(Game.id.in_(game_ids))
@@ -593,7 +650,9 @@ def enrich_all_game_metadata(
             game.id,
             game.title,
             sorted({mapping.platform for mapping in game.mappings}),
+            {str(mapping.platform_game_id) for mapping in game.mappings},
             token,
+            rawg_enabled,
         )
         for game in games
     ]

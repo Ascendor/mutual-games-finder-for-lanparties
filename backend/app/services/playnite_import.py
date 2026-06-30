@@ -499,6 +499,8 @@ def _detect_platform(entry: dict[str, Any]) -> Platform:
         return Platform.gamejolt
     if "humble" in text:
         return Platform.humble
+    if "oculus" in text or "meta quest" in text or "meta pcvr" in text:
+        return Platform.meta
     if "itch" in text or "itch.io" in text:
         return Platform.itch
     if "legacy games" in text or "legacygames" in text:
@@ -527,6 +529,7 @@ def _detect_platform_game_id(entry: dict[str, Any], platform: Platform, title: s
         Platform.bethesda: ("BethesdaId", "bethesdaId", "ProductId", "productId"),
         Platform.gamejolt: ("GameJoltId", "gameJoltId", "GameId", "gameId"),
         Platform.humble: ("HumbleId", "humbleId", "MachineName", "machineName", "ProductId", "productId"),
+        Platform.meta: ("OculusId", "oculusId", "MetaId", "metaId", "AppId", "appId", "ProductId", "productId"),
         Platform.itch: ("ItchId", "itchId", "ItchioId", "itchioId", "Url", "url"),
         Platform.legacy: ("LegacyId", "legacyId", "ProductId", "productId"),
         Platform.nintendo: ("NintendoId", "nintendoId", "TitleId", "titleId", "ProductId", "productId"),

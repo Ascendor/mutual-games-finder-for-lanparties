@@ -21,6 +21,7 @@ class Platform(StrEnum):
     bethesda = "bethesda"
     gamejolt = "gamejolt"
     humble = "humble"
+    meta = "meta"
     itch = "itch"
     legacy = "legacy"
     nintendo = "nintendo"

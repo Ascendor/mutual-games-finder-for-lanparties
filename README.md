@@ -93,6 +93,18 @@ RAWG_API_KEY=...
 
 Die IGDB-Zugangsdaten stammen aus einer Twitch-Developer-Anwendung. Anschliessend werden alle bestehenden Spiele ueber `Synchronisation` -> `Metadaten aktualisieren` neu bewertet.
 
+Einen RAWG-Schluessel gibt es unter `https://rawg.io/apidocs`. HTTP 401 oder 403 kann auch bei ausgeschoepftem Monatskontingent auftreten. IGDB laeuft dann weiter und RAWG wird fuer diesen Metadatenlauf nach einem einzigen Vorabcheck uebersprungen. Nach dem Kontingent-Reset kann der Metadatenlauf ohne Datenverlust erneut gestartet werden.
+
+## Amazon Games, Battle.net, Humble und Meta/Oculus
+
+Diese Plattformen koennen unter **Accounts & Logins** fuer jeden Teilnehmer getrennt verbunden werden:
+
+- Amazon Games verwendet den Anmeldeablauf des Amazon Games Launchers. Nach der Anmeldung wird die komplette Adresse der Abschlussseite in den Assistenten eingefuegt. Das gespeicherte Geraetetoken kann automatisch erneuert werden.
+- Battle.net und Humble verwenden die angemeldete Browser-Sitzung. Der Assistent erklaert in Firefox das Kopieren der passenden Netzwerkanfrage als cURL und liest die Cookies selbst aus.
+- Meta/Oculus verwendet ebenfalls eine kopierte Browser-Anfrage. Aus ihr wird ausschliesslich das fuer die Oculus-GraphQL-Bibliothek erforderliche `oc_ac_at`-Token gespeichert.
+
+Die drei Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen der Anbieter ausfallen oder eine erneute Anmeldung verlangen. Zugangspasswoerter werden dabei nicht an die Anwendung uebermittelt. Playnite-Backups bleiben fuer alle Plattformen als Fallback verfuegbar.
+
 ## Entwicklung ohne Docker
 
 Backend:

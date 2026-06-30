@@ -2,7 +2,7 @@
 from sqlalchemy import select
 
 from app.models import Ownership
-from app.services.import_providers import ImportedGame, _steam_metadata_from_details
+from app.services.import_providers import ImportedGame, _is_non_game_steam_entry, _steam_metadata_from_details
 from app.services.sync_service import _reconcile_account_ownerships, resolve_game, upsert_ownership
 
 
@@ -216,6 +216,13 @@ def test_steam_metadata_marks_only_free_store_games_as_free():
 
     assert free_game["is_free"] is True
     assert demo["is_free"] is False
+
+
+def test_steam_non_game_filter_uses_store_type_and_unambiguous_titles():
+    assert _is_non_game_steam_entry("DEFCON Beta Demo", {}) is True
+    assert _is_non_game_steam_entry("Game Tool", {"store_type": "tool"}) is True
+    assert _is_non_game_steam_entry("Demeo", {}) is False
+    assert _is_non_game_steam_entry("The Finals Playtest", {}) is False
 
 
 def test_provider_partial_metadata_does_not_overwrite_igdb_fields(db):

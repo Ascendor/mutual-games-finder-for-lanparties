@@ -98,6 +98,59 @@ def test_igdb_matching_prefers_the_owned_platform_for_identical_titles():
     assert selected["id"] == 241
 
 
+def test_igdb_matching_prefers_exact_external_store_id():
+    candidates = [
+        {
+            "id": 332258,
+            "name": "Quake",
+            "platforms": [{"name": "PC (Microsoft Windows)"}],
+        },
+        {
+            "id": 333,
+            "name": "Quake",
+            "platforms": [{"name": "PC (Microsoft Windows)"}],
+            "external_games": [{"uid": "2310"}],
+        },
+    ]
+
+    selected = metadata_service._select_igdb_game(
+        "Quake",
+        candidates,
+        [Platform.steam],
+        {"2310", "1435828198"},
+    )
+
+    assert selected is not None
+    assert selected["id"] == 333
+
+
+def test_rawg_availability_rejects_invalid_key_once(monkeypatch):
+    class Response:
+        status_code = 401
+        is_error = True
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr(metadata_service.settings, "rawg_api_key", "invalid")
+    monkeypatch.setattr(metadata_service.httpx, "Client", Client)
+
+    available, reason = metadata_service._rawg_availability()
+
+    assert available is False
+    assert reason == "nicht verfügbar (HTTP 401; Monatskontingent oder Schlüssel prüfen)"
+
+
 def test_metadata_sync_applies_igdb_before_rawg(db, monkeypatch):
     game = Game(
         title="Portal 2",
@@ -120,6 +173,7 @@ def test_metadata_sync_applies_igdb_before_rawg(db, monkeypatch):
     db.commit()
 
     monkeypatch.setattr(metadata_service, "_igdb_access_token", lambda: "token")
+    monkeypatch.setattr(metadata_service, "_rawg_availability", lambda: (True, None))
 
     def fake_fetch(job):
         record = MetadataRecord(primary_source="igdb", external_id="620")

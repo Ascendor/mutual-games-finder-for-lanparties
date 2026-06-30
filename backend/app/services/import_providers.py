@@ -2,8 +2,11 @@
 
 import json
 import os
+import re
 import subprocess
 import time
+import hashlib
+from html import unescape
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -25,6 +28,8 @@ GOG_REDIRECT_URI = "https://embed.gog.com/on_login_success?origin=client"
 GOG_EMBED_URL = "https://embed.gog.com"
 GOG_API_URL = "https://api.gog.com"
 GOG_DEFAULT_CACHE = Path.home() / ".config" / "heroic_gogdl" / "auth.json"
+AMAZON_ENTITLEMENTS_URL = "https://gaming.amazon.com/api/distribution/entitlements"
+AMAZON_TOKEN_URL = "https://api.amazon.com/auth/token"
 
 def platform_value(platform: Platform | str) -> str:
     return platform.value if isinstance(platform, Platform) else str(platform)
@@ -56,6 +61,17 @@ def save_provider_auth_json(platform: Platform, account_id: int, payload: dict[s
     path = provider_auth_json_path(platform, account_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _cookie_headers(credentials: dict[str, Any]) -> dict[str, str]:
+    cookie = str(credentials.get("cookie") or credentials.get("cookies") or "").strip()
+    if not cookie:
+        raise RuntimeError("Die gespeicherte Browser-Sitzung fehlt. Bitte den Account neu verbinden.")
+    return {
+        "Cookie": cookie,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LANPartyGameFinder/1.0",
+        "Accept": "application/json, text/plain, */*",
+    }
 
 
 def _collect_game_candidates(payload: Any) -> list[dict[str, Any]]:
@@ -532,6 +548,7 @@ def _steam_metadata_from_details(appid: int, details: dict[str, Any]) -> dict[st
         "cover_url": details.get("header_image") or f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg",
         "release_date": _parse_date((details.get("release_date") or {}).get("date") if isinstance(details.get("release_date"), dict) else None),
         "genres": genres,
+        "store_type": str(details.get("type") or "").casefold() or None,
         "is_free": bool(details.get("is_free")) and details.get("type") == "game",
         "singleplayer": 2 in category_ids or any("single-player" in category for category in categories),
         "multiplayer": multiplayer,
@@ -587,6 +604,8 @@ class SteamProvider:
         for item in games:
             appid = int(item["appid"])
             metadata = details_by_appid.get(appid, {})
+            if _is_non_game_steam_entry(str(item.get("name") or ""), metadata):
+                continue
             imported_games.append(
                 ImportedGame(
                     platform_game_id=str(appid),
@@ -659,6 +678,19 @@ class SteamProvider:
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
         return details_by_appid
+
+
+STEAM_NON_GAME_TITLE = re.compile(
+    r"\b(?:demo|dedicated\s+server|test\s+server|sdk)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_non_game_steam_entry(title: str, metadata: dict[str, Any]) -> bool:
+    store_type = str(metadata.get("store_type") or "").casefold()
+    if store_type and store_type != "game":
+        return True
+    return bool(STEAM_NON_GAME_TITLE.search(title))
 
 
 class EpicProvider:
@@ -771,6 +803,7 @@ class GOGAuthStore:
 
 class GOGProvider:
     platform = Platform.gog
+    authoritative_library = True
 
     def sync_account(self, account: Account) -> list[ImportedGame]:
         credentials = GOGAuthStore(str(gog_auth_config_path(account.id))).get_credentials()
@@ -780,6 +813,7 @@ class GOGProvider:
         headers = {
             "Authorization": f"Bearer {token}",
             "User-Agent": "gogdl/0 (LAN Party Game Finder)",
+            "Accept-Language": "en-US",
         }
         with httpx.Client(headers=headers, timeout=30) as client:
             owned_response = client.get(f"{GOG_EMBED_URL}/user/data/games")
@@ -795,10 +829,39 @@ class GOGProvider:
                 details_payload = details_response.json() if details_response.is_success else {}
                 details_data = details_payload if isinstance(details_payload, dict) else {}
                 data = _merge_dicts({"platform_game_id": str(game_id)}, product_data, details_data)
+                title = _resolved_gog_title(product_data, details_data)
+                if not title:
+                    raise RuntimeError(
+                        f"GOG did not return a resolved title for product {game_id}; "
+                        "the existing library was kept unchanged."
+                    )
+                data["title"] = title
                 game = _game_from_mapping(data, fallback_platform_id=str(game_id))
                 if game:
                     results.append(game)
             return results
+
+
+GOG_TITLE_TOKEN = re.compile(r"^product_title_\d+$", re.IGNORECASE)
+
+
+def _resolved_gog_title(
+    product_data: dict[str, Any],
+    details_data: dict[str, Any],
+) -> str | None:
+    for payload in (product_data, details_data):
+        value = _first(
+            payload,
+            "title",
+            "name",
+            "productTitle",
+            "product_title",
+            default=None,
+        )
+        title = str(value or "").strip()
+        if title and not GOG_TITLE_TOKEN.fullmatch(title):
+            return title
+    return None
 
 
 UBISOFT_APP_ID = "f68a4bb5-608a-4ff2-8123-be8ef797e0a6"
@@ -926,6 +989,245 @@ class EAProvider:
                     errors.append(f"{url}: {response.status_code}")
         raise RuntimeError("EA sync did not return a library: " + "; ".join(errors[-4:]))
 
+
+def _amazon_credentials(account: Account) -> dict[str, Any]:
+    credentials = load_provider_auth_json(Platform.amazon, account.id)
+    access_token = credentials.get("access_token")
+    expires_at = float(credentials.get("expires_at") or 0)
+    if access_token and expires_at > time.time() + 60:
+        return credentials
+    refresh_token = credentials.get("refresh_token")
+    if not refresh_token:
+        raise RuntimeError("Amazon-Anmeldung ist abgelaufen. Bitte den Account neu verbinden.")
+    response = httpx.post(
+        AMAZON_TOKEN_URL,
+        json={
+            "app_name": "AGSLauncher for Windows",
+            "app_version": "1.0.0",
+            "source_token": refresh_token,
+            "requested_token_type": "access_token",
+            "source_token_type": "refresh_token",
+        },
+        headers={"User-Agent": "AGSLauncher/1.0.0"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    refreshed = response.json()
+    credentials.update(refreshed)
+    credentials["expires_at"] = time.time() + float(refreshed.get("expires_in") or 3600)
+    save_provider_auth_json(Platform.amazon, account.id, credentials)
+    return credentials
+
+
+class AmazonProvider:
+    platform = Platform.amazon
+    authoritative_library = True
+
+    def sync_account(self, account: Account) -> list[ImportedGame]:
+        credentials = _amazon_credentials(account)
+        token = credentials.get("access_token")
+        headers = {
+            "User-Agent": "com.amazon.agslauncher.win/3.0.9495.3",
+            "X-Amz-Target": "com.amazon.animusdistributionservice.entitlement.AnimusEntitlementsService.GetEntitlements",
+            "x-amzn-token": str(token),
+            "Content-Encoding": "amz-1.0",
+            "Expect": "100-continue",
+        }
+        device_serial = str(credentials.get("device_serial") or "")
+        if not device_serial:
+            raise RuntimeError("Amazon-Gerätekennung fehlt. Bitte den Account neu verbinden.")
+        request_data: dict[str, Any] = {
+            "Operation": "GetEntitlements",
+            "clientId": "Sonic",
+            "syncPoint": None,
+            "nextToken": None,
+            "maxResults": 50,
+            "productIdFilter": None,
+            "keyId": "d5dc8b8b-86c8-4fc4-ae93-18c0def5314d",
+            "hardwareHash": hashlib.sha256(device_serial.encode("utf-8")).hexdigest().upper(),
+        }
+        games: list[ImportedGame] = []
+        with httpx.Client(headers=headers, timeout=40) as client:
+            while True:
+                response = client.post(AMAZON_ENTITLEMENTS_URL, json=request_data)
+                response.raise_for_status()
+                payload = response.json()
+                for entitlement in payload.get("entitlements") or []:
+                    product = entitlement.get("product") if isinstance(entitlement, dict) else None
+                    if not isinstance(product, dict) or product.get("productLine") == "Twitch:FuelEntitlement":
+                        continue
+                    title = str(product.get("title") or "").strip()
+                    product_id = str(product.get("id") or product.get("asin") or "").strip()
+                    if not title or not product_id:
+                        continue
+                    detail = product.get("productDetail") if isinstance(product.get("productDetail"), dict) else {}
+                    games.append(
+                        ImportedGame(
+                            platform_game_id=product_id,
+                            title=title,
+                            cover_url=detail.get("iconUrl"),
+                            feature_metadata_known=False,
+                        )
+                    )
+                next_token = payload.get("nextToken")
+                if not next_token:
+                    break
+                request_data["nextToken"] = next_token
+        if not games:
+            raise RuntimeError("Amazon Games hat keine Bibliothek zurückgegeben; vorhandene Daten bleiben erhalten.")
+        return games
+
+
+class BattleNetProvider:
+    platform = Platform.battle_net
+    authoritative_library = True
+
+    def sync_account(self, account: Account) -> list[ImportedGame]:
+        credentials = load_provider_auth_json(Platform.battle_net, account.id)
+        headers = _cookie_headers(credentials)
+        games: list[ImportedGame] = []
+        seen: set[str] = set()
+        with httpx.Client(headers=headers, follow_redirects=True, timeout=30) as client:
+            client.get("https://account.battle.net/oauth2/authorization/account-settings")
+            status_response = client.get("https://account.battle.net/api/")
+            if status_response.status_code == 401:
+                raise RuntimeError("Battle.net-Sitzung ist abgelaufen. Bitte den Account neu verbinden.")
+            games_response = client.get("https://account.battle.net/api/games-and-subs")
+            games_response.raise_for_status()
+            for item in games_response.json().get("gameAccounts") or []:
+                title = str(item.get("localizedGameName") or "").strip()
+                title_id = str(item.get("titleId") or "").strip()
+                if not title or not title_id or title_id in seen:
+                    continue
+                seen.add(title_id)
+                games.append(ImportedGame(platform_game_id=title_id, title=title, feature_metadata_known=False))
+            classic_response = client.get("https://account.battle.net/api/classic-games")
+            if classic_response.is_success:
+                for index, item in enumerate(classic_response.json().get("classicGames") or []):
+                    title = str(item.get("localizedGameName") or "").strip()
+                    if not title:
+                        continue
+                    icon = str(item.get("regionalGameFranchiseIconFilename") or "")
+                    platform_id = f"classic:{icon or normalize_title(title)}:{index}"
+                    if platform_id not in seen:
+                        seen.add(platform_id)
+                        games.append(ImportedGame(platform_game_id=platform_id, title=title, feature_metadata_known=False))
+        if not games:
+            raise RuntimeError("Battle.net hat keine Spiele zurückgegeben; vorhandene Daten bleiben erhalten.")
+        return games
+
+
+HUMBLE_USER_DATA = re.compile(
+    r"""<[^>]+id=["']user-home-json-data["'][^>]*>(?P<data>.*?)</[^>]+>""",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+class HumbleProvider:
+    platform = Platform.humble
+    authoritative_library = True
+
+    def sync_account(self, account: Account) -> list[ImportedGame]:
+        credentials = load_provider_auth_json(Platform.humble, account.id)
+        headers = _cookie_headers(credentials)
+        with httpx.Client(headers=headers, follow_redirects=True, timeout=40) as client:
+            library_response = client.get("https://www.humblebundle.com/home/library?hmb_source=navbar")
+            library_response.raise_for_status()
+            match = HUMBLE_USER_DATA.search(library_response.text)
+            if not match:
+                raise RuntimeError("Humble-Sitzung ist abgelaufen. Bitte den Account neu verbinden.")
+            user_data = json.loads(unescape(match.group("data")).strip())
+            game_keys = [str(value) for value in user_data.get("gamekeys") or [] if value]
+            if not game_keys:
+                raise RuntimeError("Humble hat keine Bibliothek zurückgegeben; vorhandene Daten bleiben erhalten.")
+            games: list[ImportedGame] = []
+            seen: set[str] = set()
+            for offset in range(0, len(game_keys), 40):
+                params: list[tuple[str, str]] = [("all_tpkds", "true")]
+                params.extend(("gamekeys", key) for key in game_keys[offset : offset + 40])
+                response = client.get("https://www.humblebundle.com/api/v1/orders", params=params)
+                response.raise_for_status()
+                orders = response.json()
+                order_values = orders.values() if isinstance(orders, dict) else []
+                for order in order_values:
+                    if not isinstance(order, dict):
+                        continue
+                    for product in order.get("subproducts") or []:
+                        if not isinstance(product, dict):
+                            continue
+                        downloads = product.get("downloads") or []
+                        if not any(isinstance(download, dict) and download.get("platform") == "windows" for download in downloads):
+                            continue
+                        title = str(product.get("human_name") or "").strip()
+                        product_id = str(product.get("machine_name") or "").strip()
+                        if not title or not product_id or product_id in seen:
+                            continue
+                        seen.add(product_id)
+                        games.append(
+                            ImportedGame(
+                                platform_game_id=product_id,
+                                title=title,
+                                cover_url=product.get("icon"),
+                                feature_metadata_known=False,
+                            )
+                        )
+        if not games:
+            raise RuntimeError("Humble hat keine Windows-Spiele zurückgegeben; vorhandene Daten bleiben erhalten.")
+        return games
+
+
+def _meta_entitlement_games(payload: Any) -> list[ImportedGame]:
+    games: list[ImportedGame] = []
+    seen: set[str] = set()
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            item = value.get("item")
+            if isinstance(item, dict):
+                game_id = str(item.get("id") or "").strip()
+                title = str(item.get("display_name") or item.get("displayName") or "").strip()
+                if game_id and title and game_id not in seen:
+                    seen.add(game_id)
+                    games.append(ImportedGame(platform_game_id=game_id, title=title, feature_metadata_known=False))
+            for nested in value.values():
+                visit(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                visit(nested)
+
+    visit(payload)
+    return games
+
+
+class MetaProvider:
+    platform = Platform.meta
+    authoritative_library = True
+
+    def sync_account(self, account: Account) -> list[ImportedGame]:
+        credentials = load_provider_auth_json(Platform.meta, account.id)
+        access_token = str(credentials.get("access_token") or credentials.get("oc_ac_at") or "").strip()
+        if not access_token:
+            raise RuntimeError("Meta/Oculus-Zugriffstoken fehlt. Bitte den Account neu verbinden.")
+        games: list[ImportedGame] = []
+        seen: set[str] = set()
+        with httpx.Client(timeout=40) as client:
+            for document_id in ("9431935310238631", "29383114651302983", "29143116735333849"):
+                response = client.post(
+                    "https://graph.oculus.com/graphql?locale=en_US",
+                    data={"access_token": access_token, "doc_id": document_id},
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if payload.get("errors"):
+                    raise RuntimeError(f"Meta/Oculus-Anmeldung wurde abgelehnt: {payload['errors'][0].get('message', 'unbekannter Fehler')}")
+                for game in _meta_entitlement_games(payload):
+                    if game.platform_game_id not in seen:
+                        seen.add(game.platform_game_id)
+                        games.append(game)
+        if not games:
+            raise RuntimeError("Meta/Oculus hat keine Bibliothek zurückgegeben; vorhandene Daten bleiben erhalten.")
+        return games
+
 PROVIDERS: dict[Platform, ImportProvider] = {
     Platform.steam: SteamProvider(),
     Platform.epic: EpicProvider(),
@@ -933,6 +1235,10 @@ PROVIDERS: dict[Platform, ImportProvider] = {
     Platform.xbox: XboxProvider(),
     Platform.ubisoft: UbisoftProvider(),
     Platform.ea: EAProvider(),
+    Platform.amazon: AmazonProvider(),
+    Platform.battle_net: BattleNetProvider(),
+    Platform.humble: HumbleProvider(),
+    Platform.meta: MetaProvider(),
 }
 
 

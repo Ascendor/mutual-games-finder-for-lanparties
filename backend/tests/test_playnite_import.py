@@ -56,6 +56,21 @@ def test_playnite_import_keeps_supported_non_direct_platforms(db):
     assert diablo.playtime_minutes == 90
 
 
+def test_playnite_import_detects_meta_oculus_source(db):
+    participant = Participant(nickname="VRUser", present=True)
+    db.add(participant)
+    db.commit()
+
+    result = import_playnite_export(
+        db,
+        participant.id,
+        json.dumps({"Games": [{"Name": "Lone Echo", "Source": {"Name": "Oculus"}, "AppId": "1368187813209608"}]}),
+    )
+
+    assert result.platforms == ["meta"]
+    assert participant.ownerships[0].platform == Platform.meta
+
+
 def test_playnite_import_reads_backup_zip(db):
     participant = Participant(nickname="Grace", present=True)
     db.add(participant)

@@ -133,7 +133,18 @@ interface ProviderSlot {
   account?: Account
 }
 
-const loginPlatforms: Platform[] = ['steam', 'epic', 'gog', 'ubisoft', 'xbox', 'ea']
+const loginPlatforms: Platform[] = [
+  'steam',
+  'epic',
+  'gog',
+  'ubisoft',
+  'xbox',
+  'ea',
+  'amazon',
+  'battle_net',
+  'humble',
+  'meta'
+]
 const route = useRoute()
 const store = useLanStore()
 const statuses = ref<ProviderAuthStatus[]>([])
@@ -200,7 +211,7 @@ function statusFor(accountId: number) {
 }
 
 function isConnected(slot: ProviderSlot) {
-  if (!slot.account || slot.account.account_id.startsWith('playnite:')) return false
+  if (!slot.account) return false
   if (slot.platform === 'steam') return /^\d{17}$/.test(slot.account.account_id)
   return Boolean(statusFor(slot.account.id)?.authenticated)
 }
@@ -308,7 +319,11 @@ function platformTitle(platform: Platform) {
     gog: 'GOG',
     ubisoft: 'Ubisoft Connect',
     xbox: 'Xbox Live',
-    ea: 'EA App'
+    ea: 'EA App',
+    amazon: 'Amazon Games',
+    battle_net: 'Battle.net',
+    humble: 'Humble',
+    meta: 'Meta / Oculus'
   }
   return titles[platform] || platform
 }
@@ -320,7 +335,11 @@ function platformIcon(platform: Platform) {
     gog: 'mdi-gamepad-square-outline',
     ubisoft: 'mdi-alpha-u-circle-outline',
     xbox: 'mdi-microsoft-xbox',
-    ea: 'mdi-alpha-e-circle-outline'
+    ea: 'mdi-alpha-e-circle-outline',
+    amazon: 'mdi-amazon',
+    battle_net: 'mdi-battle-net',
+    humble: 'mdi-alpha-h-circle-outline',
+    meta: 'mdi-virtual-reality'
   }
   return icons[platform] || 'mdi-gamepad-variant-outline'
 }

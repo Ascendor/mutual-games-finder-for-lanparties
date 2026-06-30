@@ -212,6 +212,70 @@
             </v-btn>
 
           </template>
+
+          <template v-else-if="target.platform === 'amazon'">
+            <h2 class="text-h6 mb-2">Bei Amazon anmelden</h2>
+            <p class="text-body-2 mb-4">
+              Melde dich auf der geöffneten Amazon-Seite an. Kopiere danach die vollständige Adresse aus der Browserzeile,
+              auch wenn dort nur die normale Amazon-Seite erscheint.
+            </p>
+            <v-btn
+              :href="loginStart?.login_url"
+              target="_blank"
+              color="primary"
+              prepend-icon="mdi-open-in-new"
+              class="mb-4"
+            >
+              Amazon-Anmeldung öffnen
+            </v-btn>
+            <v-textarea
+              v-model="code"
+              label="Adresse nach der Anmeldung"
+              rows="3"
+              auto-grow
+              :disabled="busy"
+              hint="Die App liest den Bestätigungscode selbst aus der vollständigen URL."
+              persistent-hint
+            />
+            <v-btn variant="text" prepend-icon="mdi-content-paste" class="mt-2" @click="pasteCode">
+              Aus Zwischenablage einfügen
+            </v-btn>
+          </template>
+
+          <template v-else-if="isBrowserSessionPlatform">
+            <h2 class="text-h6 mb-2">{{ platformTitle(target.platform) }}-Sitzung übernehmen</h2>
+            <v-alert type="warning" variant="tonal" class="mb-4">
+              Diese direkte Anbindung nutzt eine inoffizielle Browser-Sitzung. Sie kann nach Änderungen des Anbieters
+              vorübergehend ausfallen und muss nach Ablauf der Sitzung erneut verbunden werden.
+            </v-alert>
+            <ol class="session-steps mb-4">
+              <li>Öffne die Loginseite und melde dich vollständig an.</li>
+              <li>Drücke in Firefox <strong>F12</strong>, öffne <strong>Netzwerkanalyse</strong> und lade die Seite neu.</li>
+              <li>Klicke die oberste Anfrage mit Status 200 rechts an und wähle <strong>Wert kopieren → Als cURL kopieren</strong>.</li>
+              <li>Füge die komplette kopierte Anfrage unten ein. Die App findet die Sitzungsdaten selbst.</li>
+            </ol>
+            <v-btn
+              :href="loginStart?.login_url"
+              target="_blank"
+              color="primary"
+              prepend-icon="mdi-open-in-new"
+              class="mb-4"
+            >
+              {{ platformTitle(target.platform) }} öffnen
+            </v-btn>
+            <v-textarea
+              v-model="code"
+              label="Komplette cURL-Anfrage einfügen"
+              rows="5"
+              auto-grow
+              :disabled="busy"
+              hint="Zugangsdaten werden nicht benötigt. Die gespeicherte Sitzung gilt nur für diesen Teilnehmer."
+              persistent-hint
+            />
+            <v-btn variant="text" prepend-icon="mdi-content-paste" class="mt-2" @click="pasteCode">
+              Aus Zwischenablage einfügen
+            </v-btn>
+          </template>
         </template>
 
         <template v-else-if="stage === 3">
@@ -326,6 +390,9 @@ const canSubmit = computed(() => {
   if (platform === 'ea' || platform === 'xbox') return false
   return Boolean(code.value.trim())
 })
+const isBrowserSessionPlatform = computed(() =>
+  ['battle_net', 'humble', 'meta'].includes(props.target?.platform || '')
+)
 const introTitle = computed(() => `${platformTitle(props.target?.platform || '')} verbinden`)
 const introText = computed(() => {
   const platform = props.target?.platform
@@ -334,6 +401,10 @@ const introText = computed(() => {
   if (platform === 'gog') return 'Die Anmeldung findet auf der offiziellen GOG-Seite statt. Danach übernimmt die App den Bestätigungscode.'
   if (platform === 'ubisoft') return 'Du meldest dich direkt mit deinem Ubisoft-Konto an. Falls 2FA aktiv ist, führt der Assistent automatisch zum nächsten Schritt.'
   if (platform === 'xbox') return 'Du bestätigst die Verbindung einmalig bei Microsoft. Danach lädt die App automatisch deine auf dem PC gespielten Xbox-Titel.'
+  if (platform === 'amazon') return 'Du meldest dich einmalig bei Amazon an. Die App speichert eine erneuerbare Geräteanmeldung und lädt deine Amazon-Games-Bibliothek.'
+  if (platform === 'battle_net') return 'Die App übernimmt einmalig deine angemeldete Battle.net-Browsersitzung und kann damit deine PC-Spiele laden.'
+  if (platform === 'humble') return 'Die App übernimmt einmalig deine angemeldete Humble-Browsersitzung und lädt daraus deine Windows-Spiele.'
+  if (platform === 'meta') return 'Die App übernimmt einmalig deine angemeldete Meta-Sitzung und lädt deine Rift-, PCVR- und Quest-Bibliothek.'
   return 'Für diese Plattform ist der Playnite-Import derzeit der verlässlichste und einfachste Weg.'
 })
 const introSteps = computed(() => {
@@ -342,6 +413,8 @@ const introSteps = computed(() => {
   if (platform === 'epic' || platform === 'gog') return ['Offizielle Loginseite öffnen', 'Bestätigung kopieren und einfügen', 'Bibliothek automatisch laden']
   if (platform === 'ubisoft') return ['E-Mail und Passwort eingeben', 'Falls nötig 2FA bestätigen', 'Bibliothek automatisch laden']
   if (platform === 'xbox') return ['Einmaligen Code anzeigen', 'Bei Microsoft bestätigen', 'Bibliothek automatisch laden']
+  if (platform === 'amazon') return ['Amazon-Anmeldung öffnen', 'Adresse zurückgeben', 'Bibliothek automatisch laden']
+  if (['battle_net', 'humble', 'meta'].includes(platform || '')) return ['Anbieterseite öffnen', 'Browser-Anfrage kopieren', 'Bibliothek automatisch laden']
   return ['Playnite-Backup auswählen', 'Backup importieren', 'Spiele prüfen']
 })
 
@@ -580,7 +653,11 @@ function platformTitle(platform: Platform | '') {
     gog: 'GOG',
     ubisoft: 'Ubisoft Connect',
     xbox: 'Xbox Live',
-    ea: 'EA App'
+    ea: 'EA App',
+    amazon: 'Amazon Games',
+    battle_net: 'Battle.net',
+    humble: 'Humble',
+    meta: 'Meta / Oculus'
   }
   return titles[platform] || platform
 }
@@ -592,7 +669,11 @@ function platformIcon(platform: Platform) {
     gog: 'mdi-gamepad-square-outline',
     ubisoft: 'mdi-alpha-u-circle-outline',
     xbox: 'mdi-microsoft-xbox',
-    ea: 'mdi-alpha-e-circle-outline'
+    ea: 'mdi-alpha-e-circle-outline',
+    amazon: 'mdi-amazon',
+    battle_net: 'mdi-battle-net',
+    humble: 'mdi-alpha-h-circle-outline',
+    meta: 'mdi-virtual-reality'
   }
   return icons[platform] || 'mdi-gamepad-variant-outline'
 }
@@ -610,6 +691,14 @@ function platformIcon(platform: Platform) {
   gap: 8px;
   color: rgb(var(--v-theme-on-surface-variant));
   font-size: 0.75rem;
+}
+
+.session-steps {
+  padding-left: 22px;
+}
+
+.session-steps li {
+  margin-bottom: 8px;
 }
 
 .xbox-code-row {

@@ -1,9 +1,12 @@
 ﻿from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import re
+import secrets
 import time
+import uuid
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -28,7 +31,19 @@ from app.services.import_providers import (
 
 EPIC_LOGIN_URL = "https://legendary.gl/epiclogin"
 UBISOFT_APP_ID = "f68a4bb5-608a-4ff2-8123-be8ef797e0a6"
-LOGIN_PLATFORMS = {Platform.epic, Platform.gog, Platform.ubisoft, Platform.xbox, Platform.ea}
+LOGIN_PLATFORMS = {
+    Platform.epic,
+    Platform.gog,
+    Platform.ubisoft,
+    Platform.xbox,
+    Platform.ea,
+    Platform.amazon,
+    Platform.battle_net,
+    Platform.humble,
+    Platform.meta,
+}
+AMAZON_DEVICE_TYPE = "A2UMVHOX7UP4V7"
+AMAZON_LOGIN_URL = "https://www.amazon.com/ap/signin"
 
 
 def _account_platform(account: Account) -> Platform:
@@ -132,6 +147,87 @@ def _provider_payload_from_input(code: str, fields: dict[str, Any] | None = None
         if value not in (None, "") and key != "code":
             payload.setdefault(key, value)
     return payload
+
+
+def _extract_browser_cookie(value: str) -> str:
+    text = _unwrap_pasted_value(value)
+    if not text:
+        return ""
+    if text.startswith(("[", "{")):
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            payload = None
+        cookie_items = payload if isinstance(payload, list) else payload.get("cookies") if isinstance(payload, dict) else None
+        if isinstance(cookie_items, list):
+            cookies = [
+                f"{item['name']}={item['value']}"
+                for item in cookie_items
+                if isinstance(item, dict) and item.get("name") and item.get("value") is not None
+            ]
+            if cookies:
+                return "; ".join(cookies)
+    for pattern in (
+        r"""(?:-H|--header)\s+(?:"Cookie:\s*([^"]+)"|'Cookie:\s*([^']+)')""",
+        r"""(?:-b|--cookie)\s+(?:"([^"]+)"|'([^']+)')""",
+        r"""Cookie:\s*([^\r\n]+)""",
+    ):
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return next((group.strip() for group in match.groups() if group), "")
+    if re.search(r"(?:^|;\s*)[\w.-]+=", text):
+        return text.removeprefix("Cookie:").strip()
+    return ""
+
+
+def _cookie_value(cookie_header: str, name: str) -> str | None:
+    for item in cookie_header.split(";"):
+        key, separator, value = item.strip().partition("=")
+        if separator and key == name:
+            return value.strip()
+    return None
+
+
+def _amazon_login(account: Account) -> dict[str, Any]:
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii").rstrip("=")
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("utf-8")).digest()).decode("ascii").rstrip("=")
+    device_serial = uuid.uuid1().hex.upper()
+    client_id = f"{device_serial}#{AMAZON_DEVICE_TYPE}".encode("ascii").hex()
+    save_provider_auth_json(
+        Platform.amazon,
+        account.id,
+        {
+            "pending_code_verifier": verifier,
+            "pending_client_id": client_id,
+            "device_serial": device_serial,
+        },
+    )
+    params = {
+        "openid.ns": "http://specs.openid.net/auth/2.0",
+        "openid.claimed_id": "http://specs.openid.net/auth/2.0/identifier_select",
+        "openid.identity": "http://specs.openid.net/auth/2.0/identifier_select",
+        "openid.mode": "checkid_setup",
+        "openid.oa2.scope": "device_auth_access",
+        "openid.ns.oa2": "http://www.amazon.com/ap/ext/oauth/2",
+        "openid.oa2.response_type": "code",
+        "openid.oa2.code_challenge_method": "S256",
+        "openid.oa2.client_id": f"device:{client_id}",
+        "language": "en_US",
+        "marketPlaceId": "ATVPDKIKX0DER",
+        "openid.return_to": "https://www.amazon.com",
+        "openid.pape.max_auth_age": "0",
+        "openid.assoc_handle": "amzn_sonic_games_launcher",
+        "pageId": "amzn_sonic_games_launcher",
+        "openid.oa2.code_challenge": challenge,
+    }
+    return {
+        "account_id": account.id,
+        "participant_id": account.participant_id,
+        "platform": Platform.amazon,
+        "login_url": f"{AMAZON_LOGIN_URL}?{urlencode(params)}",
+        "code_label": "Adresse nach der Anmeldung",
+        "message": "Nach der Amazon-Anmeldung die vollständige Adresse der letzten Seite kopieren.",
+    }
 
 
 def _pick_first(payload: dict[str, Any], *keys: str) -> Any:
@@ -292,6 +388,12 @@ def generic_json_status(account: Account) -> dict[str, Any]:
     if platform == Platform.ubisoft:
         authenticated = bool(_ubisoft_ticket(credentials) and _ubisoft_profile_id(credentials, account))
         needs_2fa = bool(credentials.get("pending_2fa_ticket")) and not authenticated
+    elif platform == Platform.amazon:
+        authenticated = bool(credentials.get("access_token") and credentials.get("refresh_token"))
+    elif platform in {Platform.battle_net, Platform.humble}:
+        authenticated = bool(credentials.get("cookie"))
+    elif platform == Platform.meta:
+        authenticated = bool(credentials.get("access_token"))
     message = f"{label} auth data is stored" if authenticated else f"{label} is not connected"
     if needs_2fa:
         message = "Ubisoft wartet auf 2FA-Code"
@@ -367,6 +469,35 @@ def start(account: Account) -> dict[str, Any]:
             "code_label": "",
             "message": "EA bietet keinen stabilen Drittanbieter-Login. Bitte ein Playnite-Backup importieren.",
         }
+    if platform == Platform.amazon:
+        return _amazon_login(account)
+    if platform == Platform.battle_net:
+        return {
+            "account_id": account.id,
+            "participant_id": account.participant_id,
+            "platform": platform,
+            "login_url": "https://account.battle.net/api/games-and-subs",
+            "code_label": "Kopierte Browser-Anfrage",
+            "message": "Bei Battle.net anmelden und die Bibliotheksanfrage als cURL kopieren.",
+        }
+    if platform == Platform.humble:
+        return {
+            "account_id": account.id,
+            "participant_id": account.participant_id,
+            "platform": platform,
+            "login_url": "https://www.humblebundle.com/home/library?hmb_source=navbar",
+            "code_label": "Kopierte Browser-Anfrage",
+            "message": "Bei Humble anmelden und die Bibliotheksanfrage als cURL kopieren.",
+        }
+    if platform == Platform.meta:
+        return {
+            "account_id": account.id,
+            "participant_id": account.participant_id,
+            "platform": platform,
+            "login_url": "https://secure.oculus.com/my/profile/",
+            "code_label": "Kopierte Browser-Anfrage",
+            "message": "Bei Meta anmelden und die Profilanfrage als cURL kopieren.",
+        }
     raise _provider_error(platform)
 
 
@@ -395,6 +526,97 @@ def complete_gog(account: Account, code: str, redirect_uri: str = GOG_REDIRECT_U
     all_credentials[GOG_CLIENT_ID] = credentials
     store._save_all(all_credentials)
     return {"account_id": account.id, "participant_id": account.participant_id, "platform": _account_platform(account), "authenticated": True, "message": "GOG connected"}
+
+
+def complete_amazon(account: Account, value: str) -> dict[str, Any]:
+    pasted = _unwrap_pasted_value(value)
+    parsed = urlparse(pasted)
+    query = {**parse_qs(parsed.query), **parse_qs(parsed.fragment)}
+    authorization_code = str(
+        (query.get("openid.oa2.authorization_code") or query.get("authorization_code") or query.get("code") or [""])[0]
+    ).strip()
+    if not authorization_code:
+        match = re.search(r"openid\.oa2\.authorization_code[=:]\s*([^&\s]+)", pasted)
+        authorization_code = match.group(1) if match else ""
+    pending = load_provider_auth_json(Platform.amazon, account.id)
+    verifier = pending.get("pending_code_verifier")
+    client_id = pending.get("pending_client_id")
+    if not authorization_code or not verifier or not client_id:
+        raise RuntimeError("Amazon-Bestätigungscode fehlt. Bitte die vollständige Adresse nach der Anmeldung einfügen.")
+    request_data = {
+        "auth_data": {
+            "use_global_authentication": False,
+            "authorization_code": authorization_code,
+            "code_verifier": verifier,
+            "code_algorithm": "SHA-256",
+            "client_id": client_id,
+            "client_domain": "DeviceLegacy",
+        },
+        "registration_data": {
+            "app_name": "AGSLauncher for Windows",
+            "app_version": "1.0.0",
+            "device_model": "Windows",
+            "device_name": None,
+            "device_serial": pending.get("device_serial") or secrets.token_hex(16),
+            "device_type": AMAZON_DEVICE_TYPE,
+            "domain": "Device",
+            "os_version": "10.0.19044.0",
+        },
+        "requested_extensions": ["customer_info", "device_info"],
+        "requested_token_type": ["bearer", "mac_dms"],
+        "user_context_map": {},
+    }
+    response = httpx.post(
+        "https://api.amazon.com/auth/register",
+        json=request_data,
+        headers={"User-Agent": "AGSLauncher/1.0.0"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    bearer = (
+        payload.get("response", {})
+        .get("success", {})
+        .get("tokens", {})
+        .get("bearer", {})
+    )
+    if not bearer.get("access_token") or not bearer.get("refresh_token"):
+        raise RuntimeError("Amazon hat keine verwendbare Anmeldung zurückgegeben.")
+    bearer["expires_at"] = time.time() + float(bearer.get("expires_in") or 3600)
+    bearer["device_serial"] = request_data["registration_data"]["device_serial"]
+    save_provider_auth_json(Platform.amazon, account.id, bearer)
+    return {
+        "account_id": account.id,
+        "participant_id": account.participant_id,
+        "platform": Platform.amazon,
+        "authenticated": True,
+        "message": "Amazon Games verbunden",
+    }
+
+
+def complete_browser_session(account: Account, value: str) -> dict[str, Any]:
+    platform = _account_platform(account)
+    cookie = _extract_browser_cookie(value)
+    if not cookie:
+        raise RuntimeError(
+            "Keine Browser-Sitzung erkannt. Bitte im Netzwerk-Tab die angegebene Anfrage mit "
+            "„Kopieren > Als cURL kopieren“ übernehmen und vollständig einfügen."
+        )
+    if platform == Platform.meta:
+        access_token = _cookie_value(cookie, "oc_ac_at")
+        if not access_token:
+            raise RuntimeError("In der kopierten Meta-Anfrage fehlt das Cookie oc_ac_at. Bitte die Profilseite neu laden und erneut kopieren.")
+        credentials = {"access_token": access_token}
+    else:
+        credentials = {"cookie": cookie}
+    save_provider_auth_json(platform, account.id, credentials)
+    return {
+        "account_id": account.id,
+        "participant_id": account.participant_id,
+        "platform": platform,
+        "authenticated": True,
+        "message": f"{platform_value(platform)} verbunden",
+    }
 
 
 def complete_ubisoft(account: Account, code: str, fields: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -452,6 +674,10 @@ def complete(account: Account, code: str, fields: dict[str, Any] | None = None) 
         return complete_ubisoft(account, code, fields)
     if platform == Platform.ea:
         raise ValueError("EA kann nicht direkt verbunden werden. Bitte ein Playnite-Backup importieren.")
+    if platform == Platform.amazon:
+        return complete_amazon(account, code)
+    if platform in {Platform.battle_net, Platform.humble, Platform.meta}:
+        return complete_browser_session(account, code)
     return complete_generic_json(account, code, fields)
 
 

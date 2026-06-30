@@ -1,12 +1,26 @@
 ﻿import json
 import time
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
 import app.services.import_providers as import_providers
 from app.models import Account, Platform
-from app.services.import_providers import EAProvider, EpicProvider, GOG_CLIENT_ID, GOGProvider, SteamProvider, UbisoftProvider, XboxProvider
+from app.services.import_providers import (
+    AmazonProvider,
+    BattleNetProvider,
+    EAProvider,
+    EpicProvider,
+    GOG_CLIENT_ID,
+    GOGProvider,
+    HumbleProvider,
+    MetaProvider,
+    SteamProvider,
+    UbisoftProvider,
+    XboxProvider,
+    _resolved_gog_title,
+)
 
 
 class FakeResponse:
@@ -113,6 +127,18 @@ def test_gog_provider_uses_auth_cache_and_direct_api(monkeypatch, tmp_path):
     assert games[0].title == "Stardew Valley"
     assert games[0].playtime_minutes == 120
     assert games[0].singleplayer is True
+    assert provider.authoritative_library is True
+
+
+def test_gog_title_resolution_rejects_localization_tokens():
+    assert _resolved_gog_title(
+        {"title": "product_title_2034259767"},
+        {"title": "STAR WARS Jedi Knight: Dark Forces II"},
+    ) == "STAR WARS Jedi Knight: Dark Forces II"
+    assert _resolved_gog_title(
+        {"title": "product_title_2034259767"},
+        {},
+    ) is None
 
 
 
@@ -280,6 +306,124 @@ def test_provider_auth_cleans_common_gog_paste_variants():
     assert _clean_gog_code("https://embed.gog.com/on_login_success?code=gog-code") == "gog-code"
 
 
+def test_provider_auth_extracts_firefox_curl_and_cookie_json():
+    from app.services.provider_auth import _extract_browser_cookie
+
+    curl = """curl 'https://account.battle.net/api/games-and-subs' -H 'Accept: application/json' -H 'Cookie: sid=abc; region=eu'"""
+    cookie_json = '[{"name":"oc_ac_at","value":"meta-token"},{"name":"locale","value":"de_DE"}]'
+
+    assert _extract_browser_cookie(curl) == "sid=abc; region=eu"
+    assert _extract_browser_cookie(cookie_json) == "oc_ac_at=meta-token; locale=de_DE"
+
+
+def test_provider_auth_stores_meta_access_token(monkeypatch, tmp_path):
+    from app.services import provider_auth
+
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    account = Account(id=31, participant_id=1, platform=Platform.meta, account_id="local-meta-1-1")
+
+    result = provider_auth.complete(
+        account,
+        """curl 'https://secure.oculus.com/my/profile/' -H 'Cookie: locale=de_DE; oc_ac_at=meta-token; session=abc'""",
+    )
+    stored = import_providers.load_provider_auth_json(Platform.meta, 31)
+
+    assert result["authenticated"] is True
+    assert stored == {"access_token": "meta-token"}
+    assert provider_auth.account_status(account)["authenticated"] is True
+
+
+def test_amazon_login_exchanges_callback_for_refreshable_tokens(monkeypatch, tmp_path):
+    from app.services import provider_auth
+
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    account = Account(id=32, participant_id=1, platform=Platform.amazon, account_id="local-amazon-1-1")
+    start = provider_auth.start(account)
+    monkeypatch.setattr(
+        provider_auth.httpx,
+        "post",
+        lambda *args, **kwargs: FakeResponse(
+            {
+                "response": {
+                    "success": {
+                        "tokens": {
+                            "bearer": {
+                                "access_token": "amazon-access",
+                                "refresh_token": "amazon-refresh",
+                                "expires_in": 3600,
+                            }
+                        }
+                    }
+                }
+            }
+        ),
+    )
+
+    result = provider_auth.complete(
+        account,
+        "https://www.amazon.com/?openid.oa2.authorization_code=amazon-code",
+    )
+    stored = import_providers.load_provider_auth_json(Platform.amazon, 32)
+    login_query = parse_qs(urlparse(start["login_url"]).query)
+    client_id = login_query["openid.oa2.client_id"][0].removeprefix("device:")
+
+    assert "openid.oa2.code_challenge=" in start["login_url"]
+    assert bytes.fromhex(client_id).decode("ascii").endswith("#A2UMVHOX7UP4V7")
+    assert result["authenticated"] is True
+    assert stored["refresh_token"] == "amazon-refresh"
+
+
+def test_amazon_provider_reads_entitlements(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(
+        Platform.amazon,
+        33,
+        {
+            "access_token": "amazon-access",
+            "refresh_token": "amazon-refresh",
+            "expires_at": time.time() + 3600,
+            "device_serial": "0123456789abcdef0123456789abcdef",
+        },
+    )
+
+    class AmazonClient:
+        def __init__(self, **kwargs):
+            self.headers = kwargs.get("headers", {})
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json=None):
+            assert json["Operation"] == "GetEntitlements"
+            assert json["clientId"] == "Sonic"
+            assert len(json["hardwareHash"]) == 64
+            return FakeResponse(
+                {
+                    "entitlements": [
+                        {
+                            "product": {
+                                "id": "amazon-game-1",
+                                "title": "The Forgotten City",
+                                "productLine": "Amazon:Game",
+                                "productDetail": {"iconUrl": "https://example.test/icon.jpg"},
+                            }
+                        }
+                    ]
+                }
+            )
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: AmazonClient(**kwargs))
+    games = AmazonProvider().sync_account(
+        Account(id=33, participant_id=1, platform=Platform.amazon, account_id="local-amazon-1-1")
+    )
+
+    assert len(games) == 1
+    assert games[0].platform_game_id == "amazon-game-1"
+
+
 def test_provider_auth_rejects_direct_ea_login():
     from app.services import provider_auth
 
@@ -381,5 +525,106 @@ def test_ubisoft_provider_parses_applications_library(monkeypatch, tmp_path):
     assert games[0].title == "Beyond Good and Evil"
     assert games[0].multiplayer is True
     assert any("limit=100" in url for url in requested_urls)
+
+
+def test_battlenet_provider_reads_web_session_library(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(Platform.battle_net, 41, {"cookie": "sid=abc"})
+
+    class BattleNetClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url):
+            if url.endswith("/api/"):
+                return FakeResponse({"authenticated": True})
+            if url.endswith("games-and-subs"):
+                return FakeResponse({"gameAccounts": [{"titleId": 123, "localizedGameName": "Diablo IV"}]})
+            return FakeResponse({"classicGames": [{"localizedGameName": "Diablo II", "regionalGameFranchiseIconFilename": "diablo-ii"}]})
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: BattleNetClient(**kwargs))
+    games = BattleNetProvider().sync_account(
+        Account(id=41, participant_id=1, platform=Platform.battle_net, account_id="local-battle_net-1-1")
+    )
+
+    assert [game.title for game in games] == ["Diablo IV", "Diablo II"]
+
+
+def test_humble_provider_reads_windows_games(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(Platform.humble, 42, {"cookie": "_simpleauth_sess=abc"})
+
+    class HumbleResponse(FakeResponse):
+        def __init__(self, payload=None, text=""):
+            super().__init__(payload or {})
+            self.text = text
+
+    class HumbleClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, params=None):
+            if "/home/library" in url:
+                return HumbleResponse(text='<script id="user-home-json-data">{"gamekeys":["key-1"]}</script>')
+            return HumbleResponse(
+                {
+                    "key-1": {
+                        "subproducts": [
+                            {
+                                "machine_name": "ftl",
+                                "human_name": "FTL: Faster Than Light",
+                                "downloads": [{"platform": "windows"}],
+                            }
+                        ]
+                    }
+                }
+            )
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: HumbleClient(**kwargs))
+    games = HumbleProvider().sync_account(
+        Account(id=42, participant_id=1, platform=Platform.humble, account_id="local-humble-1-1")
+    )
+
+    assert len(games) == 1
+    assert games[0].platform_game_id == "ftl"
+
+
+def test_meta_provider_combines_pc_and_quest_entitlements(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(Platform.meta, 43, {"access_token": "token"})
+
+    class MetaClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, data=None):
+            document_id = data["doc_id"]
+            item = {"id": document_id, "display_name": f"Game {document_id}"}
+            return FakeResponse({"data": {"viewer": {"user": {"entitlements": {"edges": [{"node": {"item": item}}]}}}}})
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: MetaClient(**kwargs))
+    games = MetaProvider().sync_account(
+        Account(id=43, participant_id=1, platform=Platform.meta, account_id="local-meta-1-1")
+    )
+
+    assert len(games) == 3
 
 

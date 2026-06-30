@@ -7,7 +7,17 @@ from app.models import Account, Platform
 from app.schemas import AccountCreate, AccountRead, AccountUpdate
 
 router = APIRouter()
-LOCAL_ID_PLATFORMS = {Platform.epic, Platform.gog, Platform.ubisoft, Platform.xbox, Platform.ea}
+LOCAL_ID_PLATFORMS = {
+    Platform.epic,
+    Platform.gog,
+    Platform.ubisoft,
+    Platform.xbox,
+    Platform.ea,
+    Platform.amazon,
+    Platform.battle_net,
+    Platform.humble,
+    Platform.meta,
+}
 
 
 def _platform_value(platform: Platform | str) -> str:
