@@ -17,6 +17,12 @@
       <div class="text-caption text-medium-emphasis">{{ item.players }}</div>
     </template>
     <template #item.owner_count="{ item }">{{ item.owner_display }}</template>
+    <template #item.coverage_percent="{ item }">
+      <strong>{{ item.availability_display }}</strong>
+      <div v-if="item.unknown_display" class="text-caption text-medium-emphasis">
+        {{ item.unknown_display }}
+      </div>
+    </template>
     <template #item.total_hours="{ item }">{{ item.total_hours }} h</template>
     <template #item.median_hours="{ item }">{{ item.median_hours }} h</template>
     <template #item.average_hours="{ item }">{{ item.average_hours }} h</template>
@@ -38,9 +44,15 @@ import GameFilterBar from './GameFilterBar.vue'
 import { createGameFilterState, matchesGameFilters } from '../gameFilters'
 import type { Game, Recommendation } from '../types'
 
-const props = withDefaults(defineProps<{ items: Recommendation[]; loading?: boolean; limit?: number }>(), {
+const props = withDefaults(defineProps<{
+  items: Recommendation[]
+  loading?: boolean
+  limit?: number
+  showAvailability?: boolean
+}>(), {
   loading: false,
-  limit: 0
+  limit: 0,
+  showAvailability: false
 })
 const filters = ref(createGameFilterState())
 const games = computed(() => props.items.map((item) => item.game))
@@ -49,15 +61,17 @@ const filteredItems = computed(() => {
   return props.limit > 0 ? filtered.slice(0, props.limit) : filtered
 })
 
-const headers = [
+const headers = computed(() => [
   { title: 'Spiel', key: 'title' },
-  { title: 'Besitzer', key: 'owner_count' },
+  props.showAvailability
+    ? { title: 'Verfügbarkeit', key: 'coverage_percent' }
+    : { title: 'Besitzer', key: 'owner_count' },
   { title: 'Gesamt', key: 'total_hours' },
   { title: 'Median', key: 'median_hours' },
   { title: 'Durchschnitt', key: 'average_hours' },
   { title: 'Features', key: 'features' },
   { title: 'Plattformen', key: 'platforms' }
-]
+])
 
 const rows = computed(() =>
   filteredItems.value.map((rec) => ({
@@ -66,6 +80,11 @@ const rows = computed(() =>
     players: playerLabel(rec.game),
     owner_count: rec.owner_count,
     owner_display: rec.game.is_free ? `Alle (${rec.owner_count} importiert)` : String(rec.owner_count),
+    coverage_percent: rec.coverage_percent,
+    availability_display: rec.game.is_free
+      ? 'Für alle kostenlos'
+      : `${rec.available_player_count} von ${rec.known_player_count} bestätigt`,
+    unknown_display: unknownPlayerLabel(rec),
     total_hours: hours(rec.total_playtime_minutes),
     median_hours: hours(rec.median_playtime_minutes),
     average_hours: hours(rec.average_playtime_minutes),
@@ -80,6 +99,12 @@ const rows = computed(() =>
 )
 
 const hours = (minutes: number) => Math.round(minutes / 60)
+
+function unknownPlayerLabel(rec: Recommendation) {
+  const names = rec.unknown_players.map((participant) => participant.nickname)
+  if (!names.length) return ''
+  return `Bei ${names.join(', ')} unbekannt`
+}
 
 function featureText(game: Game) {
   return [

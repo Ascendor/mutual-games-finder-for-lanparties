@@ -6,7 +6,7 @@
         <v-select v-model="selected" :items="store.participants" item-title="nickname" item-value="id" label="Ausgewählte Spieler" multiple chips density="compact" />
       </v-col>
       <v-col cols="12" md="3" class="d-flex align-center">
-        <v-btn color="primary" prepend-icon="mdi-star-search-outline" :loading="loading" :disabled="selected.length === 0" @click="load">Berechnen</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-star-search-outline" :loading="loading || commonLoading" :disabled="selected.length === 0" @click="load">Berechnen</v-btn>
       </v-col>
     </v-row>
 
@@ -20,7 +20,28 @@
       <v-tab value="new">Neu für die Gruppe</v-tab>
     </v-tabs>
     <v-window v-model="tab" class="mt-4">
-      <v-window-item value="common"><RecommendationTable :items="common" :loading="loading" /></v-window-item>
+      <v-window-item value="common">
+        <div class="availability-filter mb-3">
+          <span class="text-body-2 font-weight-medium">Mindestens verfügbar für</span>
+          <v-btn-toggle
+            v-model="minimumCoverage"
+            color="primary"
+            density="compact"
+            mandatory
+            divided
+            @update:model-value="loadCommon"
+          >
+            <v-btn :value="100">Alle</v-btn>
+            <v-btn :value="75">75 %</v-btn>
+            <v-btn :value="50">50 %</v-btn>
+          </v-btn-toggle>
+        </div>
+        <RecommendationTable
+          :items="common"
+          :loading="loading || commonLoading"
+          show-availability
+        />
+      </v-window-item>
       <v-window-item value="coop"><RecommendationTable :items="coop" :loading="loading" /></v-window-item>
       <v-window-item value="lan"><RecommendationTable :items="lan" :loading="loading" /></v-window-item>
       <v-window-item value="popular"><RecommendationTable :items="popular" :loading="loading || store.loading" /></v-window-item>
@@ -47,6 +68,8 @@ const lan = ref<Recommendation[]>([])
 const popular = ref<Recommendation[]>([])
 const newForGroup = ref<Recommendation[]>([])
 const loading = ref(false)
+const commonLoading = ref(false)
+const minimumCoverage = ref(75)
 const error = ref('')
 
 onMounted(async () => {
@@ -63,7 +86,7 @@ async function load() {
   error.value = ''
   try {
     const [commonGames, coopGames, lanGames, popularGames, newGames] = await Promise.all([
-      api.common(selected.value),
+      api.common(selected.value, minimumCoverage.value),
       api.coop(selected.value),
       api.lanForGroup(selected.value),
       api.recommendations('popular'),
@@ -80,6 +103,28 @@ async function load() {
     loading.value = false
   }
 }
+
+async function loadCommon() {
+  if (!selected.value.length || loading.value) return
+  commonLoading.value = true
+  error.value = ''
+  try {
+    common.value = await api.common(selected.value, minimumCoverage.value)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    commonLoading.value = false
+  }
+}
 </script>
+
+<style scoped>
+.availability-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+</style>
 
 

@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from app.models import Participant, RecommendationCacheRevision
+from app.models import Account, Participant, Platform, RecommendationCacheRevision
 from app.services.recommendation_cache import (
     RecommendationCache,
     recommendation_cache,
@@ -37,6 +37,25 @@ def test_recommendation_cache_is_invalidated_by_relevant_commit(db):
     revision = recommendation_cache.revision
 
     db.add(Participant(nickname="CacheInvalidation"))
+    db.commit()
+
+    assert recommendation_cache.revision > revision
+
+
+def test_recommendation_cache_is_invalidated_by_account_status_change(db):
+    participant = Participant(nickname="AccountStatus")
+    db.add(participant)
+    db.flush()
+    account = Account(
+        participant_id=participant.id,
+        platform=Platform.steam,
+        account_id="account-status",
+    )
+    db.add(account)
+    db.commit()
+    revision = recommendation_cache.revision
+
+    account.last_error = "Library is not accessible"
     db.commit()
 
     assert recommendation_cache.revision > revision

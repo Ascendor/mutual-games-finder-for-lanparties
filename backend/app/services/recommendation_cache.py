@@ -10,12 +10,12 @@ from sqlalchemy import event, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import Game, Ownership, Participant, PlatformGameMapping, RecommendationCacheRevision
+from app.models import Account, Game, Ownership, Participant, PlatformGameMapping, RecommendationCacheRevision
 from app.schemas import RecommendationRead
 
 
 CacheKey = tuple[Hashable, ...]
-RELEVANT_MODELS = (Game, Ownership, Participant, PlatformGameMapping)
+RELEVANT_MODELS = (Account, Game, Ownership, Participant, PlatformGameMapping)
 
 
 class RecommendationCache:

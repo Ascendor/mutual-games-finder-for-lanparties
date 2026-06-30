@@ -51,7 +51,12 @@ export const api = {
   recommendations: (kind: 'popular' | 'lan' | 'present' | 'new', limit?: number) =>
     request<Recommendation[]>(`/recommendations/${kind}${limit ? `?limit=${limit}` : ''}`),
   newForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/new${players.length ? `?${players.map((id) => `players=${id}`).join('&')}` : ''}`),
-  common: (players: number[]) => request<Recommendation[]>(`/recommendations/common?${players.map((id) => `players=${id}`).join('&')}`),
+  common: (players: number[], minimumCoverage = 75) => {
+    const params = new URLSearchParams()
+    players.forEach((id) => params.append('players', String(id)))
+    params.set('minimum_coverage', String(minimumCoverage))
+    return request<Recommendation[]>(`/recommendations/common?${params}`)
+  },
   coop: (players: number[]) => request<Recommendation[]>(`/recommendations/coop?${players.map((id) => `players=${id}`).join('&')}`),
   lanForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/lan?${players.map((id) => `players=${id}`).join('&')}`),
   syncAccount: (id: number) => request<SyncRun>(`/sync/accounts/${id}`, { method: 'POST' }),

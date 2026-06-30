@@ -79,12 +79,17 @@ export interface GameOwner {
 export interface Recommendation {
   game: Game
   owner_count: number
+  available_player_count: number
+  known_player_count: number
+  selected_player_count: number
+  coverage_percent: number
   total_playtime_minutes: number
   average_playtime_minutes: number
   median_playtime_minutes: number
   score: number
   platforms: Platform[]
   owners: Participant[]
+  unknown_players: Participant[]
 }
 
 

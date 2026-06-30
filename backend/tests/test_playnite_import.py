@@ -30,6 +30,7 @@ def test_playnite_import_reuses_direct_platform_account_and_avoids_duplicates(db
     assert result.created_accounts == 1
     assert {account.platform for account in participant.accounts} == {Platform.steam, Platform.local}
     assert len(participant.ownerships) == 2
+    assert steam.last_successful_sync is not None
     portal = next(own for own in participant.ownerships if own.game.title == "Portal 2")
     assert portal.account_id == steam.id
     assert portal.playtime_minutes == 180

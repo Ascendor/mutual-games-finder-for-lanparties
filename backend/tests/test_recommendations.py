@@ -1,10 +1,18 @@
 ﻿from app.models import Account, Game, Ownership, Participant, Platform
+from datetime import datetime
+
+from app.models import PlatformGameMapping
 from app.services.normalization import normalize_title
 from app.services.recommendations import find_best_lan_games, find_common_coop_games, find_common_games, find_common_lan_games, find_games_for_group_size, find_most_popular_games, find_new_for_group_games
 
 
 def add_owned(db, participant, game, minutes=0):
-    account = Account(participant_id=participant.id, platform=Platform.steam, account_id=f"{participant.nickname}-{game.title}")
+    account = Account(
+        participant_id=participant.id,
+        platform=Platform.steam,
+        account_id=f"{participant.nickname}-{game.title}",
+        last_successful_sync=datetime.utcnow(),
+    )
     db.add(account)
     db.flush()
     db.add(
@@ -72,7 +80,111 @@ def test_known_free_steam_game_is_available_to_every_selected_player(db):
 
     assert [item.game.title for item in common] == ["Free Arena"]
     assert common[0].owner_count == 0
+    assert common[0].available_player_count == 2
+    assert common[0].known_player_count == 2
+    assert common[0].coverage_percent == 100
     assert common[0].platforms == [Platform.steam]
+
+
+def test_common_games_ignore_unreadable_library_and_apply_coverage_threshold(db):
+    ada = Participant(nickname="Ada", present=True)
+    linus = Participant(nickname="Linus", present=True)
+    player_three = Participant(nickname="player_three", present=True)
+    broad = Game(
+        title="Broadly Owned",
+        normalized_title=normalize_title("Broadly Owned"),
+        multiplayer=True,
+    )
+    partial = Game(
+        title="Half Owned",
+        normalized_title=normalize_title("Half Owned"),
+        multiplayer=True,
+    )
+    db.add_all([ada, linus, player_three, broad, partial])
+    db.flush()
+    add_owned(db, ada, broad)
+    add_owned(db, linus, broad)
+    add_owned(db, ada, partial)
+    db.add(
+        Account(
+            participant_id=player_three.id,
+            platform=Platform.steam,
+            account_id="private-library",
+            last_error="Steam library is not accessible",
+        )
+    )
+    db.commit()
+
+    at_75_percent = find_common_games(
+        db,
+        [ada.id, linus.id, player_three.id],
+        minimum_coverage=0.75,
+    )
+    at_50_percent = find_common_games(
+        db,
+        [ada.id, linus.id, player_three.id],
+        minimum_coverage=0.5,
+    )
+
+    assert [item.game.title for item in at_75_percent] == ["Broadly Owned"]
+    assert [item.game.title for item in at_50_percent] == [
+        "Broadly Owned",
+        "Half Owned",
+    ]
+    assert at_75_percent[0].available_player_count == 2
+    assert at_75_percent[0].known_player_count == 2
+    assert at_75_percent[0].coverage_percent == 100
+    assert [player.nickname for player in at_75_percent[0].unknown_players] == [
+        "player_three"
+    ]
+    assert at_50_percent[1].coverage_percent == 50
+
+
+def test_unsynced_playnite_only_account_does_not_make_game_unknown(db):
+    owner = Participant(nickname="Owner", present=True)
+    mixed = Participant(nickname="Mixed", present=True)
+    game = Game(
+        title="Steam Game",
+        normalized_title=normalize_title("Steam Game"),
+        multiplayer=True,
+    )
+    db.add_all([owner, mixed, game])
+    db.flush()
+    add_owned(db, owner, game)
+    db.add_all(
+        [
+            PlatformGameMapping(
+                game_id=game.id,
+                platform=Platform.ea,
+                platform_game_id="ea-steam-game",
+                platform_title="Steam Game",
+                normalized_title=normalize_title("Steam Game"),
+            ),
+            Account(
+                participant_id=mixed.id,
+                platform=Platform.steam,
+                account_id="mixed-steam",
+                last_successful_sync=datetime.utcnow(),
+            ),
+            Account(
+                participant_id=mixed.id,
+                platform=Platform.ea,
+                account_id="mixed-ea",
+            ),
+        ]
+    )
+    db.commit()
+
+    recommendations = find_common_games(
+        db,
+        [owner.id, mixed.id],
+        minimum_coverage=0.5,
+    )
+
+    assert [item.game.title for item in recommendations] == ["Steam Game"]
+    assert recommendations[0].known_player_count == 2
+    assert recommendations[0].coverage_percent == 50
+    assert recommendations[0].unknown_players == []
 
 
 

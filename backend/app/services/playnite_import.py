@@ -451,6 +451,8 @@ def _account_for_import(db: Session, participant_id: int, platform: Platform) ->
         .order_by(Account.id)
     )
     if existing:
+        existing.last_successful_sync = datetime.utcnow()
+        existing.last_error = None
         return existing, False
 
     account = Account(

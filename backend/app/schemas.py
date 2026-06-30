@@ -157,12 +157,17 @@ class GameOwnerRead(BaseModel):
 class RecommendationRead(BaseModel):
     game: GameRead
     owner_count: int
+    available_player_count: int
+    known_player_count: int
+    selected_player_count: int
+    coverage_percent: float
     total_playtime_minutes: int
     average_playtime_minutes: float
     median_playtime_minutes: float
     score: float
     platforms: list[Platform]
     owners: list[ParticipantRead]
+    unknown_players: list[ParticipantRead]
 
 
 

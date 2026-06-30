@@ -48,6 +48,7 @@ def common_games(
     request: Request,
     response: Response,
     players: list[int] = Query(default=[]),
+    minimum_coverage: int = Query(75, ge=50, le=100),
     db: Session = Depends(get_db),
 ):
     selected = tuple(sorted(set(players)))
@@ -55,8 +56,12 @@ def common_games(
         request,
         response,
         db,
-        ("common", selected),
-        lambda: engine.find_common_games(db, list(selected)),
+        ("common", selected, minimum_coverage),
+        lambda: engine.find_common_games(
+            db,
+            list(selected),
+            minimum_coverage / 100,
+        ),
     )
 
 
