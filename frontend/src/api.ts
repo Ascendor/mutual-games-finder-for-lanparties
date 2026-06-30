@@ -75,7 +75,9 @@ export const api = {
   },
   providerAuthStatus: () => request<ProviderAuthStatus[]>('/provider-auth/status'),
   startProviderLogin: (accountId: number) => request<ProviderLoginStart>(`/provider-auth/accounts/${accountId}/start`),
-  completeProviderLogin: (accountId: number, payload: { code?: string; email?: string; password?: string; two_factor_code?: string; access_token?: string; cookie?: string; pid?: string }) =>
+  pollProviderLogin: (accountId: number) =>
+    request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/poll`, { method: 'POST' }),
+  completeProviderLogin: (accountId: number, payload: { code?: string; email?: string; password?: string; two_factor_code?: string }) =>
     request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/complete`, { method: 'POST', body: JSON.stringify(payload) }),
   logoutProvider: (accountId: number) => request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/logout`, { method: 'POST' })
 }

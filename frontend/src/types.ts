@@ -120,6 +120,8 @@ export interface ProviderAuthStatus {
   platform: Platform
   authenticated: boolean
   needs_2fa?: boolean
+  pending?: boolean
+  interval?: number
   message: string
 }
 
@@ -130,6 +132,10 @@ export interface ProviderLoginStart {
   login_url: string
   code_label: string
   message: string
+  verification_uri?: string
+  user_code?: string
+  expires_in?: number
+  interval?: number
 }
 
 

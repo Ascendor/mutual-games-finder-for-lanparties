@@ -2,6 +2,8 @@
 import time
 from types import SimpleNamespace
 
+import pytest
+
 import app.services.import_providers as import_providers
 from app.models import Account, Platform
 from app.services.import_providers import EAProvider, EpicProvider, GOG_CLIENT_ID, GOGProvider, SteamProvider, UbisoftProvider, XboxProvider
@@ -63,7 +65,12 @@ def test_epic_provider_parses_legendary_json(monkeypatch):
                         "app_title": "World of Goo",
                         "playtime_minutes": 90,
                         "genres": ["Puzzle"],
-                    }
+                    },
+                    {
+                        "appName": "digitalextras",
+                        "app_title": "Soundtrack and Artbook",
+                        "metadata": {"categories": [{"path": "games"}, {"path": "digitalextras"}]},
+                    },
                 ]
             ),
             stderr="",
@@ -145,14 +152,34 @@ def test_xbox_provider_parses_title_history(monkeypatch, tmp_path):
     monkeypatch.setattr(
         import_providers.httpx,
         "get",
-        lambda *args, **kwargs: FakeResponse({"titles": [{"titleId": "42", "name": "Halo Infinite"}]}),
+        lambda *args, **kwargs: FakeResponse(
+            {
+                "titles": [
+                    {
+                        "titleId": "42",
+                        "pfn": "Microsoft.HaloInfinite",
+                        "name": "Halo Infinite",
+                        "type": "Game",
+                        "devices": ["PC", "XboxSeries"],
+                        "minutesPlayed": "120",
+                    },
+                    {
+                        "titleId": "99",
+                        "name": "Console only",
+                        "type": "Game",
+                        "devices": ["XboxSeries"],
+                    },
+                ]
+            }
+        ),
     )
 
     games = XboxProvider().sync_account(Account(id=9, participant_id=1, platform=Platform.xbox, account_id="123"))
 
     assert len(games) == 1
     assert games[0].title == "Halo Infinite"
-    assert games[0].platform_game_id == "42"
+    assert games[0].platform_game_id == "Microsoft.HaloInfinite"
+    assert games[0].playtime_minutes == 120
 
 
 def test_ea_provider_parses_configured_library_endpoint(monkeypatch, tmp_path):
@@ -191,6 +218,35 @@ def test_provider_auth_status_accepts_string_platform(monkeypatch, tmp_path):
     assert status["platform"] == Platform.ubisoft
     assert status["authenticated"] is False
     assert "ubisoft" in status["message"]
+
+
+def test_provider_auth_cleans_common_epic_paste_variants():
+    from app.services.provider_auth import _clean_epic_code
+
+    assert _clean_epic_code('"abc-123"') == "abc-123"
+    assert _clean_epic_code("'abc-123'") == "abc-123"
+    assert _clean_epic_code('{"authorizationCode": "abc-123"}') == "abc-123"
+    assert _clean_epic_code('```json\n{"AuthorizationCode": "abc-123"}\n```') == "abc-123"
+    assert _clean_epic_code('authorizationCode: "abc-123"') == "abc-123"
+    assert _clean_epic_code("https://example.test/callback?authorizationCode=abc-123") == "abc-123"
+
+
+def test_provider_auth_cleans_common_gog_paste_variants():
+    from app.services.provider_auth import _clean_gog_code
+
+    assert _clean_gog_code('"gog-code"') == "gog-code"
+    assert _clean_gog_code('{"code": "gog-code"}') == "gog-code"
+    assert _clean_gog_code("code='gog-code'") == "gog-code"
+    assert _clean_gog_code("https://embed.gog.com/on_login_success?code=gog-code") == "gog-code"
+
+
+def test_provider_auth_rejects_direct_ea_login():
+    from app.services import provider_auth
+
+    account = Account(id=99, participant_id=1, platform=Platform.ea, account_id="local-ea")
+
+    with pytest.raises(ValueError, match="Playnite"):
+        provider_auth.complete(account, '{"access_token":"not-supported"}')
 
 
 def test_ubisoft_complete_accepts_account_id_alias(monkeypatch, tmp_path):

@@ -41,6 +41,7 @@ services:
       IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
       IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
       RAWG_API_KEY: ${RAWG_API_KEY:-}
+      XBOX_CLIENT_ID: ${XBOX_CLIENT_ID:-}
       PROVIDER_AUTH_ROOT: /provider-auth
     volumes:
       - backend-data:/legacy-data:ro

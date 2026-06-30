@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     legendary_command: str = "legendary"
     provider_auth_root: str = "/provider-auth"
     gog_auth_config_path: str | None = None
+    xbox_client_id: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

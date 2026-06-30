@@ -14,9 +14,6 @@ class ProviderCodePayload(BaseModel):
     email: str | None = None
     password: str | None = None
     two_factor_code: str | None = None
-    access_token: str | None = None
-    cookie: str | None = None
-    pid: str | None = None
 
 
 def _get_account(db: Session, account_id: int) -> Account:
@@ -54,6 +51,24 @@ def complete_login(account_id: int, payload: ProviderCodePayload, db: Session = 
     account = _get_account(db, account_id)
     try:
         return provider_auth.complete(account, payload.code.strip(), payload.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
+@router.post("/accounts/{account_id}/poll")
+def poll_login(account_id: int, db: Session = Depends(get_db)):
+    account = _get_account(db, account_id)
+    try:
+        result = provider_auth.poll(account)
+        if result.get("authenticated"):
+            if result.get("xuid"):
+                account.account_id = str(result["xuid"])
+            if result.get("gamertag"):
+                account.display_name = str(result["gamertag"])
+            db.commit()
+        return result
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:

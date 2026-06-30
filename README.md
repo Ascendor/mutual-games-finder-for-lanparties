@@ -53,16 +53,27 @@ POSTGRES_PASSWORD=lanparty
 - Steam: offizielle Steam Web API
 - Epic: direkt ueber `legendary`
 - GOG: direkt ueber GOG-Web-APIs mit Auth-Cache
+- Ubisoft Connect: dialoggefuehrter Login mit optionaler 2FA
+- Xbox Live: dialoggefuehrter Microsoft-Geraetecode-Login
 
-Epic-Login im Backend-Container:
+### Xbox Live einmalig einrichten
 
-```bash
-docker compose exec backend legendary auth
+Der Login fuer die Teilnehmer benoetigt nur einen kurzen Microsoft-Code. Der Server braucht dafuer einmalig eine eigene Microsoft-Anwendungs-ID:
+
+1. Im Microsoft Entra Admin Center unter `App registrations` eine neue Anwendung anlegen.
+2. Als Kontotyp `Personal Microsoft accounts only` waehlen.
+3. Unter `Authentication` die Option `Allow public client flows` aktivieren.
+4. Die `Application (client) ID` in `.env` hinterlegen:
+
+```env
+XBOX_CLIENT_ID=00000000-0000-0000-0000-000000000000
 ```
 
-GOG erwartet einen Auth-Cache unter `/config/heroic_gogdl/auth.json`, persistent im Volume `gogdl-config`.
+Danach `docker compose up -d --build backend frontend` ausfuehren. Auf `Accounts & Logins` zeigt der Xbox-Assistent einen einmaligen Code, oeffnet die Microsoft-Anmeldung und synchronisiert direkt nach der Bestaetigung.
 
-Xbox, Ubisoft Connect und EA App sind im Code als eigene Provider angelegt, aber ihre direkten API-/Auth-Adapter sind noch offen.
+Der Xbox-Webdienst liefert normalen Drittanbietern keine vollstaendige Microsoft-Store-Besitzliste. Importiert werden deshalb Eintraege aus der Xbox-Titelhistorie, die Microsoft mit dem Geraet `PC` kennzeichnet. Noch nie gestartete und nicht installierte Store-Spiele koennen fehlen; Konsolentitel werden bewusst ausgeschlossen. Ein Playnite-Backup kann diese Liste ergaenzen.
+
+EA App wird mangels stabiler Drittanbieter-Anmeldung ueber ein Playnite-Backup importiert.
 
 ## Playnite-Import
 

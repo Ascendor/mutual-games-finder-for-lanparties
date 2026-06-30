@@ -2,6 +2,7 @@
 
 import base64
 import json
+import re
 import time
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -43,25 +44,85 @@ def _supported_account(account: Account) -> None:
         raise _provider_error(account.platform)
 
 
+def _unwrap_pasted_value(value: str) -> str:
+    text = value.strip().lstrip("\ufeff")
+    fence = re.fullmatch(r"```(?:json|text)?\s*(.*?)\s*```", text, flags=re.DOTALL | re.IGNORECASE)
+    if fence:
+        text = fence.group(1).strip()
+    for _ in range(3):
+        if len(text) < 2 or text[0] not in "\"'“”‘’" or text[-1] not in "\"'“”‘’":
+            break
+        candidate = text[1:-1].strip()
+        if text[0] == '"' and text[-1] == '"':
+            try:
+                decoded = json.loads(text)
+                if isinstance(decoded, str):
+                    text = decoded.strip()
+                    continue
+            except json.JSONDecodeError:
+                pass
+        text = candidate
+    return text.strip()
+
+
+def _extract_case_insensitive(payload: Any, *keys: str) -> Any:
+    wanted = {key.casefold() for key in keys}
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if str(key).casefold() in wanted and value not in (None, ""):
+                return value
+        for value in payload.values():
+            found = _extract_case_insensitive(value, *keys)
+            if found not in (None, ""):
+                return found
+    elif isinstance(payload, list):
+        for value in payload:
+            found = _extract_case_insensitive(value, *keys)
+            if found not in (None, ""):
+                return found
+    return None
+
+
 def _clean_epic_code(code: str) -> str:
-    value = code.strip()
-    if value.startswith("{"):
-        payload = json.loads(value)
-        value = str(payload.get("authorizationCode") or "").strip()
-    return value.strip('"')
+    value = _unwrap_pasted_value(code)
+    if value.startswith(("{", "[")):
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError:
+            payload = None
+        extracted = _extract_case_insensitive(payload, "authorizationCode", "authorization_code", "code")
+        if extracted:
+            value = str(extracted)
+    elif value.startswith(("http://", "https://")):
+        parsed = urlparse(value)
+        query = {**parse_qs(parsed.query), **parse_qs(parsed.fragment)}
+        value = str(
+            (query.get("authorizationCode") or query.get("authorization_code") or query.get("code") or [""])[0]
+        )
+    else:
+        match = re.search(
+            r"(?:authorizationCode|authorization_code|code)\s*[:=]\s*[\"'“”‘’]?([^\"'“”‘’\s,}]+)",
+            value,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            value = match.group(1)
+    return _unwrap_pasted_value(value).rstrip(",;")
 
 
 def _parse_json_or_key_values(code: str) -> dict[str, Any]:
-    value = code.strip()
+    value = _unwrap_pasted_value(code)
     if not value:
         return {}
-    if value.startswith("{"):
-        return json.loads(value)
+    if value.startswith(("{", "[")):
+        parsed = json.loads(value)
+        return parsed if isinstance(parsed, dict) else {}
     payload: dict[str, Any] = {}
     for line in value.splitlines():
-        if "=" in line:
-            key, item = line.split("=", 1)
-            payload[key.strip()] = item.strip()
+        separator = "=" if "=" in line else ":" if ":" in line else None
+        if separator:
+            key, item = line.split(separator, 1)
+            payload[key.strip()] = _unwrap_pasted_value(item)
     return payload
 
 
@@ -176,16 +237,21 @@ def gog_login_url() -> str:
 
 
 def _clean_gog_code(value: str) -> str:
-    text = value.strip()
+    text = _unwrap_pasted_value(value)
     if not text:
         return ""
-    if text.startswith("{"):
+    if text.startswith(("{", "[")):
         payload = json.loads(text)
-        text = str(payload.get("code") or "").strip()
+        text = str(_extract_case_insensitive(payload, "code", "authorizationCode") or "").strip()
     elif text.startswith("http://") or text.startswith("https://"):
         parsed = urlparse(text)
-        text = (parse_qs(parsed.query).get("code") or [""])[0].strip()
-    return text.strip('"')
+        query = {**parse_qs(parsed.query), **parse_qs(parsed.fragment)}
+        text = (query.get("code") or query.get("authorizationCode") or [""])[0].strip()
+    else:
+        match = re.search(r"(?:code|authorizationCode)\s*[:=]\s*[\"'“”‘’]?([^\"'“”‘’\s,}]+)", text)
+        if match:
+            text = match.group(1)
+    return _unwrap_pasted_value(text).rstrip(",;")
 
 
 def epic_status(account: Account) -> dict[str, Any]:
@@ -246,6 +312,10 @@ def account_status(account: Account) -> dict[str, Any]:
         return epic_status(account)
     if platform == Platform.gog:
         return gog_status(account)
+    if platform == Platform.xbox:
+        from app.services.xbox_auth import xbox_status
+
+        return xbox_status(account)
     return generic_json_status(account)
 
 
@@ -285,22 +355,17 @@ def start(account: Account) -> dict[str, Any]:
             "message": "E-Mail und Passwort eintragen. Falls Ubisoft 2FA verlangt, bleibt das Ticket gespeichert und danach reicht der 2FA-Code.",
         }
     if platform == Platform.xbox:
-        return {
-            "account_id": account.id,
-            "participant_id": account.participant_id,
-            "platform": platform,
-            "login_url": "https://www.xbox.com/",
-            "code_label": "JSON",
-            "message": "Xbox braucht XSTS-Daten: {\"xsts_token\":\"...\",\"user_hash\":\"...\",\"xuid\":\"...\"}.",
-        }
+        from app.services.xbox_auth import start_device_login
+
+        return start_device_login(account)
     if platform == Platform.ea:
         return {
             "account_id": account.id,
             "participant_id": account.participant_id,
             "platform": platform,
-            "login_url": "https://www.ea.com/ea-app",
-            "code_label": "JSON",
-            "message": "EA bietet keinen stabilen Drittanbieter-Login. In ea.com einloggen, Browser-Entwicklerwerkzeuge oeffnen und entweder Authorization-Bearer oder den Cookie-Header eines eingeloggten Requests kopieren.",
+            "login_url": "",
+            "code_label": "",
+            "message": "EA bietet keinen stabilen Drittanbieter-Login. Bitte ein Playnite-Backup importieren.",
         }
     raise _provider_error(platform)
 
@@ -385,7 +450,18 @@ def complete(account: Account, code: str, fields: dict[str, Any] | None = None) 
         return complete_gog(account, code)
     if platform == Platform.ubisoft:
         return complete_ubisoft(account, code, fields)
+    if platform == Platform.ea:
+        raise ValueError("EA kann nicht direkt verbunden werden. Bitte ein Playnite-Backup importieren.")
     return complete_generic_json(account, code, fields)
+
+
+def poll(account: Account) -> dict[str, Any]:
+    _supported_account(account)
+    if _account_platform(account) != Platform.xbox:
+        raise ValueError("Dieser Anmeldeablauf ist nur für Xbox Live verfügbar.")
+    from app.services.xbox_auth import poll_device_login
+
+    return poll_device_login(account)
 
 
 def logout(account: Account) -> dict[str, Any]:

@@ -88,6 +88,45 @@ def _games_from_payload(payload: Any, fallback_prefix: str) -> list[ImportedGame
     return games
 
 
+def _xbox_pc_games_from_payload(payload: Any) -> list[ImportedGame]:
+    if not isinstance(payload, dict) or not isinstance(payload.get("titles"), list):
+        return []
+    games: list[ImportedGame] = []
+    seen: set[str] = set()
+    for item in payload["titles"]:
+        if not isinstance(item, dict):
+            continue
+        devices = {
+            str(device).strip().casefold()
+            for device in item.get("devices", [])
+            if device not in (None, "")
+        }
+        if "pc" not in devices:
+            continue
+        content_type = str(item.get("type") or "Game").strip().casefold()
+        if content_type != "game":
+            continue
+        platform_id = str(item.get("pfn") or item.get("titleId") or item.get("id") or "").strip()
+        title = str(item.get("name") or item.get("title") or "").strip()
+        if not platform_id or not title or platform_id in seen:
+            continue
+        seen.add(platform_id)
+        detail = item.get("detail") if isinstance(item.get("detail"), dict) else {}
+        games.append(
+            ImportedGame(
+                platform_game_id=platform_id,
+                title=title,
+                playtime_minutes=_as_int(item.get("minutesPlayed"), 0),
+                description=str(detail.get("description") or ""),
+                cover_url=item.get("displayImage") or detail.get("image"),
+                release_date=_parse_date(detail.get("releaseDate")),
+                genres=_as_list(detail.get("genres") or detail.get("genre")),
+                feature_metadata_known=False,
+            )
+        )
+    return games
+
+
 def _ubisoft_is_non_game(details: dict[str, Any]) -> bool:
     title = str(_first(details, "displayName", "name", default="") or "").casefold()
     platform = str(_first(details, "platform", "devicePlatformType", default="") or "").casefold()
@@ -615,6 +654,18 @@ class SteamProvider:
 
 class EpicProvider:
     platform = Platform.epic
+    authoritative_library = True
+
+    @staticmethod
+    def _is_game(item: dict[str, Any]) -> bool:
+        metadata = item.get("metadata")
+        categories = metadata.get("categories") if isinstance(metadata, dict) else []
+        category_paths = {
+            str(category.get("path") or "").casefold()
+            for category in categories or []
+            if isinstance(category, dict)
+        }
+        return "digitalextras" not in category_paths
 
     def sync_account(self, account: Account) -> list[ImportedGame]:
         result = run_legendary_for_account(account, ["list", "--json"], timeout=120)
@@ -629,7 +680,7 @@ class EpicProvider:
 
         games: list[ImportedGame] = []
         for item in items:
-            if isinstance(item, dict):
+            if isinstance(item, dict) and self._is_game(item):
                 data = _flatten_candidate(item)
                 title = _first(data, "app_title", "title", "name", "appName", "displayName")
                 if not title:
@@ -786,7 +837,9 @@ class XboxProvider:
     platform = Platform.xbox
 
     def sync_account(self, account: Account) -> list[ImportedGame]:
-        credentials = load_provider_auth_json(Platform.xbox, account.id)
+        from app.services.xbox_auth import ensure_xbox_credentials
+
+        credentials = ensure_xbox_credentials(account)
         xsts_token = credentials.get("xsts_token") or credentials.get("Token")
         user_hash = credentials.get("user_hash") or credentials.get("uhs")
         xuid = credentials.get("xuid") or credentials.get("userXuid") or account.account_id
@@ -800,9 +853,9 @@ class XboxProvider:
         url = f"https://titlehub.xboxlive.com/users/xuid({xuid})/titles/titlehistory/decoration/detail,scid,image"
         response = httpx.get(url, headers=headers, timeout=30)
         response.raise_for_status()
-        games = _games_from_payload(response.json(), "xbox")
+        games = _xbox_pc_games_from_payload(response.json())
         if not games:
-            raise RuntimeError("Xbox title history returned no games")
+            raise RuntimeError("Xbox title history returned no PC games")
         return games
 
 
