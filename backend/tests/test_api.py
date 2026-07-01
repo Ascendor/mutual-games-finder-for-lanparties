@@ -1,4 +1,8 @@
 ﻿from fastapi.testclient import TestClient
+import json
+import zipfile
+from io import BytesIO
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -7,6 +11,8 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app import models  # noqa: F401
+from app.api.imports import UPLOAD_CHUNK_SIZE
+from app.core.config import settings
 
 
 def test_participant_api_roundtrip():
@@ -138,4 +144,69 @@ def test_account_create_reuses_participant_platform():
     assert second.status_code == 201
     assert second.json()["id"] == first.json()["id"]
     assert len(client.get("/api/accounts").json()) == 1
+    app.dependency_overrides.clear()
+
+
+def test_playnite_upload_streams_to_disk_and_removes_temp_file(tmp_path, monkeypatch):
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_db():
+        db = Session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    monkeypatch.setattr(settings, "playnite_upload_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "playnite_upload_max_bytes", 16 * 1024 * 1024)
+    app.dependency_overrides[get_db] = override_db
+    client = TestClient(app)
+    participant = client.post("/api/participants", json={"nickname": "Stream", "present": True}).json()
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("unused-large-member.bin", b"x" * (UPLOAD_CHUNK_SIZE + 1024))
+        archive.writestr(
+            "library/games.json",
+            json.dumps({"Games": [{"Name": "FTL", "Source": {"Name": "GOG"}, "ProductId": "ftl-gog"}]}),
+        )
+
+    response = client.post(
+        "/api/imports/playnite",
+        data={"participant_id": str(participant["id"])},
+        files={"file": ("playnite.zip", buffer.getvalue(), "application/zip")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["imported_games"] == 1
+    assert list(tmp_path.iterdir()) == []
+    app.dependency_overrides.clear()
+
+
+def test_playnite_upload_rejects_oversized_file_and_removes_temp_file(tmp_path, monkeypatch):
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_db():
+        db = Session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    monkeypatch.setattr(settings, "playnite_upload_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "playnite_upload_max_bytes", 32)
+    app.dependency_overrides[get_db] = override_db
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/imports/playnite",
+        data={"participant_id": "1"},
+        files={"file": ("too-large.zip", b"x" * 64, "application/zip")},
+    )
+
+    assert response.status_code == 413
+    assert list(tmp_path.iterdir()) == []
     app.dependency_overrides.clear()

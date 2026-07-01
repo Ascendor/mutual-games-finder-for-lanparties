@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from threading import Thread
 
 from app.api import accounts, games, imports, ownerships, participants, provider_auth, recommendations, sync
+from app.api.imports import remove_stale_uploads
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services.metadata_service import close_interrupted_metadata_runs
@@ -30,6 +31,7 @@ app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
 
 @app.on_event("startup")
 def close_interrupted_syncs_on_startup() -> None:
+    remove_stale_uploads()
     db = SessionLocal()
     try:
         close_interrupted_metadata_runs(db)

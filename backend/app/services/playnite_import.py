@@ -8,6 +8,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -32,6 +33,19 @@ class PlayniteImportResult:
 
 def import_playnite_export(db: Session, participant_id: int, raw_json: bytes | str) -> PlayniteImportResult:
     entries = _extract_entries_from_upload(raw_json)
+    return _import_playnite_entries(db, participant_id, entries)
+
+
+def import_playnite_export_path(db: Session, participant_id: int, path: Path | str) -> PlayniteImportResult:
+    entries = _extract_entries_from_path(Path(path))
+    return _import_playnite_entries(db, participant_id, entries)
+
+
+def _import_playnite_entries(
+    db: Session,
+    participant_id: int,
+    entries: list[dict[str, Any]],
+) -> PlayniteImportResult:
     result = PlayniteImportResult(platforms=[])
     seen_platforms: set[str] = set()
 
@@ -63,10 +77,17 @@ def _extract_entries_from_upload(raw: bytes | str) -> list[dict[str, Any]]:
     return _extract_game_entries(json.loads(raw.decode("utf-8-sig")))
 
 
-def _extract_entries_from_zip(raw: bytes) -> list[dict[str, Any]]:
+def _extract_entries_from_path(path: Path) -> list[dict[str, Any]]:
+    if zipfile.is_zipfile(path):
+        return _extract_entries_from_zip(path)
+    return _extract_game_entries(json.loads(path.read_text(encoding="utf-8-sig")))
+
+
+def _extract_entries_from_zip(raw: bytes | Path) -> list[dict[str, Any]]:
     all_entries: list[dict[str, Any]] = []
     seen_keys: set[tuple[str, str, str]] = set()
-    with zipfile.ZipFile(BytesIO(raw)) as archive:
+    source = BytesIO(raw) if isinstance(raw, bytes) else raw
+    with zipfile.ZipFile(source) as archive:
         db_entries = _extract_litedb_entries_from_zip(archive)
         for entry in db_entries:
             _append_unique_playnite_entry(all_entries, seen_keys, entry)
@@ -103,12 +124,16 @@ def _append_unique_playnite_entry(
 
 def _extract_litedb_entries_from_zip(archive: zipfile.ZipFile) -> list[dict[str, Any]]:
     db_files: dict[str, bytes] = {}
+    required_files = {"games.db", "sources.db", "platforms.db", "genres.db"}
     for name in archive.namelist():
         lowered = name.replace("\\", "/").casefold()
         if not lowered.startswith("library/") or not lowered.endswith(".db"):
             continue
+        filename = lowered.rsplit("/", 1)[-1]
+        if filename not in required_files:
+            continue
         with archive.open(name) as member:
-            db_files[lowered.rsplit("/", 1)[-1]] = member.read()
+            db_files[filename] = member.read()
 
     games_raw = db_files.get("games.db")
     if not games_raw:

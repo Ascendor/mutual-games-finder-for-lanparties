@@ -2,8 +2,10 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-h4">Accounts & Logins</h1>
-        <p class="text-medium-emphasis">Spielekonten pro Teilnehmer verbinden und aktualisieren.</p>
+        <h1 class="text-h4">{{ adminMode ? 'Accounts & Logins aller Teilnehmer:innen' : 'Meine Accounts & Logins' }}</h1>
+        <p class="text-medium-emphasis">
+          {{ adminMode ? 'Spielekonten aller Teilnehmer verbinden und aktualisieren.' : 'Verbinde deine Spielekonten und aktualisiere deine Bibliotheken.' }}
+        </p>
       </div>
       <v-btn icon="mdi-refresh" variant="text" :loading="loading" aria-label="Aktualisieren" @click="load">
         <v-icon>mdi-refresh</v-icon>
@@ -13,12 +15,28 @@
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
     <v-alert v-if="message" type="success" variant="tonal" class="mb-4">{{ message }}</v-alert>
-    <v-alert v-if="store.participants.length === 0" type="info" variant="tonal">
+    <v-alert type="info" variant="tonal" :icon="false" class="playnite-guide mb-5">
+      <div class="font-weight-bold mb-1">Playnite-Import empfohlen</div>
+      <p class="mb-2">
+        Playnite ist eine lokale Spielebibliothek, die Spiele aus vielen Launchern und von lokal installierten Quellen
+        zusammenführt. Wenn du Playnite bereits eingerichtet hast, ist ein Playnite-Backup hier der bevorzugte und
+        einfachste Importweg.
+      </p>
+      <p class="mb-2">
+        Öffne in Playnite das Hauptmenü, wähle <strong>Bibliothek → Bibliothek sichern</strong> und erstelle ein
+        ZIP-Backup. Diese ZIP-Datei kannst du unten direkt im Feld <strong>Playnite-Backup</strong> auswählen und
+        importieren.
+      </p>
+      <p class="mb-0">
+        Alternativ kannst du deine Plattformen darunter einzeln verbinden und deren Bibliotheken direkt aktualisieren.
+      </p>
+    </v-alert>
+    <v-alert v-if="!loading && slotsByParticipant.length === 0" type="info" variant="tonal">
       Lege zuerst einen Teilnehmer an.
     </v-alert>
 
     <v-row v-else>
-      <v-col v-for="group in slotsByParticipant" :key="group.participant.id" cols="12" xl="6">
+      <v-col v-for="group in slotsByParticipant" :key="group.participant.id" cols="12" :xl="adminMode ? 6 : 12">
         <v-card variant="flat">
           <v-card-title class="participant-title">
             <span>{{ group.participant.nickname }}</span>
@@ -120,9 +138,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { api } from '../api'
 import ProviderConnectDialog from '../components/ProviderConnectDialog.vue'
+import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { useLanStore } from '../store'
 import type { Account, Participant, Platform, ProviderAuthStatus } from '../types'
 
@@ -132,6 +151,12 @@ interface ProviderSlot {
   platform: Platform
   account?: Account
 }
+
+const props = withDefaults(defineProps<{
+  adminMode?: boolean
+}>(), {
+  adminMode: false
+})
 
 const loginPlatforms: Platform[] = [
   'steam',
@@ -145,7 +170,7 @@ const loginPlatforms: Platform[] = [
   'humble',
   'meta'
 ]
-const route = useRoute()
+const router = useRouter()
 const store = useLanStore()
 const statuses = ref<ProviderAuthStatus[]>([])
 const loading = ref(false)
@@ -155,16 +180,15 @@ const message = ref('')
 const playniteFiles = reactive<Record<number, File | File[] | null>>({})
 const wizardOpen = ref(false)
 const wizardTarget = ref<ProviderSlot | null>(null)
+const adminMode = computed(() => props.adminMode)
+const visibleParticipants = computed(() =>
+  props.adminMode
+    ? store.sortedParticipants
+    : store.sortedParticipants.filter((participant) => participant.id === currentParticipantId.value)
+)
 
 const slotsByParticipant = computed(() =>
-  [...store.participants]
-    .sort((left, right) => {
-      const focused = Number(route.query.participant)
-      if (!focused) return left.nickname.localeCompare(right.nickname)
-      if (left.id === focused) return -1
-      if (right.id === focused) return 1
-      return left.nickname.localeCompare(right.nickname)
-    })
+  visibleParticipants.value
     .map((participant) => ({
       participant,
       slots: loginPlatforms.map((platform) => ({
@@ -192,6 +216,10 @@ async function load() {
     store.participants = participants
     store.accounts = accounts
     statuses.value = providerStatuses
+    if (!props.adminMode && !participants.some((participant) => participant.id === currentParticipantId.value)) {
+      clearParticipant()
+      await router.replace({ path: '/player', query: { redirect: '/logins' } })
+    }
   } catch (err) {
     error.value = readableError(err)
   } finally {
@@ -351,6 +379,10 @@ function platformIcon(platform: Platform) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.playnite-guide {
+  max-width: 980px;
 }
 
 .provider-row {

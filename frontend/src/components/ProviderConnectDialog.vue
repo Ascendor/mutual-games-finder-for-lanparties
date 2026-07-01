@@ -248,12 +248,21 @@
               Diese direkte Anbindung nutzt eine inoffizielle Browser-Sitzung. Sie kann nach Änderungen des Anbieters
               vorübergehend ausfallen und muss nach Ablauf der Sitzung erneut verbunden werden.
             </v-alert>
+            <v-select
+              v-model="browserFamily"
+              :items="browserOptions"
+              label="Erkannter Browser"
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="browser-select mb-4"
+            />
             <ol class="session-steps mb-4">
-              <li>Öffne die Loginseite und melde dich vollständig an.</li>
-              <li>Drücke in Firefox <strong>F12</strong>, öffne <strong>Netzwerkanalyse</strong> und lade die Seite neu.</li>
-              <li>Klicke die oberste Anfrage mit Status 200 rechts an und wähle <strong>Wert kopieren → Als cURL kopieren</strong>.</li>
-              <li>Füge die komplette kopierte Anfrage unten ein. Die App findet die Sitzungsdaten selbst.</li>
+              <li v-for="step in browserGuide.steps" :key="step">{{ step }}</li>
             </ol>
+            <v-alert type="info" variant="tonal" density="compact" class="mb-4">
+              {{ browserRequestHint }}
+            </v-alert>
             <v-btn
               :href="loginStart?.login_url"
               target="_blank"
@@ -350,6 +359,64 @@ interface ProviderTarget {
   account?: Account
 }
 
+type BrowserFamily = 'firefox' | 'edge' | 'chromium' | 'safari' | 'other'
+
+const browserOptions: Array<{ title: string; value: BrowserFamily }> = [
+  { title: 'Firefox', value: 'firefox' },
+  { title: 'Microsoft Edge', value: 'edge' },
+  { title: 'Chrome / Chromium', value: 'chromium' },
+  { title: 'Safari', value: 'safari' },
+  { title: 'Anderer Browser', value: 'other' }
+]
+
+const browserGuides: Record<BrowserFamily, { steps: string[] }> = {
+  firefox: {
+    steps: [
+      'Öffne die Loginseite und melde dich vollständig an.',
+      'Drücke F12 und öffne den Tab „Netzwerkanalyse“.',
+      'Lade die Anbieterseite neu, damit die Anfragen in der Liste erscheinen.',
+      'Klicke die passende erfolgreiche Anfrage mit der rechten Maustaste an und wähle „Wert kopieren“ und danach „Als cURL kopieren“.',
+      'Füge die komplette kopierte Anfrage unten ein.'
+    ]
+  },
+  edge: {
+    steps: [
+      'Öffne die Loginseite und melde dich vollständig an.',
+      'Drücke F12 und öffne in den Entwicklertools den Tab „Netzwerk“ beziehungsweise „Network“.',
+      'Lade die Anbieterseite neu, damit die Anfragen in der Liste erscheinen.',
+      'Klicke die passende erfolgreiche Anfrage mit der rechten Maustaste an und wähle „Kopieren“ beziehungsweise „Copy“ und dann „Als cURL kopieren (bash)“.',
+      'Füge die komplette kopierte Anfrage unten ein.'
+    ]
+  },
+  chromium: {
+    steps: [
+      'Öffne die Loginseite und melde dich vollständig an.',
+      'Drücke F12 und öffne in den Entwicklertools den Tab „Netzwerk“ beziehungsweise „Network“.',
+      'Lade die Anbieterseite neu, damit die Anfragen in der Liste erscheinen.',
+      'Klicke die passende erfolgreiche Anfrage mit der rechten Maustaste an und wähle „Kopieren“ beziehungsweise „Copy“ und dann „Als cURL kopieren (bash)“.',
+      'Füge die komplette kopierte Anfrage unten ein.'
+    ]
+  },
+  safari: {
+    steps: [
+      'Öffne die Loginseite und melde dich vollständig an.',
+      'Öffne mit ⌥⌘I die Webinformationen und dort den Tab „Netzwerk“. Fehlt das Entwickler-Menü, aktiviere es zuvor in Safari unter „Einstellungen > Erweitert“.',
+      'Lade die Anbieterseite neu, damit die Anfragen in der Liste erscheinen.',
+      'Klicke die passende erfolgreiche Anfrage mit der rechten Maustaste an und wähle „Als cURL kopieren“.',
+      'Füge die komplette kopierte Anfrage unten ein.'
+    ]
+  },
+  other: {
+    steps: [
+      'Öffne die Loginseite und melde dich vollständig an.',
+      'Öffne die Entwicklertools deines Browsers und darin den Bereich „Netzwerk“ beziehungsweise „Network“.',
+      'Lade die Anbieterseite neu, damit die Anfragen in der Liste erscheinen.',
+      'Kopiere die passende erfolgreiche Anfrage als cURL.',
+      'Füge die komplette kopierte Anfrage unten ein.'
+    ]
+  }
+}
+
 const props = defineProps<{
   modelValue: boolean
   target: ProviderTarget | null
@@ -372,9 +439,23 @@ const playniteFile = ref<File | File[] | null>(null)
 const ubisoft = reactive({ email: '', password: '', twoFactorCode: '' })
 const xboxChecking = ref(false)
 const codeCopied = ref(false)
+const browserFamily = ref<BrowserFamily>(detectBrowser())
 let xboxPollTimer: ReturnType<typeof setTimeout> | undefined
 
 const progress = computed(() => stage.value * 25)
+const browserGuide = computed(() => browserGuides[browserFamily.value])
+const browserRequestHint = computed(() => {
+  if (props.target?.platform === 'battle_net') {
+    return 'Am einfachsten ist die Anfrage „games-and-subs“ mit Status 200.'
+  }
+  if (props.target?.platform === 'humble') {
+    return 'Filtere nach „user/order“ und kopiere diese Anfrage mit Status 200. Falls sie fehlt, öffne deine Humble-Bibliothek und lade sie neu.'
+  }
+  if (props.target?.platform === 'meta') {
+    return 'Kopiere eine erfolgreiche Anfrage an „secure.oculus.com“ aus der neu geladenen Profilseite.'
+  }
+  return 'Wähle eine erfolgreiche Anfrage an den gerade geöffneten Anbieter.'
+})
 const selectedPlayniteFile = computed(() => {
   const value = playniteFile.value
   return Array.isArray(value) ? value[0] : value
@@ -437,6 +518,7 @@ watch(
     playniteFile.value = null
     xboxChecking.value = false
     codeCopied.value = false
+    browserFamily.value = detectBrowser()
     Object.assign(ubisoft, { email: '', password: '', twoFactorCode: '' })
   }
 )
@@ -613,6 +695,16 @@ function extractSteamId(value: string) {
     || ''
 }
 
+function detectBrowser(): BrowserFamily {
+  if (typeof navigator === 'undefined') return 'other'
+  const userAgent = navigator.userAgent
+  if (/Edg\//i.test(userAgent)) return 'edge'
+  if (/Firefox\//i.test(userAgent)) return 'firefox'
+  if (/(Chrome|Chromium|CriOS)\//i.test(userAgent)) return 'chromium'
+  if (/Safari\//i.test(userAgent)) return 'safari'
+  return 'other'
+}
+
 function readableError(value: unknown) {
   const raw = value instanceof Error ? value.message : String(value)
   const normalized = raw.toLocaleLowerCase()
@@ -699,6 +791,10 @@ function platformIcon(platform: Platform) {
 
 .session-steps li {
   margin-bottom: 8px;
+}
+
+.browser-select {
+  max-width: 320px;
 }
 
 .xbox-code-row {

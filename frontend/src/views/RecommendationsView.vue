@@ -3,10 +3,10 @@
     <h1 class="text-h4 mb-4">Was können wir spielen?</h1>
     <v-row class="mb-4">
       <v-col cols="12" md="9">
-        <v-select v-model="selected" :items="store.participants" item-title="nickname" item-value="id" label="Ausgewählte Spieler" multiple chips density="compact" />
+        <v-select v-model="selected" :items="otherParticipants" item-title="nickname" item-value="id" label="Mitspieler:innen" multiple chips density="compact" />
       </v-col>
       <v-col cols="12" md="3" class="d-flex align-center">
-        <v-btn color="primary" prepend-icon="mdi-star-search-outline" :loading="loading || commonLoading" :disabled="selected.length === 0" @click="load">Berechnen</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-star-search-outline" :loading="loading || commonLoading" :disabled="!currentParticipant" @click="load">Berechnen</v-btn>
       </v-col>
     </v-row>
 
@@ -51,15 +51,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import RecommendationTable from '../components/RecommendationTable.vue'
+import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { useLanStore } from '../store'
 import type { Recommendation } from '../types'
 
 const store = useLanStore()
 const route = useRoute()
+const router = useRouter()
 const selected = ref<number[]>([])
 const tab = ref('common')
 const common = ref<Recommendation[]>([])
@@ -71,26 +73,42 @@ const loading = ref(false)
 const commonLoading = ref(false)
 const minimumCoverage = ref(75)
 const error = ref('')
+const currentParticipant = computed(() =>
+  store.participants.find((participant) => participant.id === currentParticipantId.value)
+)
+const otherParticipants = computed(() =>
+  store.sortedParticipants.filter((participant) => participant.id !== currentParticipantId.value)
+)
+const selectedPlayerIds = computed(() => {
+  if (!currentParticipantId.value) return []
+  return [currentParticipantId.value, ...selected.value.filter((id) => id !== currentParticipantId.value)]
+})
 
 onMounted(async () => {
   await store.refreshParticipants()
+  if (!currentParticipant.value) {
+    clearParticipant()
+    await router.replace({ path: '/player', query: { redirect: '/recommendations' } })
+    return
+  }
   const queryPlayers = typeof route.query.players === 'string' ? route.query.players.split(',').map((item) => Number(item)).filter(Boolean) : []
-  selected.value = queryPlayers.length ? queryPlayers : store.presentParticipants.map((participant) => participant.id)
+  selected.value = (queryPlayers.length ? queryPlayers : store.presentParticipants.map((participant) => participant.id))
+    .filter((id) => id !== currentParticipantId.value)
   if (typeof route.query.tab === 'string') tab.value = route.query.tab
   await load()
 })
 
 async function load() {
-  if (!selected.value.length) return
+  if (!selectedPlayerIds.value.length) return
   loading.value = true
   error.value = ''
   try {
     const [commonGames, coopGames, lanGames, popularGames, newGames] = await Promise.all([
-      api.common(selected.value, minimumCoverage.value),
-      api.coop(selected.value),
-      api.lanForGroup(selected.value),
+      api.common(selectedPlayerIds.value, minimumCoverage.value),
+      api.coop(selectedPlayerIds.value),
+      api.lanForGroup(selectedPlayerIds.value),
       api.recommendations('popular'),
-      api.newForGroup(selected.value)
+      api.newForGroup(selectedPlayerIds.value)
     ])
     common.value = commonGames
     coop.value = coopGames
@@ -105,11 +123,11 @@ async function load() {
 }
 
 async function loadCommon() {
-  if (!selected.value.length || loading.value) return
+  if (!selectedPlayerIds.value.length || loading.value) return
   commonLoading.value = true
   error.value = ''
   try {
-    common.value = await api.common(selected.value, minimumCoverage.value)
+    common.value = await api.common(selectedPlayerIds.value, minimumCoverage.value)
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {

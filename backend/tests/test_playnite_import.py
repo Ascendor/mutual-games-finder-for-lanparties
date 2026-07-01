@@ -5,7 +5,7 @@ import zipfile
 from io import BytesIO
 
 from app.models import Account, Participant, Platform
-from app.services.playnite_import import import_playnite_export
+from app.services.playnite_import import import_playnite_export, import_playnite_export_path
 
 
 def test_playnite_import_reuses_direct_platform_account_and_avoids_duplicates(db):
@@ -113,6 +113,24 @@ def test_playnite_import_reads_backup_zip(db):
     assert result.imported_games == 1
     assert result.platforms == ["amazon"]
     assert participant.ownerships[0].game.title == "Control"
+
+
+def test_playnite_import_reads_backup_zip_from_disk(db, tmp_path):
+    participant = Participant(nickname="DiskBackup", present=True)
+    db.add(participant)
+    db.commit()
+    backup = tmp_path / "playnite.zip"
+    with zipfile.ZipFile(backup, "w") as archive:
+        archive.writestr(
+            "library/games.json",
+            json.dumps({"Games": [{"Name": "Into the Breach", "Source": {"Name": "GOG"}, "ProductId": "1443567355"}]}),
+        )
+
+    result = import_playnite_export_path(db, participant.id, backup)
+
+    assert result.imported_games == 1
+    assert result.platforms == ["gog"]
+    assert participant.ownerships[0].game.title == "Into the Breach"
 
 
 def test_playnite_import_recurses_past_named_backup_containers(db):

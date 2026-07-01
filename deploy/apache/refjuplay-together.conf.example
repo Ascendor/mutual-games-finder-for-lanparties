@@ -1,0 +1,48 @@
+<VirtualHost *:80>
+    ServerName refjuplay-together.example.org
+
+    RewriteEngine On
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L,NE]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName refjuplay-together.example.org
+
+    SSLEngine On
+    SSLCertificateFile /path/to/wildcard/fullchain.pem
+    SSLCertificateKeyFile /path/to/wildcard/privkey.pem
+
+    ProxyRequests Off
+    ProxyPreserveHost On
+    ProxyTimeout 3600
+    LimitRequestBody 4294967296
+
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Port "443"
+
+    <Location "/">
+        AuthType Basic
+        AuthName "ref'ju:geeks play together"
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/auth/refjuplay-together.htpasswd
+        Require valid-user
+    </Location>
+
+    ProxyPass        "/api/"         "http://127.0.0.1:18000/api/" connectiontimeout=5 timeout=3600
+    ProxyPassReverse "/api/"         "http://127.0.0.1:18000/api/"
+    ProxyPass        "/docs"         "http://127.0.0.1:18000/docs" connectiontimeout=5 timeout=60
+    ProxyPassReverse "/docs"         "http://127.0.0.1:18000/docs"
+    ProxyPass        "/redoc"        "http://127.0.0.1:18000/redoc" connectiontimeout=5 timeout=60
+    ProxyPassReverse "/redoc"        "http://127.0.0.1:18000/redoc"
+    ProxyPass        "/openapi.json" "http://127.0.0.1:18000/openapi.json" connectiontimeout=5 timeout=60
+    ProxyPassReverse "/openapi.json" "http://127.0.0.1:18000/openapi.json"
+    ProxyPass        "/"             "http://127.0.0.1:18080/" connectiontimeout=5 timeout=60
+    ProxyPassReverse "/"             "http://127.0.0.1:18080/"
+
+    Header always set Strict-Transport-Security "max-age=31536000"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "same-origin"
+
+    ErrorLog ${APACHE_LOG_DIR}/refjuplay-together-error.log
+    CustomLog ${APACHE_LOG_DIR}/refjuplay-together-access.log combined
+</VirtualHost>

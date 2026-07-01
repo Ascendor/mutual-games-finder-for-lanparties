@@ -1,0 +1,90 @@
+name: refjuplay-together
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  database:
+    image: mirror.gcr.io/library/postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be configured}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be configured}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be configured}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - database-internal
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be configured}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be configured}@database:5432/${POSTGRES_DB:?POSTGRES_DB must be configured}
+      SQLITE_MIGRATION_PATH: ""
+      CORS_ORIGINS: https://${APP_HOST:?APP_HOST must be configured}
+      STEAM_API_KEY: ${STEAM_API_KEY:-}
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+      RAWG_API_KEY: ${RAWG_API_KEY:-}
+      XBOX_CLIENT_ID: ${XBOX_CLIENT_ID:-}
+      PROVIDER_AUTH_ROOT: /provider-auth
+      TMPDIR: /playnite-uploads
+      PLAYNITE_UPLOAD_DIR: /playnite-uploads
+      PLAYNITE_UPLOAD_MAX_BYTES: ${PLAYNITE_UPLOAD_MAX_BYTES:-4294967296}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-18000}:8000"
+    volumes:
+      - provider-auth:/provider-auth
+      - playnite-uploads:/playnite-uploads
+    networks:
+      - application
+      - database-internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging: *default-logging
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-18080}:80"
+    networks:
+      - application
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *default-logging
+
+networks:
+  application:
+  database-internal:
+    internal: true
+
+volumes:
+  postgres-data:
+  provider-auth:
+  playnite-uploads:

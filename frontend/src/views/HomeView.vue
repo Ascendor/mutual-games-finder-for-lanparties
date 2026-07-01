@@ -10,7 +10,7 @@
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
           <v-card-title>Mitspieler:innen finden</v-card-title>
-          <v-card-text>
+          <v-card-text class="action-content">
             <div class="inline-action">
               <span>Ich will</span>
               <v-autocomplete
@@ -38,13 +38,13 @@
 
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
-          <v-card-title>Spiel finden</v-card-title>
-          <v-card-text>
+          <v-card-title>Gemeinsames Spiel finden</v-card-title>
+          <v-card-text class="action-content">
             <div class="inline-action">
               <span>Ich will mit</span>
               <v-autocomplete
                 v-model="selectedPlayers"
-                :items="store.participants"
+                :items="otherParticipants"
                 item-title="nickname"
                 item-value="id"
                 label="Mitspieler:innen"
@@ -65,13 +65,13 @@
 
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
-          <v-card-title>Meine Spiele hinzufügen</v-card-title>
-          <v-card-text>
-            <v-combobox v-model="participant.nickname" :items="participantNicknames" label="Nickname" prepend-inner-icon="mdi-account-outline" density="comfortable" hide-details="auto" class="mb-3" auto-select-first />
-            <v-text-field v-model="participant.real_name" label="Real Name optional" density="comfortable" hide-details="auto" />
+          <v-card-title>Einstellungen</v-card-title>
+          <v-card-text class="action-content text-center">
+            <span class="text-body-1">Eingeloggt als <strong>{{ currentParticipant?.nickname }}</strong></span>
           </v-card-text>
-          <v-card-actions>
-            <v-btn color="primary" prepend-icon="mdi-plus" :loading="creating" :disabled="!participantNickname()" @click="createParticipant">Loslegen</v-btn>
+          <v-card-actions class="settings-actions">
+            <v-btn variant="text" color="primary" prepend-icon="mdi-logout" @click="logout">Abmelden</v-btn>
+            <v-btn to="/logins" color="primary" prepend-icon="mdi-key-chain-variant">Meine Accounts</v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
@@ -80,21 +80,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '../api'
+import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { useLanStore } from '../store'
 
 const router = useRouter()
 const store = useLanStore()
 const gameName = ref('')
 const selectedPlayers = ref<number[]>([])
-const creating = ref(false)
 const error = ref('')
-const participant = reactive({ nickname: '', real_name: '' })
-const participantNicknames = computed(() => store.participants.map((item) => item.nickname))
+const currentParticipant = computed(() =>
+  store.participants.find((participant) => participant.id === currentParticipantId.value)
+)
+const otherParticipants = computed(() =>
+  store.sortedParticipants.filter((participant) => participant.id !== currentParticipantId.value)
+)
 
-onMounted(() => store.refreshHome())
+onMounted(async () => {
+  await store.refreshHome()
+  if (!currentParticipant.value) {
+    clearParticipant()
+    await router.replace({ path: '/player', query: { redirect: '/' } })
+  }
+})
 
 function findPlayers() {
   const game = gameName.value.trim()
@@ -103,38 +112,14 @@ function findPlayers() {
 }
 
 function findGroupGames() {
-  if (!selectedPlayers.value.length) return
-  router.push({ path: '/recommendations', query: { players: selectedPlayers.value.join(','), tab: 'common' } })
+  if (!selectedPlayers.value.length || !currentParticipantId.value) return
+  const players = [currentParticipantId.value, ...selectedPlayers.value]
+  router.push({ path: '/recommendations', query: { players: players.join(','), tab: 'common' } })
 }
 
-async function createParticipant() {
-  const nickname = participantNickname()
-  if (!nickname) return
-  creating.value = true
-  error.value = ''
-  try {
-    const existing = store.participants.find((item) => item.nickname.toLocaleLowerCase() === nickname.toLocaleLowerCase())
-    if (existing) {
-      router.push({ path: '/logins', query: { participant: String(existing.id) } })
-      return
-    }
-    const created = await api.createParticipant({
-      nickname,
-      real_name: participant.real_name.trim() || null,
-      present: true,
-      notes: ''
-    })
-    await store.refreshHome()
-    router.push({ path: '/logins', query: { participant: String(created.id) } })
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    creating.value = false
-  }
-}
-
-function participantNickname() {
-  return participant.nickname.trim()
+async function logout() {
+  clearParticipant()
+  await router.replace('/player')
 }
 </script>
 
@@ -153,11 +138,24 @@ function participantNickname() {
   flex: 1;
 }
 
+.action-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .inline-action {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
+  width: 100%;
 }
 
 @media (max-width: 620px) {

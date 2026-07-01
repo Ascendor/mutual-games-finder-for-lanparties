@@ -2,6 +2,17 @@ import { defineStore } from 'pinia'
 import { api } from './api'
 import type { Account, Game, GameOption, Ownership, Participant, Recommendation, SyncRun } from './types'
 
+const participantNameCollator = new Intl.Collator('de', {
+  sensitivity: 'base',
+  numeric: true
+})
+
+function sortParticipants(participants: Participant[]) {
+  return [...participants].sort((left, right) =>
+    participantNameCollator.compare(left.nickname, right.nickname)
+  )
+}
+
 export const useLanStore = defineStore('lan', {
   state: () => ({
     participants: [] as Participant[],
@@ -18,7 +29,10 @@ export const useLanStore = defineStore('lan', {
     error: ''
   }),
   getters: {
-    presentParticipants: (state) => state.participants.filter((participant) => participant.present),
+    sortedParticipants: (state) => sortParticipants(state.participants),
+    presentParticipants: (state) => sortParticipants(
+      state.participants.filter((participant) => participant.present)
+    ),
     totalPlaytime: (state) => state.ownerships.reduce((sum, own) => sum + own.playtime_minutes, 0)
   },
   actions: {

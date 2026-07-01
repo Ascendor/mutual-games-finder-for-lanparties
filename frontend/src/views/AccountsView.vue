@@ -5,7 +5,7 @@
         <h1 class="text-h4">Accounts</h1>
         <p class="text-medium-emphasis">Teilnehmer einmalig mit Steam, Epic oder GOG verbinden und danach synchronisieren.</p>
       </div>
-      <v-btn to="/sync" color="primary" variant="tonal" prepend-icon="mdi-sync">Zur Synchronisation</v-btn>
+      <v-btn to="/admin/sync" color="primary" variant="tonal" prepend-icon="mdi-sync">Zur Synchronisation</v-btn>
     </div>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
@@ -16,7 +16,7 @@
         <v-card variant="flat">
           <v-card-title>Bibliothek verbinden</v-card-title>
           <v-card-text>
-            <v-select v-model="form.participant_id" :items="store.participants" item-title="nickname" item-value="id" label="Teilnehmer" density="compact" />
+            <v-select v-model="form.participant_id" :items="store.sortedParticipants" item-title="nickname" item-value="id" label="Teilnehmer" density="compact" />
             <v-select v-model="form.platform" :items="platforms" label="Plattform" density="compact" />
 
             <template v-if="form.platform === 'steam'">

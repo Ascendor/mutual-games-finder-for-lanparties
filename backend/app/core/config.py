@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     provider_auth_root: str = "/provider-auth"
     gog_auth_config_path: str | None = None
     xbox_client_id: str | None = None
+    playnite_upload_dir: str = "/tmp/playnite-uploads"
+    playnite_upload_max_bytes: int = 4 * 1024 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

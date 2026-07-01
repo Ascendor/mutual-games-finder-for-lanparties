@@ -135,3 +135,16 @@ pytest
 ```
 
 Getestet werden Matching Engine, Normalisierung, Importer-Verhalten und API-Integration.
+
+## Produktion auf Debian
+
+Fuer einen vorhandenen Apache-VServer gibt es eine eigenstaendige
+`compose.production.yml`. Sie startet keinen internen TLS-Gateway, bindet
+Frontend und Backend nur an Loopback und laesst PostgreSQL ausschliesslich im
+Docker-Netz.
+
+Die vollstaendige manuelle Anleitung fuer DNS, Apache, Wildcard-Zertifikate,
+Basic Auth, Backups, Updates und Rollback steht in
+[`docs/production-deployment.md`](docs/production-deployment.md). Als Vorlage
+fuer Secrets dient `.env.production.example`; echte Produktionswerte gehoeren
+in die ignorierte Datei `.env.production`.

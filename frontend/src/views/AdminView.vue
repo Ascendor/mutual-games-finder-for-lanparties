@@ -73,16 +73,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { adminUnlocked, tryUnlockAdmin } from '../adminAccess'
 import { api } from '../api'
 import GameFilterBar from '../components/GameFilterBar.vue'
 import { createGameFilterState, matchesGameFilters } from '../gameFilters'
 import { useLanStore } from '../store'
 import type { Platform } from '../types'
 
-const ADMIN_PASSWORD = 'QC4lF93bYgwTHRT4xRynsAIz3San1lDW'
 const store = useLanStore()
+const route = useRoute()
+const router = useRouter()
 const password = ref('')
-const unlocked = ref(sessionStorage.getItem('lan-admin-unlocked') === 'true')
+const unlocked = adminUnlocked
 const loading = ref(false)
 const busy = ref('')
 const error = ref('')
@@ -142,13 +145,16 @@ onMounted(() => {
 
 function unlock() {
   error.value = ''
-  if (password.value !== ADMIN_PASSWORD) {
+  if (!tryUnlockAdmin(password.value)) {
     error.value = 'Falsches Passwort.'
     return
   }
-  sessionStorage.setItem('lan-admin-unlocked', 'true')
-  unlocked.value = true
   password.value = ''
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  if (['/admin/logins', '/admin/participants', '/admin/games', '/admin/sync'].includes(redirect)) {
+    void router.replace(redirect)
+    return
+  }
   load()
 }
 

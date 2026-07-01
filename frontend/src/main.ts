@@ -1,4 +1,4 @@
-﻿import 'vuetify/styles'
+import 'vuetify/styles'
 import './styles.css'
 
 import { createPinia } from 'pinia'
