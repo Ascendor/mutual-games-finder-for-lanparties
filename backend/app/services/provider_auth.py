@@ -174,9 +174,11 @@ def _extract_browser_cookie(value: str) -> str:
     ):
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
-            return next((group.strip() for group in match.groups() if group), "")
+            cookie = next((group.strip() for group in match.groups() if group), "")
+            return re.sub(r"\^(?=[&|<>()^$!])", "", cookie)
     if re.search(r"(?:^|;\s*)[\w.-]+=", text):
-        return text.removeprefix("Cookie:").strip()
+        cookie = text.removeprefix("Cookie:").strip()
+        return re.sub(r"\^(?=[&|<>()^$!])", "", cookie)
     return ""
 
 

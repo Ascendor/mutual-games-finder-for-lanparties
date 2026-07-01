@@ -146,6 +146,7 @@ function platformLabel(platform: Platform) {
     bethesda: 'Bethesda',
     gamejolt: 'Game Jolt',
     humble: 'Humble',
+    humble_key: 'Humble Key',
     meta: 'Meta / Oculus',
     itch: 'itch.io',
     legacy: 'Legacy',

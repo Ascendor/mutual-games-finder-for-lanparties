@@ -13,8 +13,8 @@
         <v-card variant="flat">
           <v-card-title>Accounts synchronisieren</v-card-title>
           <v-list>
-            <v-list-item v-for="account in store.accounts" :key="account.id" :title="`${account.platform}: ${account.display_name || account.account_id}`" :subtitle="account.last_error || account.last_successful_sync || 'Noch nie synchronisiert'">
-              <template #append>
+            <v-list-item v-for="account in store.accounts" :key="account.id" :title="`${platformLabel(account.platform)}: ${account.display_name || account.account_id}`" :subtitle="account.last_error || account.last_successful_sync || 'Noch nie synchronisiert'">
+              <template v-if="canSyncAccount(account.platform)" #append>
                 <v-btn size="small" color="primary" variant="tonal" prepend-icon="mdi-sync" :loading="loading === account.id" @click="sync(account.id)">Sync</v-btn>
               </template>
             </v-list-item>
@@ -115,7 +115,24 @@ async function repairMetadata() {
 function accountLabel(id?: number | null) {
   if (!id) return '-'
   const account = store.accounts.find((item) => item.id === id)
-  return account ? `${account.platform}: ${account.display_name || account.account_id}` : id
+  return account ? `${platformLabel(account.platform)}: ${account.display_name || account.account_id}` : id
+}
+
+function platformLabel(platform: string) {
+  const labels: Record<string, string> = {
+    amazon: 'Amazon Games',
+    battle_net: 'Battle.net',
+    humble: 'Humble',
+    humble_key: 'Humble Key',
+    meta: 'Meta / Oculus',
+    ubisoft: 'Ubisoft Connect',
+    xbox: 'Xbox Live'
+  }
+  return labels[platform] || platform
+}
+
+function canSyncAccount(platform: string) {
+  return ['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'amazon', 'battle_net', 'humble', 'meta'].includes(platform)
 }
 
 async function refreshRuns() {

@@ -310,9 +310,11 @@ def test_provider_auth_extracts_firefox_curl_and_cookie_json():
     from app.services.provider_auth import _extract_browser_cookie
 
     curl = """curl 'https://account.battle.net/api/games-and-subs' -H 'Accept: application/json' -H 'Cookie: sid=abc; region=eu'"""
+    windows_curl = """curl "https://www.humblebundle.com/api/v1/user/order" -H "Cookie: _simpleauth_sess=left^|middle^|right; OPTY^$name=value" """
     cookie_json = '[{"name":"oc_ac_at","value":"meta-token"},{"name":"locale","value":"de_DE"}]'
 
     assert _extract_browser_cookie(curl) == "sid=abc; region=eu"
+    assert _extract_browser_cookie(windows_curl) == "_simpleauth_sess=left|middle|right; OPTY$name=value"
     assert _extract_browser_cookie(cookie_json) == "oc_ac_at=meta-token; locale=de_DE"
 
 
@@ -558,16 +560,17 @@ def test_battlenet_provider_reads_web_session_library(monkeypatch, tmp_path):
 
 def test_humble_provider_reads_windows_games(monkeypatch, tmp_path):
     monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
-    import_providers.save_provider_auth_json(Platform.humble, 42, {"cookie": "_simpleauth_sess=abc"})
+    import_providers.save_provider_auth_json(Platform.humble, 42, {"cookie": "_simpleauth_sess=left^|right"})
 
     class HumbleResponse(FakeResponse):
         def __init__(self, payload=None, text=""):
             super().__init__(payload or {})
             self.text = text
+            self.headers = {"content-type": "application/json; charset=utf-8"}
 
     class HumbleClient:
         def __init__(self, **kwargs):
-            pass
+            assert kwargs["headers"]["Cookie"] == "_simpleauth_sess=left|right"
 
         def __enter__(self):
             return self
@@ -576,18 +579,56 @@ def test_humble_provider_reads_windows_games(monkeypatch, tmp_path):
             return False
 
         def get(self, url, params=None):
-            if "/home/library" in url:
-                return HumbleResponse(text='<script id="user-home-json-data">{"gamekeys":["key-1"]}</script>')
+            if url.endswith("/api/v1/user/order"):
+                return HumbleResponse([{"gamekey": "key-1"}])
             return HumbleResponse(
                 {
                     "key-1": {
+                        "gamekey": "key-1",
                         "subproducts": [
                             {
                                 "machine_name": "ftl",
                                 "human_name": "FTL: Faster Than Light",
                                 "downloads": [{"platform": "windows"}],
                             }
-                        ]
+                        ],
+                        "tpkd_dict": {
+                            "all_tpks": [
+                                {
+                                    "human_name": "The Walking Dead",
+                                    "machine_name": "walking-dead",
+                                    "key_type": "steam",
+                                    "key_type_human_name": "Steam",
+                                    "keyindex": 1,
+                                    "visible": True,
+                                    "is_expired": False,
+                                    "sold_out": False,
+                                },
+                                {
+                                    "human_name": "Already revealed",
+                                    "key_type": "steam",
+                                    "keyindex": 2,
+                                    "visible": True,
+                                    "is_expired": False,
+                                    "redeemed_key_val": "never-store-this",
+                                },
+                                {
+                                    "human_name": "Expired Game",
+                                    "key_type": "gog",
+                                    "keyindex": 3,
+                                    "visible": True,
+                                    "is_expired": True,
+                                },
+                                {
+                                    "human_name": "Python Course",
+                                    "key_type": "external_key",
+                                    "key_type_human_name": "MetaSnake",
+                                    "keyindex": 4,
+                                    "visible": True,
+                                    "is_expired": False,
+                                },
+                            ]
+                        },
                     }
                 }
             )
@@ -597,8 +638,11 @@ def test_humble_provider_reads_windows_games(monkeypatch, tmp_path):
         Account(id=42, participant_id=1, platform=Platform.humble, account_id="local-humble-1-1")
     )
 
-    assert len(games) == 1
+    assert len(games) == 2
     assert games[0].platform_game_id == "ftl"
+    assert games[1].title == "The Walking Dead"
+    assert games[1].mapping_platform == Platform.humble_key
+    assert games[1].ownership_platform == Platform.humble_key
 
 
 def test_meta_provider_combines_pc_and_quest_entitlements(monkeypatch, tmp_path):

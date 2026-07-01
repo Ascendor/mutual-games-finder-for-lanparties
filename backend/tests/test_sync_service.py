@@ -160,6 +160,50 @@ def test_authoritative_library_reconciliation_keeps_known_free_games(db):
     assert ownership.game.is_free is True
 
 
+def test_direct_humble_key_reuses_playnite_ownership_and_can_reconcile_it(db):
+    participant = Participant(nickname="Key Snapshot")
+    db.add(participant)
+    db.flush()
+    playnite_account = Account(
+        participant_id=participant.id,
+        platform=Platform.humble_key,
+        account_id="playnite:key",
+    )
+    direct_account = Account(
+        participant_id=participant.id,
+        platform=Platform.humble,
+        account_id="humble-direct",
+    )
+    db.add_all([playnite_account, direct_account])
+    db.flush()
+    imported = ImportedGame(
+        platform_game_id="walking-dead-key",
+        title="The Walking Dead",
+    )
+    game = resolve_game(db, Platform.humble_key, imported)
+    upsert_ownership(db, playnite_account, game, imported)
+    db.flush()
+
+    direct_import = ImportedGame(
+        platform_game_id="order:1:walking-dead",
+        title="The Walking Dead",
+        mapping_platform=Platform.humble_key,
+        ownership_platform=Platform.humble_key,
+    )
+    direct_game = resolve_game(db, Platform.humble_key, direct_import)
+    upsert_ownership(db, direct_account, direct_game, direct_import)
+    db.flush()
+
+    ownerships = db.scalars(select(Ownership).where(Ownership.participant_id == participant.id)).all()
+    assert len(ownerships) == 1
+    assert ownerships[0].platform == Platform.humble_key
+    assert ownerships[0].account_id == direct_account.id
+
+    _reconcile_account_ownerships(db, direct_account, set(), Platform.humble_key)
+    db.flush()
+    assert db.scalar(select(Ownership).where(Ownership.participant_id == participant.id)) is None
+
+
 def test_resolve_game_tolerates_missing_imported_player_counts(db):
     imported = ImportedGame(platform_game_id="broken-meta", title="Broken Metadata")
     imported.min_players = None  # type: ignore[assignment]

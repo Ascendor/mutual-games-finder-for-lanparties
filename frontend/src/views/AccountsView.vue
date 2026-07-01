@@ -116,7 +116,7 @@ function canSync(platform: Platform) {
 }
 
 function platformTitle(platform: Platform) {
-  const titles: Record<string, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App / Origin', amazon: 'Amazon Games', battle_net: 'Battle.net', bethesda: 'Bethesda', gamejolt: 'Game Jolt', humble: 'Humble', meta: 'Meta / Oculus', itch: 'itch.io', legacy: 'Legacy Games', nintendo: 'Nintendo', playstation: 'PlayStation', riot: 'Riot', rockstar: 'Rockstar', local: 'Lokal' }
+  const titles: Record<string, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App / Origin', amazon: 'Amazon Games', battle_net: 'Battle.net', bethesda: 'Bethesda', gamejolt: 'Game Jolt', humble: 'Humble', humble_key: 'Humble Key', meta: 'Meta / Oculus', itch: 'itch.io', legacy: 'Legacy Games', nintendo: 'Nintendo', playstation: 'PlayStation', riot: 'Riot', rockstar: 'Rockstar', local: 'Lokal' }
   return titles[platform] ?? platform
 }
 

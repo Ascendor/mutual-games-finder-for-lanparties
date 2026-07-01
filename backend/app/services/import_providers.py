@@ -6,7 +6,6 @@ import re
 import subprocess
 import time
 import hashlib
-from html import unescape
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -67,6 +66,8 @@ def _cookie_headers(credentials: dict[str, Any]) -> dict[str, str]:
     cookie = str(credentials.get("cookie") or credentials.get("cookies") or "").strip()
     if not cookie:
         raise RuntimeError("Die gespeicherte Browser-Sitzung fehlt. Bitte den Account neu verbinden.")
+    # Firefox escapes Windows cmd metacharacters when copying a request as cURL.
+    cookie = re.sub(r"\^(?=[&|<>()^$!])", "", cookie)
     return {
         "Cookie": cookie,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LANPartyGameFinder/1.0",
@@ -329,6 +330,8 @@ def run_legendary_for_account(account: Account, args: list[str], timeout: int = 
 class ImportedGame:
     platform_game_id: str
     title: str
+    mapping_platform: Platform | None = None
+    ownership_platform: Platform | None = None
     playtime_minutes: int = 0
     owned_since: datetime | None = None
     description: str = ""
@@ -1117,31 +1120,32 @@ class BattleNetProvider:
         return games
 
 
-HUMBLE_USER_DATA = re.compile(
-    r"""<[^>]+id=["']user-home-json-data["'][^>]*>(?P<data>.*?)</[^>]+>""",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
 class HumbleProvider:
     platform = Platform.humble
     authoritative_library = True
+    authoritative_ownership_platforms = {Platform.humble_key}
 
     def sync_account(self, account: Account) -> list[ImportedGame]:
         credentials = load_provider_auth_json(Platform.humble, account.id)
         headers = _cookie_headers(credentials)
         with httpx.Client(headers=headers, follow_redirects=True, timeout=40) as client:
-            library_response = client.get("https://www.humblebundle.com/home/library?hmb_source=navbar")
-            library_response.raise_for_status()
-            match = HUMBLE_USER_DATA.search(library_response.text)
-            if not match:
+            orders_response = client.get("https://www.humblebundle.com/api/v1/user/order")
+            orders_response.raise_for_status()
+            if "application/json" not in str(orders_response.headers.get("content-type") or ""):
                 raise RuntimeError("Humble-Sitzung ist abgelaufen. Bitte den Account neu verbinden.")
-            user_data = json.loads(unescape(match.group("data")).strip())
-            game_keys = [str(value) for value in user_data.get("gamekeys") or [] if value]
+            order_refs = orders_response.json()
+            if not isinstance(order_refs, list):
+                raise RuntimeError("Humble hat eine unerwartete Bestellliste zurückgegeben; vorhandene Daten bleiben erhalten.")
+            game_keys = [
+                str(item.get("gamekey"))
+                for item in order_refs
+                if isinstance(item, dict) and item.get("gamekey")
+            ]
             if not game_keys:
                 raise RuntimeError("Humble hat keine Bibliothek zurückgegeben; vorhandene Daten bleiben erhalten.")
             games: list[ImportedGame] = []
             seen: set[str] = set()
+            seen_key_titles: set[str] = set()
             for offset in range(0, len(game_keys), 40):
                 params: list[tuple[str, str]] = [("all_tpkds", "true")]
                 params.extend(("gamekeys", key) for key in game_keys[offset : offset + 40])
@@ -1171,9 +1175,77 @@ class HumbleProvider:
                                 feature_metadata_known=False,
                             )
                         )
+                    for key_entry in (order.get("tpkd_dict") or {}).get("all_tpks") or []:
+                        key_game = _humble_available_key_game(order, key_entry)
+                        key_title = normalize_title(key_game.title) if key_game else ""
+                        if key_game and key_title not in seen_key_titles:
+                            seen_key_titles.add(key_title)
+                            games.append(key_game)
         if not games:
             raise RuntimeError("Humble hat keine Windows-Spiele zurückgegeben; vorhandene Daten bleiben erhalten.")
         return games
+
+
+HUMBLE_GAME_KEY_TYPES = {
+    "steam",
+    "gog",
+    "rockstar_social",
+    "origin",
+    "ea",
+    "uplay",
+    "ubisoft",
+    "epic",
+    "epic_games",
+    "battle_net",
+    "battlenet",
+    "oculus",
+    "meta",
+}
+HUMBLE_EXTERNAL_GAME_PROVIDERS = {
+    "battle.net",
+    "blizzard",
+    "ea",
+    "ea app",
+    "epic games",
+    "gog",
+    "meta",
+    "oculus",
+    "origin",
+    "rockstar",
+    "steam",
+    "ubisoft",
+    "uplay",
+}
+
+
+def _humble_available_key_game(order: dict[str, Any], item: Any) -> ImportedGame | None:
+    if not isinstance(item, dict):
+        return None
+    if "redeemed_key_val" in item:
+        return None
+    if item.get("is_expired") or item.get("sold_out") or not item.get("visible", True):
+        return None
+    key_type = str(item.get("key_type") or "").strip().casefold()
+    provider = str(item.get("key_type_human_name") or "").strip().casefold()
+    is_game_provider = key_type in HUMBLE_GAME_KEY_TYPES or (
+        key_type == "external_key" and provider in HUMBLE_EXTERNAL_GAME_PROVIDERS
+    )
+    if not is_game_provider:
+        return None
+    title = str(item.get("human_name") or "").strip()
+    if not title:
+        return None
+    order_id = str(order.get("gamekey") or "order")
+    key_index = str(item.get("keyindex") if item.get("keyindex") is not None else "key")
+    machine_name = str(item.get("machine_name") or normalize_title(title))
+    return ImportedGame(
+        platform_game_id=f"{order_id}:{key_index}:{machine_name}",
+        title=title,
+        mapping_platform=Platform.humble_key,
+        ownership_platform=Platform.humble_key,
+        owned_since=_parse_datetime(order.get("created")),
+        feature_metadata_known=False,
+    )
 
 
 def _meta_entitlement_games(payload: Any) -> list[ImportedGame]:

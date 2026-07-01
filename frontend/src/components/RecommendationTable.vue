@@ -94,11 +94,15 @@ const rows = computed(() =>
     versus: rec.game.versus,
     is_free: rec.game.is_free,
     features: featureText(rec.game),
-    platforms: rec.platforms.join(', ')
+    platforms: rec.platforms.map(platformLabel).join(', ')
   }))
 )
 
 const hours = (minutes: number) => Math.round(minutes / 60)
+
+function platformLabel(platform: string) {
+  return platform === 'humble_key' ? 'Humble Key' : platform
+}
 
 function unknownPlayerLabel(rec: Recommendation) {
   const names = rec.unknown_players.map((participant) => participant.nickname)

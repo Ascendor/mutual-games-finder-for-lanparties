@@ -21,6 +21,7 @@ class Platform(StrEnum):
     bethesda = "bethesda"
     gamejolt = "gamejolt"
     humble = "humble"
+    humble_key = "humble_key"
     meta = "meta"
     itch = "itch"
     legacy = "legacy"

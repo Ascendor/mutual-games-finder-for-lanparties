@@ -207,27 +207,33 @@ def resolve_game(db: Session, platform: str, imported: ImportedGame) -> Game:
     return game
 
 
-def _pending_ownership(db: Session, account: Account, game: Game) -> Ownership | None:
+def _pending_ownership(
+    db: Session,
+    account: Account,
+    game: Game,
+    platform: Platform | str,
+) -> Ownership | None:
     for item in db.new:
         if not isinstance(item, Ownership):
             continue
         if (
             item.participant_id == account.participant_id
             and item.game_id == game.id
-            and item.platform == account.platform
+            and item.platform == platform
         ):
             return item
     return None
 
 
 def upsert_ownership(db: Session, account: Account, game: Game, imported: ImportedGame) -> Ownership:
-    ownership = _pending_ownership(db, account, game)
+    ownership_platform = imported.ownership_platform or account.platform
+    ownership = _pending_ownership(db, account, game, ownership_platform)
     if ownership is None:
         ownership = db.scalar(
             select(Ownership).where(
                 Ownership.participant_id == account.participant_id,
                 Ownership.game_id == game.id,
-                Ownership.platform == account.platform,
+                Ownership.platform == ownership_platform,
             )
         )
     if ownership is None:
@@ -235,9 +241,13 @@ def upsert_ownership(db: Session, account: Account, game: Game, imported: Import
             participant_id=account.participant_id,
             account_id=account.id,
             game_id=game.id,
-            platform=account.platform,
+            platform=ownership_platform,
         )
         db.add(ownership)
+    elif imported.ownership_platform is not None:
+        # A direct provider supersedes a synthetic Playnite ownership while
+        # retaining the participant/game/platform uniqueness contract.
+        ownership.account_id = account.id
     current_playtime = ownership.playtime_minutes or 0
     if imported.playtime_minutes > 0 or current_playtime <= 0:
         ownership.playtime_minutes = imported.playtime_minutes
@@ -246,13 +256,19 @@ def upsert_ownership(db: Session, account: Account, game: Game, imported: Import
     return ownership
 
 
-def _reconcile_account_ownerships(db: Session, account: Account, imported_game_ids: set[int]) -> None:
+def _reconcile_account_ownerships(
+    db: Session,
+    account: Account,
+    imported_game_ids: set[int],
+    platform: Platform | str | None = None,
+) -> None:
+    ownership_platform = platform or account.platform
     stmt = (
         select(Ownership)
         .join(Ownership.game)
         .where(
             Ownership.account_id == account.id,
-            Ownership.platform == account.platform,
+            Ownership.platform == ownership_platform,
             Game.is_free == False,  # noqa: E712
         )
     )
@@ -272,13 +288,25 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
     try:
         provider = PROVIDERS[account.platform]
         imported_games = provider.sync_account(account)
-        imported_game_ids: set[int] = set()
+        imported_game_ids_by_platform: dict[Platform | str, set[int]] = {}
         for imported in imported_games:
-            game = resolve_game(db, account.platform, imported)
+            mapping_platform = imported.mapping_platform or account.platform
+            ownership_platform = imported.ownership_platform or account.platform
+            game = resolve_game(db, mapping_platform, imported)
             upsert_ownership(db, account, game, imported)
-            imported_game_ids.add(game.id)
+            imported_game_ids_by_platform.setdefault(ownership_platform, set()).add(game.id)
+        authoritative_platforms: set[Platform | str] = set(
+            getattr(provider, "authoritative_ownership_platforms", set())
+        )
         if getattr(provider, "authoritative_library", False):
-            _reconcile_account_ownerships(db, account, imported_game_ids)
+            authoritative_platforms.add(account.platform)
+        for platform in authoritative_platforms:
+            _reconcile_account_ownerships(
+                db,
+                account,
+                imported_game_ids_by_platform.get(platform, set()),
+                platform,
+            )
         account.last_successful_sync = datetime.utcnow()
         account.last_error = None
         run.success = True

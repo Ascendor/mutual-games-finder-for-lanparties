@@ -71,6 +71,31 @@ def test_playnite_import_detects_meta_oculus_source(db):
     assert participant.ownerships[0].platform == Platform.meta
 
 
+def test_playnite_import_maps_humble_keys_to_humble_key_ownership(db):
+    participant = Participant(nickname="KeyUser", present=True)
+    db.add(participant)
+    db.commit()
+
+    result = import_playnite_export(
+        db,
+        participant.id,
+        json.dumps(
+            {
+                "Games": [
+                    {
+                        "Name": "The Walking Dead",
+                        "Source": {"Name": "Humble Keys"},
+                        "HumbleKeyId": "walking-dead-key",
+                    }
+                ]
+            }
+        ),
+    )
+
+    assert result.platforms == ["humble_key"]
+    assert participant.ownerships[0].platform == Platform.humble_key
+
+
 def test_playnite_import_reads_backup_zip(db):
     participant = Participant(nickname="Grace", present=True)
     db.add(participant)
