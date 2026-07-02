@@ -73,7 +73,6 @@ def test_non_games_are_excluded_from_recommendations(db):
 
 
 def test_known_free_steam_game_is_available_to_every_selected_player(db):
-    owner = Participant(nickname="Owner", present=True)
     ada = Participant(nickname="Ada", present=True)
     linus = Participant(nickname="Linus", present=True)
     free_game = Game(
@@ -82,25 +81,37 @@ def test_known_free_steam_game_is_available_to_every_selected_player(db):
         is_free=True,
         multiplayer=True,
     )
-    paid_game = Game(
-        title="Paid Arena",
-        normalized_title=normalize_title("Paid Arena"),
-        multiplayer=True,
-    )
-    db.add_all([owner, ada, linus, free_game, paid_game])
+    db.add_all([ada, linus, free_game])
     db.flush()
-    add_owned(db, owner, free_game, 120)
-    add_owned(db, owner, paid_game, 120)
+    add_owned(db, ada, free_game, 120)
     db.commit()
 
     common = find_common_games(db, [ada.id, linus.id])
 
     assert [item.game.title for item in common] == ["Free Arena"]
-    assert common[0].owner_count == 0
+    assert common[0].owner_count == 1
     assert common[0].available_player_count == 2
     assert common[0].known_player_count == 2
     assert common[0].coverage_percent == 100
     assert common[0].platforms == [Platform.steam]
+
+
+def test_free_game_owned_only_outside_selected_group_is_not_recommended(db):
+    outsider = Participant(nickname="Outsider", present=False)
+    ada = Participant(nickname="Ada", present=True)
+    linus = Participant(nickname="Linus", present=True)
+    free_game = Game(
+        title="Unknown Free Arena",
+        normalized_title=normalize_title("Unknown Free Arena"),
+        is_free=True,
+        multiplayer=True,
+    )
+    db.add_all([outsider, ada, linus, free_game])
+    db.flush()
+    add_owned(db, outsider, free_game, 120)
+    db.commit()
+
+    assert find_common_games(db, [ada.id, linus.id]) == []
 
 
 def test_free_games_with_broader_library_adoption_rank_higher(db):

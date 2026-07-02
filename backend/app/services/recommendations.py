@@ -3,7 +3,7 @@
 from statistics import median
 from typing import Literal
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Game, Ownership, Participant, Platform
@@ -115,15 +115,10 @@ def _recommendations_for_participants(
                 | (Game.local_coop == True)  # noqa: E712
                 | (Game.online_coop == True)  # noqa: E712
             )
-    if free_games_as_owned:
-        query = query.where(
-            or_(
-                Ownership.participant_id.in_(participant_ids),
-                Game.is_free == True,  # noqa: E712
-            )
-        )
-    else:
-        query = query.where(Ownership.participant_id.in_(participant_ids))
+    # A free game is useful to this group only after at least one selected
+    # participant has actually imported it. This avoids recommending the whole
+    # global free-to-play catalogue.
+    query = query.where(Ownership.participant_id.in_(participant_ids))
     games = db.scalars(query).unique().all()
     recs = []
     for game in games:
