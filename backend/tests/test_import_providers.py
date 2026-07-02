@@ -15,6 +15,7 @@ from app.services.import_providers import (
     GOG_CLIENT_ID,
     GOGProvider,
     HumbleProvider,
+    ImportBatch,
     MetaProvider,
     SteamProvider,
     UbisoftProvider,
@@ -121,13 +122,105 @@ def test_gog_provider_uses_auth_cache_and_direct_api(monkeypatch, tmp_path):
     provider = GOGProvider()
     account = Account(id=7, participant_id=1, platform=Platform.gog, account_id="ignored")
 
-    games = provider.sync_account(account)
+    batch = provider.sync_account(account)
+    assert isinstance(batch, ImportBatch)
+    games = batch.games
 
     assert len(games) == 1
     assert games[0].title == "Stardew Valley"
     assert games[0].playtime_minutes == 120
     assert games[0].singleplayer is True
+    assert batch.warnings == []
+    assert batch.authoritative_snapshot is True
     assert provider.authoritative_library is True
+
+
+def test_gog_provider_skips_one_unresolved_product_without_claiming_complete_snapshot(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    cache = import_providers.gog_auth_config_path(8)
+    cache.write_text(
+        json.dumps(
+            {
+                GOG_CLIENT_ID: {
+                    "access_token": "token",
+                    "refresh_token": "refresh",
+                    "expires_in": 3600,
+                    "loginTime": time.time(),
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class PartialGOGClient(FakeClient):
+        def get(self, url):
+            if url.endswith("/user/data/games"):
+                return FakeResponse({"owned": [101, 1173343803]})
+            if url.endswith("/products/101"):
+                return FakeResponse({"title": "Stardew Valley"})
+            if url.endswith("/account/gameDetails/101.json"):
+                return FakeResponse({})
+            if url.endswith("/products/1173343803"):
+                return FakeResponse({"title": "product_title_1173343803"})
+            if url.endswith("/account/gameDetails/1173343803.json"):
+                return FakeResponse({})
+            return FakeResponse({}, ok=False)
+
+    monkeypatch.setattr(
+        import_providers.httpx,
+        "Client",
+        lambda **kwargs: PartialGOGClient(**kwargs),
+    )
+
+    batch = GOGProvider().sync_account(
+        Account(id=8, participant_id=1, platform=Platform.gog, account_id="ignored")
+    )
+
+    assert isinstance(batch, ImportBatch)
+    assert [game.title for game in batch.games] == ["Stardew Valley"]
+    assert batch.authoritative_snapshot is False
+    assert len(batch.warnings) == 1
+    assert "1173343803" in batch.warnings[0]
+
+
+def test_gog_provider_fails_when_no_owned_product_can_be_resolved(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    cache = import_providers.gog_auth_config_path(9)
+    cache.write_text(
+        json.dumps(
+            {
+                GOG_CLIENT_ID: {
+                    "access_token": "token",
+                    "refresh_token": "refresh",
+                    "expires_in": 3600,
+                    "loginTime": time.time(),
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class BrokenGOGClient(FakeClient):
+        def get(self, url):
+            if url.endswith("/user/data/games"):
+                return FakeResponse({"owned": [1173343803]})
+            if url.endswith("/products/1173343803"):
+                return FakeResponse({"title": "product_title_1173343803"})
+            return FakeResponse({})
+
+    monkeypatch.setattr(
+        import_providers.httpx,
+        "Client",
+        lambda **kwargs: BrokenGOGClient(**kwargs),
+    )
+
+    with pytest.raises(RuntimeError, match="Keines der 1 GOG-Produkte"):
+        GOGProvider().sync_account(
+            Account(id=9, participant_id=1, platform=Platform.gog, account_id="ignored")
+        )
 
 
 def test_gog_title_resolution_rejects_localization_tokens():

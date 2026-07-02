@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Account, Game, Ownership, Platform, PlatformGameMapping, SyncRun
-from app.services.import_providers import ImportedGame, PROVIDERS
+from app.services.import_providers import ImportBatch, ImportedGame, PROVIDERS
 from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
 
@@ -287,7 +287,15 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
     db.flush()
     try:
         provider = PROVIDERS[account.platform]
-        imported_games = provider.sync_account(account)
+        provider_result = provider.sync_account(account)
+        if isinstance(provider_result, ImportBatch):
+            imported_games = provider_result.games
+            provider_warnings = provider_result.warnings
+            authoritative_snapshot = provider_result.authoritative_snapshot
+        else:
+            imported_games = provider_result
+            provider_warnings = []
+            authoritative_snapshot = True
         imported_game_ids_by_platform: dict[Platform | str, set[int]] = {}
         for imported in imported_games:
             mapping_platform = imported.mapping_platform or account.platform
@@ -295,11 +303,13 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
             game = resolve_game(db, mapping_platform, imported)
             upsert_ownership(db, account, game, imported)
             imported_game_ids_by_platform.setdefault(ownership_platform, set()).add(game.id)
-        authoritative_platforms: set[Platform | str] = set(
-            getattr(provider, "authoritative_ownership_platforms", set())
-        )
-        if getattr(provider, "authoritative_library", False):
-            authoritative_platforms.add(account.platform)
+        authoritative_platforms: set[Platform | str] = set()
+        if authoritative_snapshot:
+            authoritative_platforms.update(
+                getattr(provider, "authoritative_ownership_platforms", set())
+            )
+            if getattr(provider, "authoritative_library", False):
+                authoritative_platforms.add(account.platform)
         for platform in authoritative_platforms:
             _reconcile_account_ownerships(
                 db,
@@ -311,7 +321,15 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
         account.last_error = None
         run.success = True
         run.imported_games = len(imported_games)
-        run.message = "sync completed"
+        run.message = (
+            "sync completed"
+            if not provider_warnings
+            else (
+                f"sync completed with {len(provider_warnings)} warning(s); "
+                "existing ownerships for skipped products were kept. "
+                + " | ".join(provider_warnings[:5])
+            )
+        )
         run.finished_at = datetime.utcnow()
         db.commit()
     except Exception as exc:

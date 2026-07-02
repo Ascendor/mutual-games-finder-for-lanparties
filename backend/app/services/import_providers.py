@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import subprocess
@@ -29,6 +30,7 @@ GOG_API_URL = "https://api.gog.com"
 GOG_DEFAULT_CACHE = Path.home() / ".config" / "heroic_gogdl" / "auth.json"
 AMAZON_ENTITLEMENTS_URL = "https://gaming.amazon.com/api/distribution/entitlements"
 AMAZON_TOKEN_URL = "https://api.amazon.com/auth/token"
+LOGGER = logging.getLogger(__name__)
 
 def platform_value(platform: Platform | str) -> str:
     return platform.value if isinstance(platform, Platform) else str(platform)
@@ -357,10 +359,17 @@ class ImportedGame:
         return normalize_title(self.title)
 
 
+@dataclass
+class ImportBatch:
+    games: list[ImportedGame]
+    warnings: list[str] = field(default_factory=list)
+    authoritative_snapshot: bool = True
+
+
 class ImportProvider(Protocol):
     platform: Platform
 
-    def sync_account(self, account: Account) -> list[ImportedGame]:
+    def sync_account(self, account: Account) -> list[ImportedGame] | ImportBatch:
         ...
 
 
@@ -823,26 +832,39 @@ class GOGProvider:
             owned_response.raise_for_status()
             owned_ids = owned_response.json().get("owned", [])
             results: list[ImportedGame] = []
+            warnings: list[str] = []
             for game_id in owned_ids:
-                product = client.get(f"{GOG_API_URL}/products/{game_id}")
-                product.raise_for_status()
-                product_payload = product.json()
-                product_data = product_payload if isinstance(product_payload, dict) else {}
-                details_response = client.get(f"{GOG_EMBED_URL}/account/gameDetails/{game_id}.json")
-                details_payload = details_response.json() if details_response.is_success else {}
-                details_data = details_payload if isinstance(details_payload, dict) else {}
-                data = _merge_dicts({"platform_game_id": str(game_id)}, product_data, details_data)
-                title = _resolved_gog_title(product_data, details_data)
-                if not title:
-                    raise RuntimeError(
-                        f"GOG did not return a resolved title for product {game_id}; "
-                        "the existing library was kept unchanged."
-                    )
-                data["title"] = title
-                game = _game_from_mapping(data, fallback_platform_id=str(game_id))
-                if game:
+                try:
+                    product_response = client.get(f"{GOG_API_URL}/products/{game_id}")
+                    product_payload = product_response.json() if product_response.is_success else {}
+                    product_data = product_payload if isinstance(product_payload, dict) else {}
+                    details_response = client.get(f"{GOG_EMBED_URL}/account/gameDetails/{game_id}.json")
+                    details_payload = details_response.json() if details_response.is_success else {}
+                    details_data = details_payload if isinstance(details_payload, dict) else {}
+                    data = _merge_dicts({"platform_game_id": str(game_id)}, product_data, details_data)
+                    title = _resolved_gog_title(product_data, details_data)
+                    if not title:
+                        raise ValueError("GOG lieferte nur einen internen Titelplatzhalter")
+                    data["title"] = title
+                    game = _game_from_mapping(data, fallback_platform_id=str(game_id))
+                    if not game:
+                        raise ValueError("GOG-Produkt konnte nicht in ein Spiel umgewandelt werden")
                     results.append(game)
-            return results
+                except Exception as exc:
+                    warning = f"GOG-Produkt {game_id} wurde übersprungen: {exc}"
+                    warnings.append(warning)
+                    LOGGER.warning(warning)
+            if warnings and owned_ids and not results:
+                raise RuntimeError(
+                    f"Keines der {len(owned_ids)} GOG-Produkte konnte verarbeitet werden; "
+                    "die bestehende Bibliothek wurde unverändert beibehalten. "
+                    + " | ".join(warnings[:3])
+                )
+            return ImportBatch(
+                games=results,
+                warnings=warnings,
+                authoritative_snapshot=not warnings,
+            )
 
 
 GOG_TITLE_TOKEN = re.compile(r"^product_title_\d+$", re.IGNORECASE)

@@ -2,7 +2,8 @@
 from sqlalchemy import select
 
 from app.models import Ownership
-from app.services.import_providers import ImportedGame, _is_non_game_steam_entry, _steam_metadata_from_details
+from app.services import sync_service
+from app.services.import_providers import ImportBatch, ImportedGame, _is_non_game_steam_entry, _steam_metadata_from_details
 from app.services.sync_service import _reconcile_account_ownerships, resolve_game, upsert_ownership
 
 
@@ -158,6 +159,63 @@ def test_authoritative_library_reconciliation_keeps_known_free_games(db):
     ownership = db.scalar(select(Ownership).where(Ownership.account_id == account.id))
     assert ownership is not None
     assert ownership.game.is_free is True
+
+
+def test_incomplete_provider_snapshot_keeps_ownerships_for_skipped_products(db, monkeypatch):
+    participant = Participant(nickname="Partial GOG")
+    db.add(participant)
+    db.flush()
+    account = Account(
+        participant_id=participant.id,
+        platform=Platform.gog,
+        account_id="partial-gog",
+    )
+    db.add(account)
+    db.flush()
+    current = resolve_game(
+        db,
+        Platform.gog,
+        ImportedGame(platform_game_id="101", title="Stardew Valley"),
+    )
+    unresolved = resolve_game(
+        db,
+        Platform.gog,
+        ImportedGame(platform_game_id="1173343803", title="Existing Resolved Title"),
+    )
+    upsert_ownership(
+        db,
+        account,
+        current,
+        ImportedGame(platform_game_id="101", title="Stardew Valley"),
+    )
+    upsert_ownership(
+        db,
+        account,
+        unresolved,
+        ImportedGame(platform_game_id="1173343803", title="Existing Resolved Title"),
+    )
+    db.commit()
+
+    class PartialProvider:
+        authoritative_library = True
+
+        def sync_account(self, _account):
+            return ImportBatch(
+                games=[ImportedGame(platform_game_id="101", title="Stardew Valley")],
+                warnings=["GOG-Produkt 1173343803 wurde übersprungen"],
+                authoritative_snapshot=False,
+            )
+
+    monkeypatch.setitem(sync_service.PROVIDERS, Platform.gog, PartialProvider())
+    run = sync_service.sync_account(db, account.id)
+
+    ownerships = db.scalars(
+        select(Ownership).where(Ownership.account_id == account.id)
+    ).all()
+    assert run.success is True
+    assert run.imported_games == 1
+    assert "1 warning" in run.message
+    assert {ownership.game_id for ownership in ownerships} == {current.id, unresolved.id}
 
 
 def test_direct_humble_key_reuses_playnite_ownership_and_can_reconcile_it(db):
