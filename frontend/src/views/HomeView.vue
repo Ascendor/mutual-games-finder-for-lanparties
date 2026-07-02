@@ -53,7 +53,23 @@
                 chips
                 density="comfortable"
                 hide-details="auto"
-              />
+              >
+                <template #item="{ props: itemProps, item }">
+                  <v-list-item
+                    v-bind="itemProps"
+                    :title="participantOptionLabel(item.raw)"
+                  >
+                    <template #prepend>
+                      <v-checkbox-btn
+                        :model-value="selectedPlayers.includes(item.raw.id)"
+                        class="participant-option-checkbox"
+                        tabindex="-1"
+                        aria-hidden="true"
+                      />
+                    </template>
+                  </v-list-item>
+                </template>
+              </v-autocomplete>
               <span>spielen.</span>
             </div>
           </v-card-text>
@@ -84,6 +100,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { useLanStore } from '../store'
+import type { Participant } from '../types'
 
 const router = useRouter()
 const store = useLanStore()
@@ -115,6 +132,12 @@ function findGroupGames() {
   if (!selectedPlayers.value.length || !currentParticipantId.value) return
   const players = [currentParticipantId.value, ...selectedPlayers.value]
   router.push({ path: '/recommendations', query: { players: players.join(','), tab: 'common' } })
+}
+
+function participantOptionLabel(participant: Participant) {
+  return participant.real_name
+    ? `${participant.nickname} (${participant.real_name})`
+    : participant.nickname
 }
 
 async function logout() {
@@ -156,6 +179,10 @@ async function logout() {
   gap: 10px;
   align-items: center;
   width: 100%;
+}
+
+.participant-option-checkbox {
+  pointer-events: none;
 }
 
 @media (max-width: 620px) {

@@ -3,7 +3,32 @@
     <h1 class="text-h4 mb-4">Was können wir spielen?</h1>
     <v-row class="mb-4">
       <v-col cols="12" md="9">
-        <v-select v-model="selected" :items="participants" item-title="nickname" item-value="id" label="Spieler:innen" multiple chips density="compact" />
+        <v-select
+          v-model="selected"
+          :items="participants"
+          item-title="nickname"
+          item-value="id"
+          label="Spieler:innen"
+          multiple
+          chips
+          density="compact"
+        >
+          <template #item="{ props: itemProps, item }">
+            <v-list-item
+              v-bind="itemProps"
+              :title="participantOptionLabel(item.raw)"
+            >
+              <template #prepend>
+                <v-checkbox-btn
+                  :model-value="selected.includes(item.raw.id)"
+                  class="participant-option-checkbox"
+                  tabindex="-1"
+                  aria-hidden="true"
+                />
+              </template>
+            </v-list-item>
+          </template>
+        </v-select>
       </v-col>
       <v-col cols="12" md="3" class="d-flex align-center">
         <v-btn color="primary" prepend-icon="mdi-star-search-outline" :loading="loading || commonLoading" :disabled="!currentParticipant" @click="load">Berechnen</v-btn>
@@ -66,7 +91,7 @@ import { api } from '../api'
 import RecommendationTable from '../components/RecommendationTable.vue'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { useLanStore } from '../store'
-import type { Recommendation } from '../types'
+import type { Participant, Recommendation } from '../types'
 
 const store = useLanStore()
 const route = useRoute()
@@ -145,6 +170,12 @@ async function loadCommon() {
     commonLoading.value = false
   }
 }
+
+function participantOptionLabel(participant: Participant) {
+  return participant.real_name
+    ? `${participant.nickname} (${participant.real_name})`
+    : participant.nickname
+}
 </script>
 
 <style scoped>
@@ -153,5 +184,9 @@ async function loadCommon() {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.participant-option-checkbox {
+  pointer-events: none;
 }
 </style>
