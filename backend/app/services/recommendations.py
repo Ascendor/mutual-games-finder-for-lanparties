@@ -81,6 +81,7 @@ def _recommendations_for_participants(
     query = (
         select(Game)
         .join(Ownership)
+        .where(Game.is_game == True)  # noqa: E712
         .options(
             selectinload(
                 Game.ownerships.and_(Ownership.participant_id.in_(participant_ids))

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Game, Platform, SyncRun
+from app.services.game_classification import classify_game
 from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
 
@@ -62,6 +63,7 @@ class MetadataSyncResult:
     failed_games: int = 0
     igdb_errors: int = 0
     rawg_errors: int = 0
+    excluded_games: int = 0
     rawg_unavailable_reason: str | None = None
     message: str = "metadata sync completed"
 
@@ -140,6 +142,11 @@ def run_metadata_sync(run_id: int) -> None:
         run.imported_games = result.updated_games
         run.message = (
             f"{result.updated_games} von {result.scanned_games} Spielen aktualisiert"
+            + (
+                f", {result.excluded_games} Nicht-Spiele ausgeblendet"
+                if result.excluded_games
+                else ""
+            )
             + (
                 f", Quellenfehler: IGDB {result.igdb_errors}, RAWG {result.rawg_errors}"
                 if result.failed_games
@@ -351,6 +358,8 @@ def _igdb_record(
         return None
 
     record = MetadataRecord(primary_source="igdb", external_id=str(data["id"]))
+    record.set("is_game", True, "igdb")
+    record.set("non_game_reason", None, "igdb")
     if data.get("summary"):
         record.set("description", str(data["summary"]), "igdb")
     if data.get("first_release_date"):
@@ -596,6 +605,8 @@ def _metadata_snapshot(game: Game) -> tuple[Any, ...]:
         game.cover_url,
         game.release_date,
         tuple(game.genres or []),
+        game.is_game,
+        game.non_game_reason,
         *(getattr(game, field) for field in sorted(FEATURE_FIELDS)),
         game.metadata_source,
         game.metadata_external_id,
@@ -624,6 +635,31 @@ def _apply_metadata_record(game: Game, record: MetadataRecord) -> bool:
     game.metadata_sources = dict(record.sources)
     game.metadata_updated_at = datetime.utcnow()
     return _metadata_snapshot(game) != before
+
+
+def _apply_content_classification(
+    game: Game,
+    record: MetadataRecord | None,
+) -> bool:
+    before = (game.is_game, game.non_game_reason, dict(game.metadata_sources or {}))
+    record_genres = record.values.get("genres", []) if record else []
+    classification = classify_game(
+        game.title,
+        [*(game.genres or []), *(record_genres or [])],
+    )
+    if classification.is_game is False:
+        if record:
+            record.set("is_game", False, "classification")
+            record.set("non_game_reason", classification.reason, "classification")
+        else:
+            game.is_game = False
+            game.non_game_reason = classification.reason
+            sources = dict(game.metadata_sources or {})
+            sources["is_game"] = "classification"
+            sources["non_game_reason"] = "classification"
+            game.metadata_sources = sources
+            game.metadata_updated_at = datetime.utcnow()
+    return before != (game.is_game, game.non_game_reason, dict(game.metadata_sources or {}))
 
 
 def enrich_all_game_metadata(
@@ -660,6 +696,7 @@ def enrich_all_game_metadata(
         fetched = executor.map(_fetch_game_metadata, jobs)
         for scanned, (game_id, record, igdb_failed, rawg_failed) in enumerate(fetched, start=1):
             game = games_by_id[game_id]
+            was_game = game.is_game
             result.igdb_errors += int(igdb_failed)
             result.rawg_errors += int(rawg_failed)
             result.failed_games += int(igdb_failed or rawg_failed)
@@ -667,8 +704,11 @@ def enrich_all_game_metadata(
             genres_changed = cleaned_genres != (game.genres or [])
             if genres_changed:
                 game.genres = cleaned_genres
+            classification_changed = _apply_content_classification(game, record)
             metadata_changed = bool(record and _apply_metadata_record(game, record))
-            if genres_changed or metadata_changed:
+            if was_game and not game.is_game:
+                result.excluded_games += 1
+            if genres_changed or classification_changed or metadata_changed:
                 result.updated_games += 1
                 db.flush()
             if scanned % 25 == 0:

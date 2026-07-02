@@ -55,6 +55,23 @@ def test_common_and_coop_recommendations(db):
     assert [item.game.title for item in sized] == ["Deep Rock Galactic"]
 
 
+def test_non_games_are_excluded_from_recommendations(db):
+    participant = Participant(nickname="Viewer", present=True)
+    software = Game(
+        title="VR Video Player",
+        normalized_title=normalize_title("VR Video Player"),
+        is_game=False,
+        non_game_reason="Software-Genre: utilities",
+    )
+    db.add_all([participant, software])
+    db.flush()
+    add_owned(db, participant, software, 120)
+    db.commit()
+
+    assert find_common_games(db, [participant.id]) == []
+    assert find_most_popular_games(db) == []
+
+
 def test_known_free_steam_game_is_available_to_every_selected_player(db):
     owner = Participant(nickname="Owner", present=True)
     ada = Participant(nickname="Ada", present=True)

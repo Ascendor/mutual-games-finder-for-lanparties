@@ -57,6 +57,12 @@ def test_game_options_are_compact_searchable_and_cacheable():
             models.Game(title="Portal", normalized_title="portal"),
             models.Game(title="Portal 2", normalized_title="portal 2"),
             models.Game(title="Quake", normalized_title="quake"),
+            models.Game(
+                title="VR Video Player",
+                normalized_title="vr video player",
+                is_game=False,
+                non_game_reason="Software-Genre: utilities",
+            ),
         ]
     )
     db.commit()
@@ -66,6 +72,15 @@ def test_game_options_are_compact_searchable_and_cacheable():
     assert response.status_code == 200
     assert [item["title"] for item in response.json()] == ["Portal", "Portal 2"]
     assert set(response.json()[0]) == {"id", "title"}
+    assert "VR Video Player" not in {
+        item["title"] for item in client.get("/api/games/options").json()
+    }
+    assert "VR Video Player" not in {
+        item["title"] for item in client.get("/api/games").json()
+    }
+    assert "VR Video Player" in {
+        item["title"] for item in client.get("/api/games?include_non_games=true").json()
+    }
     assert response.headers["cache-control"].startswith("private, max-age=300")
 
     cached = client.get("/api/games/options", headers={"If-None-Match": response.headers["etag"]})

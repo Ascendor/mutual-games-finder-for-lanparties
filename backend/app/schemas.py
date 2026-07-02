@@ -74,6 +74,8 @@ class GameBase(BaseModel):
     cover_url: str | None = None
     release_date: date | None = None
     genres: list[str] = Field(default_factory=list)
+    is_game: bool = True
+    non_game_reason: str | None = None
     is_free: bool = False
     singleplayer: bool = False
     multiplayer: bool = False
@@ -110,6 +112,8 @@ class GameUpdate(BaseModel):
     cover_url: str | None = None
     release_date: date | None = None
     genres: list[str] | None = None
+    is_game: bool | None = None
+    non_game_reason: str | None = None
     is_free: bool | None = None
     singleplayer: bool | None = None
     multiplayer: bool | None = None

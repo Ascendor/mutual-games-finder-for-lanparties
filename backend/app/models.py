@@ -77,6 +77,8 @@ class Game(TimestampMixin, Base):
     cover_url: Mapped[str | None] = mapped_column(String(800))
     release_date: Mapped[date | None] = mapped_column(Date)
     genres: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    is_game: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    non_game_reason: Mapped[str | None] = mapped_column(String(255))
     is_free: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     singleplayer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     multiplayer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

@@ -323,6 +323,10 @@ def test_steam_metadata_marks_only_free_store_games_as_free():
 def test_steam_non_game_filter_uses_store_type_and_unambiguous_titles():
     assert _is_non_game_steam_entry("DEFCON Beta Demo", {}) is True
     assert _is_non_game_steam_entry("Game Tool", {"store_type": "tool"}) is True
+    assert _is_non_game_steam_entry(
+        "VR Video Player",
+        {"store_type": "game", "genres": ["Utilities", "Video Production"]},
+    ) is True
     assert _is_non_game_steam_entry("Demeo", {}) is False
     assert _is_non_game_steam_entry("The Finals Playtest", {}) is False
 

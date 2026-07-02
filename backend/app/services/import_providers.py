@@ -19,6 +19,7 @@ import yaml
 from app.core.config import settings
 from app.models import Account, Platform
 from app.services.account_identity import apply_account_identity, is_placeholder_display_name
+from app.services.game_classification import classify_game
 from app.services.normalization import normalize_title
 
 GOG_CLIENT_ID = "46899977096215655"
@@ -693,17 +694,12 @@ class SteamProvider:
         return details_by_appid
 
 
-STEAM_NON_GAME_TITLE = re.compile(
-    r"\b(?:demo|dedicated\s+server|test\s+server|sdk)\b",
-    re.IGNORECASE,
-)
-
-
 def _is_non_game_steam_entry(title: str, metadata: dict[str, Any]) -> bool:
-    store_type = str(metadata.get("store_type") or "").casefold()
-    if store_type and store_type != "game":
-        return True
-    return bool(STEAM_NON_GAME_TITLE.search(title))
+    return classify_game(
+        title,
+        metadata.get("genres") or [],
+        store_type=metadata.get("store_type"),
+    ).is_game is False
 
 
 class EpicProvider:

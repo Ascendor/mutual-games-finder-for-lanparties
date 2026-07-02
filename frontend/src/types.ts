@@ -26,6 +26,8 @@ export interface Game {
   cover_url?: string | null
   release_date?: string | null
   genres: string[]
+  is_game: boolean
+  non_game_reason?: string | null
   singleplayer: boolean
   multiplayer: boolean
   lan: boolean
@@ -157,5 +159,4 @@ export interface SteamLoginStart {
   state: string
   expires_in: number
 }
-
 

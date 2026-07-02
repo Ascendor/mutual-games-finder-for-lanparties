@@ -12,8 +12,14 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[GameRead])
-def list_games(search: str | None = None, db: Session = Depends(get_db)):
+def list_games(
+    search: str | None = None,
+    include_non_games: bool = False,
+    db: Session = Depends(get_db),
+):
     stmt = select(Game).order_by(Game.title)
+    if not include_non_games:
+        stmt = stmt.where(Game.is_game == True)  # noqa: E712
     if search:
         stmt = stmt.where(Game.normalized_title.contains(normalize_title(search)))
     return db.scalars(stmt).all()
@@ -27,7 +33,9 @@ def list_game_options(
     limit: int | None = Query(None, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
-    count, latest_update = db.execute(select(func.count(Game.id), func.max(Game.updated_at))).one()
+    count, latest_update = db.execute(
+        select(func.count(Game.id), func.max(Game.updated_at)).where(Game.is_game == True)  # noqa: E712
+    ).one()
     etag = f'"games-{count}-{latest_update.isoformat() if latest_update else "empty"}"'
     cache_headers = {
         "Cache-Control": "private, max-age=300, stale-while-revalidate=60",
@@ -36,7 +44,7 @@ def list_game_options(
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=cache_headers)
 
-    stmt = select(Game.id, Game.title).order_by(Game.title)
+    stmt = select(Game.id, Game.title).where(Game.is_game == True).order_by(Game.title)  # noqa: E712
     if search:
         stmt = stmt.where(Game.normalized_title.contains(normalize_title(search)))
     if limit:

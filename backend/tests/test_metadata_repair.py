@@ -200,3 +200,29 @@ def test_metadata_sync_applies_igdb_before_rawg(db, monkeypatch):
     assert game.player_count_known is True
     assert game.metadata_sources["max_players"] == "igdb"
     assert game.metadata_sources["description"] == "rawg"
+
+
+def test_metadata_sync_soft_excludes_software_from_existing_genres(db, monkeypatch):
+    game = Game(
+        title="VR Video Player",
+        normalized_title=normalize_title("VR Video Player"),
+        genres=["Utilities", "Video Production"],
+    )
+    db.add(game)
+    db.commit()
+
+    monkeypatch.setattr(metadata_service, "_igdb_access_token", lambda: "token")
+    monkeypatch.setattr(metadata_service, "_rawg_availability", lambda: (False, None))
+    monkeypatch.setattr(
+        metadata_service,
+        "_fetch_game_metadata",
+        lambda job: (job[0], None, False, False),
+    )
+
+    result = metadata_service.enrich_all_game_metadata(db)
+
+    assert result.excluded_games == 1
+    assert result.updated_games == 1
+    assert game.is_game is False
+    assert "utilities" in (game.non_game_reason or "")
+    assert game.metadata_sources["is_game"] == "classification"
