@@ -93,15 +93,6 @@ export interface Recommendation {
 }
 
 
-export interface PlayniteImportResult {
-  imported_games: number
-  skipped_games: number
-  created_accounts: number
-  updated_ownerships: number
-  platforms: string[]
-  message: string
-}
-
 export interface MetadataSyncResult {
   scanned_games: number
   updated_games: number
@@ -111,12 +102,16 @@ export interface MetadataSyncResult {
 export interface SyncRun {
   id: number
   account_id?: number | null
+  participant_id?: number | null
   kind: 'account' | 'metadata' | string
   started_at: string
   finished_at?: string | null
   success: boolean
   message: string
   imported_games: number
+  stage: string
+  progress_current: number
+  progress_total: number
 }
 
 
@@ -162,7 +157,5 @@ export interface SteamLoginStart {
   state: string
   expires_in: number
 }
-
-
 
 

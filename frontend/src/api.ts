@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, Game, GameOption, GameOwner, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
+import type { Account, Game, GameOption, GameOwner, Ownership, Participant, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -63,21 +63,49 @@ export const api = {
   syncMetadata: () => request<SyncRun>('/sync/metadata', { method: 'POST' }),
   repairMetadata: () => request<SyncRun>('/sync/metadata/repair', { method: 'POST' }),
   syncRuns: () => request<SyncRun[]>('/sync/runs'),
-  importPlaynite: async (participantId: number, file: File) => {
+  importPlaynite: (participantId: number, file: File, onUploadProgress?: (percent: number) => void) => {
     const form = new FormData()
     form.append('participant_id', String(participantId))
     form.append('file', file)
     pendingRequests.value += 1
-    try {
-      const response = await fetch(`${base}/imports/playnite`, { method: 'POST', body: form })
-      if (!response.ok) {
-        throw new Error(await response.text())
+    return new Promise<SyncRun>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      let completed = false
+      const finish = () => {
+        if (completed) return
+        completed = true
+        pendingRequests.value -= 1
       }
-      return response.json() as Promise<PlayniteImportResult>
-    } finally {
-      pendingRequests.value -= 1
-    }
+      xhr.open('POST', `${base}/imports/playnite`)
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          onUploadProgress?.(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+        }
+      }
+      xhr.onload = () => {
+        finish()
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new Error(xhr.responseText))
+          return
+        }
+        try {
+          resolve(JSON.parse(xhr.responseText) as SyncRun)
+        } catch {
+          reject(new Error('Der Server hat keine gültige Importantwort geliefert.'))
+        }
+      }
+      xhr.onerror = () => {
+        finish()
+        reject(new Error('Der Upload wurde durch ein Netzwerkproblem unterbrochen.'))
+      }
+      xhr.onabort = () => {
+        finish()
+        reject(new Error('Der Upload wurde abgebrochen.'))
+      }
+      xhr.send(form)
+    })
   },
+  playniteImportStatus: (runId: number) => request<SyncRun>(`/imports/playnite/${runId}`),
   providerAuthStatus: () => request<ProviderAuthStatus[]>('/provider-auth/status'),
   resolveSteamProfile: (profile: string) =>
     request<SteamProfile>('/provider-auth/steam/resolve', {

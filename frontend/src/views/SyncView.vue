@@ -53,8 +53,21 @@ const headers = [
 const rows = computed(() =>
   store.syncRuns.map((run) => ({
     ...run,
-    account: run.kind === 'metadata' ? 'Metadaten' : accountLabel(run.account_id),
-    status: !run.finished_at ? 'Läuft' : run.success ? 'OK' : 'Fehler',
+    account: run.kind === 'metadata'
+      ? 'Metadaten'
+      : run.kind === 'playnite'
+        ? `Playnite: ${participantLabel(run.participant_id)}`
+        : accountLabel(run.account_id),
+    status: !run.finished_at
+      ? run.progress_total > 0
+        ? `${run.progress_current}/${run.progress_total}`
+        : 'Läuft'
+      : run.success ? 'OK' : 'Fehler',
+    imported_games: run.kind === 'playnite'
+      && !run.finished_at
+      && ['queued', 'reading'].includes(run.stage)
+      ? '–'
+      : run.imported_games,
     statusColor: !run.finished_at ? 'primary' : run.success ? 'secondary' : 'error'
   }))
 )
@@ -116,6 +129,11 @@ function accountLabel(id?: number | null) {
   if (!id) return '-'
   const account = store.accounts.find((item) => item.id === id)
   return account ? `${platformLabel(account.platform)}: ${account.display_name || account.account_id}` : id
+}
+
+function participantLabel(id?: number | null) {
+  if (!id) return 'Unbekannt'
+  return store.participants.find((participant) => participant.id === id)?.nickname || 'Unbekannt'
 }
 
 function platformLabel(platform: string) {

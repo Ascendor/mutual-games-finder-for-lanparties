@@ -272,6 +272,17 @@
             >
               Backup importieren
             </v-btn>
+            <div v-if="playniteProgress" class="mt-4">
+              <v-progress-linear
+                :model-value="playniteProgress.percent"
+                :indeterminate="playniteProgress.indeterminate"
+                :color="playniteProgress.phase === 'failed' ? 'error' : 'primary'"
+                height="8"
+              />
+              <div class="text-caption text-medium-emphasis mt-1">
+                {{ playniteProgress.message }}
+              </div>
+            </div>
 
           </template>
 
@@ -351,12 +362,22 @@
 
         <template v-else-if="stage === 3">
           <div class="sync-state">
-            <v-progress-circular v-if="busy" indeterminate color="primary" size="48" />
+            <v-progress-linear
+              v-if="busy && playniteProgress"
+              class="sync-progress"
+              :model-value="playniteProgress.percent"
+              :indeterminate="playniteProgress.indeterminate"
+              color="primary"
+              height="8"
+            />
+            <v-progress-circular v-else-if="busy" indeterminate color="primary" size="48" />
             <v-icon v-else-if="error" color="error" size="48">mdi-alert-circle-outline</v-icon>
             <v-icon v-else color="primary" size="48">mdi-cloud-download-outline</v-icon>
-            <h2 class="text-h6 mt-4">Spiele werden geladen</h2>
+            <h2 class="text-h6 mt-4">
+              {{ playniteProgress ? 'Playnite-Bibliothek wird verarbeitet' : 'Spiele werden geladen' }}
+            </h2>
             <p class="text-body-2 text-medium-emphasis">
-              Die Verbindung steht. Jetzt wird die Bibliothek einmal vollständig synchronisiert.
+              {{ playniteProgress?.message || 'Die Verbindung steht. Jetzt wird die Bibliothek einmal vollständig synchronisiert.' }}
             </p>
           </div>
         </template>
@@ -399,7 +420,12 @@
         >
           Anmeldestatus prüfen
         </v-btn>
-        <v-btn v-else-if="stage === 3 && error && !busy" color="primary" prepend-icon="mdi-refresh" @click="syncLibrary">
+        <v-btn
+          v-else-if="stage === 3 && error && !busy"
+          color="primary"
+          prepend-icon="mdi-refresh"
+          @click="target.platform === 'ea' ? importPlaynite() : syncLibrary()"
+        >
           Erneut versuchen
         </v-btn>
         <v-btn v-else-if="stage === 4" color="primary" prepend-icon="mdi-check" @click="finish">
@@ -413,6 +439,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { stateFromRun, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
 import type { Account, Participant, Platform, ProviderLoginStart, SteamProfile } from '../types'
 
 interface ProviderTarget {
@@ -501,6 +528,7 @@ const steamLoginState = ref('')
 const needs2fa = ref(false)
 const resultMessage = ref('')
 const playniteFile = ref<File | File[] | null>(null)
+const playniteProgress = ref<PlayniteProgressState>()
 const ubisoft = reactive({ email: '', password: '', twoFactorCode: '' })
 const xboxChecking = ref(false)
 const codeCopied = ref(false)
@@ -592,6 +620,7 @@ watch(
     needs2fa.value = false
     resultMessage.value = ''
     playniteFile.value = null
+    playniteProgress.value = undefined
     xboxChecking.value = false
     codeCopied.value = false
     browserFamily.value = detectBrowser()
@@ -708,13 +737,44 @@ async function importPlaynite() {
   if (!props.target || !selectedPlayniteFile.value) return
   busy.value = true
   error.value = ''
+  playniteProgress.value = {
+    phase: 'upload',
+    percent: 0,
+    indeterminate: false,
+    message: 'Playnite-Backup wird hochgeladen: 0 %'
+  }
   try {
-    const result = await api.importPlaynite(props.target.participant.id, selectedPlayniteFile.value)
-    resultMessage.value = `${result.imported_games} Spiele wurden aus Playnite importiert.`
+    const job = await api.importPlaynite(
+      props.target.participant.id,
+      selectedPlayniteFile.value,
+      (percent) => {
+        playniteProgress.value = {
+          phase: 'upload',
+          percent,
+          indeterminate: false,
+          message: percent < 100
+            ? `Playnite-Backup wird hochgeladen: ${percent} %`
+            : 'Upload abgeschlossen. Der Server bereitet den Import vor.'
+        }
+      }
+    )
+    stage.value = 3
+    playniteProgress.value = stateFromRun(job)
+    const result = await waitForPlayniteImport(job.id, (run) => {
+      playniteProgress.value = stateFromRun(run)
+    })
+    if (!result.success) throw new Error(result.message)
+    resultMessage.value = result.message
     stage.value = 4
     emit('finished')
   } catch (err) {
     error.value = readableError(err)
+    playniteProgress.value = {
+      phase: 'failed',
+      percent: 100,
+      indeterminate: false,
+      message: error.value
+    }
   } finally {
     busy.value = false
   }
@@ -997,6 +1057,10 @@ function platformIcon(platform: Platform) {
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.sync-progress {
+  width: min(420px, 100%);
 }
 
 @media (max-width: 600px) {

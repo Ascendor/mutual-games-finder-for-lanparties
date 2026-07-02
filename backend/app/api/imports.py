@@ -1,13 +1,14 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.schemas import PlayniteImportRead
-from app.services.playnite_import import import_playnite_export_path
+from app.models import Participant, SyncRun
+from app.schemas import SyncRunRead
+from app.services.playnite_import import create_playnite_import_run, run_playnite_import
 
 router = APIRouter()
 UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
@@ -55,14 +56,31 @@ async def _store_upload(file: UploadFile) -> Path:
         await file.close()
 
 
-@router.post("/playnite", response_model=PlayniteImportRead)
+@router.post("/playnite", response_model=SyncRunRead, status_code=202)
 async def import_playnite(
+    background_tasks: BackgroundTasks,
     participant_id: int = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    if not db.get(Participant, participant_id):
+        raise HTTPException(404, "participant not found")
     path = await _store_upload(file)
     try:
-        return import_playnite_export_path(db, participant_id, path)
-    finally:
+        run = create_playnite_import_run(db, participant_id, file.filename or "Playnite-Backup")
+    except RuntimeError as exc:
         path.unlink(missing_ok=True)
+        raise HTTPException(409, str(exc)) from exc
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    background_tasks.add_task(run_playnite_import, run.id, path)
+    return run
+
+
+@router.get("/playnite/{run_id}", response_model=SyncRunRead)
+def playnite_import_status(run_id: int, db: Session = Depends(get_db)):
+    run = db.get(SyncRun, run_id)
+    if not run or run.kind != "playnite":
+        raise HTTPException(404, "Playnite-Import nicht gefunden")
+    return run

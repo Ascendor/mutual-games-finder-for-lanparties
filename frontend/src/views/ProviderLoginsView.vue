@@ -60,11 +60,22 @@
                 variant="tonal"
                 prepend-icon="mdi-import"
                 :loading="busy === `playnite:${group.participant.id}`"
-                :disabled="!selectedPlayniteFile(group.participant.id)"
+                :disabled="!selectedPlayniteFile(group.participant.id) || busy === `playnite:${group.participant.id}`"
                 @click="importPlaynite(group.participant)"
               >
                 Importieren
               </v-btn>
+              <div v-if="playniteProgress[group.participant.id]" class="playnite-progress">
+                <v-progress-linear
+                  :model-value="playniteProgress[group.participant.id].percent"
+                  :indeterminate="playniteProgress[group.participant.id].indeterminate"
+                  :color="playniteProgress[group.participant.id].phase === 'failed' ? 'error' : 'primary'"
+                  height="8"
+                />
+                <div class="text-caption text-medium-emphasis mt-1">
+                  {{ playniteProgress[group.participant.id].message }}
+                </div>
+              </div>
             </div>
 
             <div v-for="slot in group.slots" :key="slot.key" class="provider-row">
@@ -142,6 +153,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api'
 import ProviderConnectDialog from '../components/ProviderConnectDialog.vue'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
+import { stateFromRun, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
 import { useLanStore } from '../store'
 import type { Account, Participant, Platform, ProviderAuthStatus } from '../types'
 
@@ -178,6 +190,7 @@ const busy = ref<string | null>(null)
 const error = ref('')
 const message = ref('')
 const playniteFiles = reactive<Record<number, File | File[] | null>>({})
+const playniteProgress = reactive<Record<number, PlayniteProgressState>>({})
 const wizardOpen = ref(false)
 const wizardTarget = ref<ProviderSlot | null>(null)
 const adminMode = computed(() => props.adminMode)
@@ -285,13 +298,39 @@ async function importPlaynite(participant: Participant) {
   busy.value = `playnite:${participant.id}`
   error.value = ''
   message.value = ''
+  playniteProgress[participant.id] = {
+    phase: 'upload',
+    percent: 0,
+    indeterminate: false,
+    message: 'Playnite-Backup wird hochgeladen: 0 %'
+  }
   try {
-    const result = await api.importPlaynite(participant.id, file)
-    message.value = `${participant.nickname}: ${result.imported_games} Spiele aus Playnite importiert.`
+    const job = await api.importPlaynite(participant.id, file, (percent) => {
+      playniteProgress[participant.id] = {
+        phase: 'upload',
+        percent,
+        indeterminate: false,
+        message: percent < 100
+          ? `Playnite-Backup wird hochgeladen: ${percent} %`
+          : 'Upload abgeschlossen. Der Server bereitet den Import vor.'
+      }
+    })
+    playniteProgress[participant.id] = stateFromRun(job)
+    const result = await waitForPlayniteImport(job.id, (run) => {
+      playniteProgress[participant.id] = stateFromRun(run)
+    })
+    if (!result.success) throw new Error(result.message)
+    message.value = `${participant.nickname}: ${result.message}`
     playniteFiles[participant.id] = null
     await load()
   } catch (err) {
     error.value = readableError(err)
+    playniteProgress[participant.id] = {
+      phase: 'failed',
+      percent: 100,
+      indeterminate: false,
+      message: error.value
+    }
   } finally {
     busy.value = null
   }
@@ -413,6 +452,10 @@ function platformIcon(platform: Platform) {
   gap: 12px;
   align-items: center;
   padding-bottom: 12px;
+}
+
+.playnite-progress {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 760px) {

@@ -5,20 +5,25 @@ import re
 import struct
 import uuid
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from app.models import Account, Platform
+from app.db.session import SessionLocal
+from app.models import Account, Game, Platform, SyncRun
 from app.services.import_providers import ImportedGame, _as_int, _as_list, _parse_date, _parse_datetime
 from app.services.genre_utils import sanitize_genres
+from app.services.metadata_service import METADATA_SYNC_LOCK, enrich_all_game_metadata
 from app.services.normalization import normalize_title
 from app.services.sync_service import resolve_game, upsert_ownership
+
+PlayniteProgressCallback = Callable[[str, int, int, int], None]
 
 
 @dataclass
@@ -29,30 +34,51 @@ class PlayniteImportResult:
     updated_ownerships: int = 0
     platforms: list[str] | None = None
     message: str = "Playnite import completed"
+    game_ids: set[int] = field(default_factory=set)
 
 
-def import_playnite_export(db: Session, participant_id: int, raw_json: bytes | str) -> PlayniteImportResult:
+def import_playnite_export(
+    db: Session,
+    participant_id: int,
+    raw_json: bytes | str,
+    progress_callback: PlayniteProgressCallback | None = None,
+) -> PlayniteImportResult:
+    if progress_callback:
+        progress_callback("reading", 0, 0, 0)
     entries = _extract_entries_from_upload(raw_json)
-    return _import_playnite_entries(db, participant_id, entries)
+    return _import_playnite_entries(db, participant_id, entries, progress_callback)
 
 
-def import_playnite_export_path(db: Session, participant_id: int, path: Path | str) -> PlayniteImportResult:
+def import_playnite_export_path(
+    db: Session,
+    participant_id: int,
+    path: Path | str,
+    progress_callback: PlayniteProgressCallback | None = None,
+) -> PlayniteImportResult:
+    if progress_callback:
+        progress_callback("reading", 0, 0, 0)
     entries = _extract_entries_from_path(Path(path))
-    return _import_playnite_entries(db, participant_id, entries)
+    return _import_playnite_entries(db, participant_id, entries, progress_callback)
 
 
 def _import_playnite_entries(
     db: Session,
     participant_id: int,
     entries: list[dict[str, Any]],
+    progress_callback: PlayniteProgressCallback | None = None,
 ) -> PlayniteImportResult:
     result = PlayniteImportResult(platforms=[])
     seen_platforms: set[str] = set()
+    total_entries = len(entries)
+    if progress_callback:
+        progress_callback("importing", 0, total_entries, 0)
 
-    for entry in entries:
+    for index, entry in enumerate(entries, start=1):
         imported, platform = _imported_game_from_playnite_entry(entry)
         if not imported:
             result.skipped_games += 1
+            if progress_callback and (index % 10 == 0 or index == total_entries):
+                progress_callback("importing", index, total_entries, result.imported_games)
             continue
         account, created = _account_for_import(db, participant_id, platform)
         if created:
@@ -61,12 +87,205 @@ def _import_playnite_entries(
         upsert_ownership(db, account, game, imported)
         result.imported_games += 1
         result.updated_ownerships += 1
+        result.game_ids.add(game.id)
         seen_platforms.add(platform.value)
+        if progress_callback and (index % 10 == 0 or index == total_entries):
+            progress_callback("importing", index, total_entries, result.imported_games)
 
     result.platforms = sorted(seen_platforms)
     result.message = f"{result.imported_games} Spiele aus Playnite importiert"
     db.commit()
     return result
+
+
+def create_playnite_import_run(db: Session, participant_id: int, filename: str) -> SyncRun:
+    running = db.scalar(
+        select(SyncRun).where(
+            SyncRun.kind == "playnite",
+            SyncRun.participant_id == participant_id,
+            SyncRun.finished_at.is_(None),
+        )
+    )
+    if running:
+        raise RuntimeError("Für diesen Teilnehmer läuft bereits ein Playnite-Import.")
+    run = SyncRun(
+        participant_id=participant_id,
+        kind="playnite",
+        stage="queued",
+        message=f"{filename or 'Playnite-Backup'} wurde hochgeladen und wartet auf Verarbeitung.",
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def close_interrupted_playnite_runs(db: Session) -> None:
+    runs = db.scalars(
+        select(SyncRun).where(
+            SyncRun.kind == "playnite",
+            SyncRun.finished_at.is_(None),
+        )
+    ).all()
+    if not runs:
+        return
+    now = datetime.utcnow()
+    for run in runs:
+        run.success = False
+        run.stage = "failed"
+        run.finished_at = now
+        run.message = "Playnite-Import wurde durch einen Serverneustart abgebrochen."
+    db.commit()
+
+
+def _update_playnite_run(run_id: int, **values: Any) -> None:
+    progress_db = SessionLocal()
+    try:
+        run = progress_db.get(SyncRun, run_id)
+        if not run:
+            return
+        for key, value in values.items():
+            setattr(run, key, value)
+        progress_db.commit()
+    except OperationalError:
+        progress_db.rollback()
+    finally:
+        progress_db.close()
+
+
+def run_playnite_import(run_id: int, path: Path | str) -> None:
+    import_path = Path(path)
+    db = SessionLocal()
+    metadata_lock_acquired = False
+    try:
+        run = db.get(SyncRun, run_id)
+        if not run or run.participant_id is None:
+            return
+
+        def update_import_progress(stage: str, current: int, total: int, imported: int) -> None:
+            messages = {
+                "reading": "Playnite-Backup wird gelesen und entpackt.",
+                "importing": f"{current} von {total} Bibliothekseinträgen verarbeitet.",
+            }
+            _update_playnite_run(
+                run_id,
+                stage=stage,
+                progress_current=current,
+                progress_total=total,
+                imported_games=imported,
+                message=messages[stage],
+            )
+
+        result = import_playnite_export_path(
+            db,
+            run.participant_id,
+            import_path,
+            progress_callback=update_import_progress,
+        )
+        metadata_ids = set(
+            db.scalars(
+                select(Game.id).where(
+                    Game.id.in_(result.game_ids),
+                    or_(
+                        Game.metadata_updated_at.is_(None),
+                        Game.multiplayer_metadata_known.is_(False),
+                        Game.player_count_known.is_(False),
+                    ),
+                )
+            ).all()
+        )
+
+        metadata_result = None
+        metadata_error: str | None = None
+        if metadata_ids:
+            _update_playnite_run(
+                run_id,
+                stage="metadata_waiting",
+                progress_current=0,
+                progress_total=len(metadata_ids),
+                imported_games=result.imported_games,
+                message=(
+                    f"{result.imported_games} Spiele importiert. "
+                    "Metadaten-Anreicherung wartet auf einen freien Slot."
+                ),
+            )
+            METADATA_SYNC_LOCK.acquire()
+            metadata_lock_acquired = True
+            _update_playnite_run(
+                run_id,
+                stage="metadata",
+                message=f"Metadaten für {len(metadata_ids)} Spiele werden ergänzt.",
+            )
+
+            def update_metadata_progress(
+                scanned: int,
+                updated: int,
+                igdb_errors: int,
+                rawg_errors: int,
+            ) -> None:
+                error_count = igdb_errors + rawg_errors
+                _update_playnite_run(
+                    run_id,
+                    stage="metadata",
+                    progress_current=scanned,
+                    progress_total=len(metadata_ids),
+                    message=(
+                        f"Metadaten: {scanned} von {len(metadata_ids)} geprüft, "
+                        f"{updated} aktualisiert"
+                        + (f", {error_count} Quellenfehler" if error_count else "")
+                    ),
+                )
+
+            try:
+                metadata_result = enrich_all_game_metadata(
+                    db,
+                    progress_callback=update_metadata_progress,
+                    game_ids=metadata_ids,
+                )
+            except Exception as exc:
+                db.rollback()
+                metadata_error = str(exc)
+
+        metadata_summary = ""
+        if metadata_result:
+            metadata_summary = (
+                f"; Metadaten: {metadata_result.updated_games} aktualisiert"
+                + (
+                    f", {metadata_result.failed_games} mit Quellenfehlern"
+                    if metadata_result.failed_games
+                    else ""
+                )
+            )
+        elif metadata_error:
+            metadata_summary = f"; Metadaten konnten nicht ergänzt werden: {metadata_error}"
+        elif not metadata_ids:
+            metadata_summary = "; vorhandene Metadaten waren bereits vollständig"
+
+        _update_playnite_run(
+            run_id,
+            stage="completed",
+            progress_current=1,
+            progress_total=1,
+            imported_games=result.imported_games,
+            success=True,
+            finished_at=datetime.utcnow(),
+            message=f"{result.imported_games} Spiele aus Playnite importiert{metadata_summary}.",
+        )
+    except Exception as exc:
+        db.rollback()
+        _update_playnite_run(
+            run_id,
+            stage="failed",
+            imported_games=0,
+            success=False,
+            finished_at=datetime.utcnow(),
+            message=f"Playnite-Import fehlgeschlagen: {exc}",
+        )
+    finally:
+        if metadata_lock_acquired:
+            METADATA_SYNC_LOCK.release()
+        db.close()
+        import_path.unlink(missing_ok=True)
 
 
 def _extract_entries_from_upload(raw: bytes | str) -> list[dict[str, Any]]:

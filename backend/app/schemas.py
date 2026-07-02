@@ -191,23 +191,19 @@ class MetadataSyncRead(BaseModel):
     message: str
 
 
-class PlayniteImportRead(BaseModel):
-    imported_games: int
-    skipped_games: int
-    created_accounts: int
-    updated_ownerships: int
-    platforms: list[str]
-    message: str
-
 class SyncRunRead(BaseModel):
     id: int
     account_id: int | None
+    participant_id: int | None
     kind: str
     started_at: datetime
     finished_at: datetime | None
     success: bool
     message: str
     imported_games: int
+    stage: str
+    progress_current: int
+    progress_total: int
     model_config = ConfigDict(from_attributes=True)
 
 

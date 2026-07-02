@@ -4,7 +4,13 @@ import uuid
 import zipfile
 from io import BytesIO
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db.base import Base
 from app.models import Account, Participant, Platform
+from app.services import playnite_import
+from app.services.metadata_service import MetadataSyncResult
 from app.services.playnite_import import import_playnite_export, import_playnite_export_path
 
 
@@ -131,6 +137,62 @@ def test_playnite_import_reads_backup_zip_from_disk(db, tmp_path):
     assert result.imported_games == 1
     assert result.platforms == ["gog"]
     assert participant.ownerships[0].game.title == "Into the Breach"
+
+
+def test_playnite_background_job_reports_progress_and_enriches_metadata(tmp_path, monkeypatch):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'jobs.db'}",
+        connect_args={"timeout": 0.05},
+    )
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    monkeypatch.setattr(playnite_import, "SessionLocal", Session)
+    session = Session()
+    participant = Participant(nickname="Progress", present=True)
+    session.add(participant)
+    session.commit()
+    backup = tmp_path / "playnite.zip"
+    with zipfile.ZipFile(backup, "w") as archive:
+        archive.writestr(
+            "library/games.json",
+            json.dumps(
+                {
+                    "Games": [
+                        {"Name": "Portal 2", "Source": {"Name": "Steam"}, "SteamAppId": 620},
+                        {"Name": "Control", "Source": {"Name": "GOG"}, "ProductId": "control"},
+                    ]
+                }
+            ),
+        )
+    run = playnite_import.create_playnite_import_run(session, participant.id, backup.name)
+    session.close()
+    metadata_calls: list[set[int]] = []
+
+    def fake_metadata(db, progress_callback=None, game_ids=None):
+        metadata_calls.append(set(game_ids or set()))
+        if progress_callback:
+            progress_callback(len(game_ids or set()), 1, 0, 0)
+        return MetadataSyncResult(
+            scanned_games=len(game_ids or set()),
+            updated_games=1,
+        )
+
+    monkeypatch.setattr(playnite_import, "enrich_all_game_metadata", fake_metadata)
+    playnite_import.run_playnite_import(run.id, backup)
+
+    check = Session()
+    try:
+        completed = check.get(playnite_import.SyncRun, run.id)
+        assert completed is not None
+        assert completed.success is True
+        assert completed.stage == "completed"
+        assert completed.imported_games == 2
+        assert completed.finished_at is not None
+        assert metadata_calls and len(metadata_calls[0]) == 2
+        assert "Metadaten: 1 aktualisiert" in completed.message
+        assert backup.exists() is False
+    finally:
+        check.close()
 
 
 def test_playnite_import_recurses_past_named_backup_containers(db):

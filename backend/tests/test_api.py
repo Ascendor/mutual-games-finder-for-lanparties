@@ -2,6 +2,7 @@
 import json
 import zipfile
 from io import BytesIO
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -12,6 +13,7 @@ from app.db.session import get_db
 from app.main import app
 from app import models  # noqa: F401
 from app.api.imports import UPLOAD_CHUNK_SIZE
+from app.api import imports as imports_api
 from app.core.config import settings
 
 
@@ -161,6 +163,11 @@ def test_playnite_upload_streams_to_disk_and_removes_temp_file(tmp_path, monkeyp
 
     monkeypatch.setattr(settings, "playnite_upload_dir", str(tmp_path))
     monkeypatch.setattr(settings, "playnite_upload_max_bytes", 16 * 1024 * 1024)
+    monkeypatch.setattr(
+        imports_api,
+        "run_playnite_import",
+        lambda _run_id, path: Path(path).unlink(missing_ok=True),
+    )
     app.dependency_overrides[get_db] = override_db
     client = TestClient(app)
     participant = client.post("/api/participants", json={"nickname": "Stream", "present": True}).json()
@@ -178,8 +185,9 @@ def test_playnite_upload_streams_to_disk_and_removes_temp_file(tmp_path, monkeyp
         files={"file": ("playnite.zip", buffer.getvalue(), "application/zip")},
     )
 
-    assert response.status_code == 200
-    assert response.json()["imported_games"] == 1
+    assert response.status_code == 202
+    assert response.json()["kind"] == "playnite"
+    assert response.json()["stage"] == "queued"
     assert list(tmp_path.iterdir()) == []
     app.dependency_overrides.clear()
 
@@ -200,10 +208,11 @@ def test_playnite_upload_rejects_oversized_file_and_removes_temp_file(tmp_path, 
     monkeypatch.setattr(settings, "playnite_upload_max_bytes", 32)
     app.dependency_overrides[get_db] = override_db
     client = TestClient(app)
+    participant = client.post("/api/participants", json={"nickname": "Oversized", "present": True}).json()
 
     response = client.post(
         "/api/imports/playnite",
-        data={"participant_id": "1"},
+        data={"participant_id": str(participant["id"])},
         files={"file": ("too-large.zip", b"x" * 64, "application/zip")},
     )
 
