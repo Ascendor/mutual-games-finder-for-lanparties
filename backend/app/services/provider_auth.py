@@ -19,6 +19,7 @@ from app.services.import_providers import (
     GOG_AUTH_URL,
     GOG_CLIENT_ID,
     GOG_CLIENT_SECRET,
+    GOG_EMBED_URL,
     GOG_LOGIN_URL,
     GOG_REDIRECT_URI,
     GOGAuthStore,
@@ -238,6 +239,43 @@ def _pick_first(payload: dict[str, Any], *keys: str) -> Any:
         if value not in (None, ""):
             return value
     return None
+
+
+def _identity_from_payload(payload: dict[str, Any]) -> dict[str, str]:
+    account_id = _extract_case_insensitive(
+        payload,
+        "userId",
+        "user_id",
+        "profileId",
+        "profile_id",
+        "accountId",
+        "account_id",
+        "customer_id",
+        "xuid",
+    )
+    display_name = _extract_case_insensitive(
+        payload,
+        "displayName",
+        "display_name",
+        "username",
+        "userName",
+        "nameOnPlatform",
+        "gamertag",
+        "nickname",
+    )
+    identity: dict[str, str] = {}
+    if account_id not in (None, ""):
+        identity["provider_account_id"] = str(account_id)
+    if display_name not in (None, ""):
+        identity["provider_display_name"] = str(display_name)
+    return identity
+
+
+def _epic_identity_from_output(output: str) -> dict[str, str]:
+    match = re.search(r'(?:logged in|login successful).*?(?:as|for)\s+["\']([^"\']+)["\']', output, re.IGNORECASE)
+    if not match:
+        match = re.search(r'Epic account:\s*(.+)', output, re.IGNORECASE)
+    return {"provider_display_name": match.group(1).strip()} if match else {}
 
 
 def _ubisoft_profile_id(payload: dict[str, Any], account: Account) -> str | None:
@@ -511,7 +549,14 @@ def complete_epic(account: Account, code: str) -> dict[str, Any]:
     output = f"{result.stdout}\n{result.stderr}".strip()
     if result.returncode != 0:
         raise RuntimeError(output or "Epic authentication failed")
-    return {"account_id": account.id, "participant_id": account.participant_id, "platform": _account_platform(account), "authenticated": True, "message": output or "Epic connected"}
+    return {
+        "account_id": account.id,
+        "participant_id": account.participant_id,
+        "platform": _account_platform(account),
+        "authenticated": True,
+        "message": output or "Epic connected",
+        **_epic_identity_from_output(output),
+    }
 
 
 def complete_gog(account: Account, code: str, redirect_uri: str = GOG_REDIRECT_URI) -> dict[str, Any]:
@@ -527,7 +572,27 @@ def complete_gog(account: Account, code: str, redirect_uri: str = GOG_REDIRECT_U
     all_credentials = store._load_all()
     all_credentials[GOG_CLIENT_ID] = credentials
     store._save_all(all_credentials)
-    return {"account_id": account.id, "participant_id": account.participant_id, "platform": _account_platform(account), "authenticated": True, "message": "GOG connected"}
+    identity = _identity_from_payload(credentials)
+    try:
+        profile_response = httpx.get(
+            f"{GOG_EMBED_URL}/userData.json",
+            headers={"Authorization": f"Bearer {credentials['access_token']}"},
+            timeout=20,
+        )
+        if profile_response.is_success:
+            profile = profile_response.json()
+            if isinstance(profile, dict):
+                identity.update(_identity_from_payload(profile))
+    except Exception:
+        pass
+    return {
+        "account_id": account.id,
+        "participant_id": account.participant_id,
+        "platform": _account_platform(account),
+        "authenticated": True,
+        "message": "GOG connected",
+        **identity,
+    }
 
 
 def complete_amazon(account: Account, value: str) -> dict[str, Any]:
@@ -587,12 +652,14 @@ def complete_amazon(account: Account, value: str) -> dict[str, Any]:
     bearer["expires_at"] = time.time() + float(bearer.get("expires_in") or 3600)
     bearer["device_serial"] = request_data["registration_data"]["device_serial"]
     save_provider_auth_json(Platform.amazon, account.id, bearer)
+    identity = _identity_from_payload(payload)
     return {
         "account_id": account.id,
         "participant_id": account.participant_id,
         "platform": Platform.amazon,
         "authenticated": True,
         "message": "Amazon Games verbunden",
+        **identity,
     }
 
 
@@ -653,7 +720,15 @@ def complete_ubisoft(account: Account, code: str, fields: dict[str, Any] | None 
     payload["ticket"] = ticket
     payload["profileId"] = profile_id
     save_provider_auth_json(Platform.ubisoft, account.id, payload)
-    return {"account_id": account.id, "participant_id": account.participant_id, "platform": Platform.ubisoft, "authenticated": True, "needs_2fa": False, "message": "Ubisoft connected"}
+    return {
+        "account_id": account.id,
+        "participant_id": account.participant_id,
+        "platform": Platform.ubisoft,
+        "authenticated": True,
+        "needs_2fa": False,
+        "message": "Ubisoft connected",
+        **_identity_from_payload(payload),
+    }
 
 
 def complete_generic_json(account: Account, code: str, fields: dict[str, Any] | None = None) -> dict[str, Any]:

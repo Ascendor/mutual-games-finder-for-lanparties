@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.models import Account, Participant
 from app.schemas import AccountRead, SteamConnectionRead, SteamProfileRead
 from app.services import provider_auth
+from app.services.account_identity import apply_account_identity
 from app.services.steam_auth import (
     build_steam_login_url,
     resolve_steam_profile,
@@ -247,7 +248,11 @@ def start_login(account_id: int, db: Session = Depends(get_db)):
 def complete_login(account_id: int, payload: ProviderCodePayload, db: Session = Depends(get_db)):
     account = _get_account(db, account_id)
     try:
-        return provider_auth.complete(account, payload.code.strip(), payload.model_dump(exclude_none=True))
+        result = provider_auth.complete(account, payload.code.strip(), payload.model_dump(exclude_none=True))
+        if result.get("authenticated"):
+            apply_account_identity(account, result, participant_fallback=True)
+            db.commit()
+        return result
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:

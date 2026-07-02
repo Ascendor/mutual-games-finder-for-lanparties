@@ -13,7 +13,7 @@
         <v-card variant="flat">
           <v-card-title>Accounts synchronisieren</v-card-title>
           <v-list>
-            <v-list-item v-for="account in store.accounts" :key="account.id" :title="`${platformLabel(account.platform)}: ${account.display_name || account.account_id}`" :subtitle="account.last_error || account.last_successful_sync || 'Noch nie synchronisiert'">
+            <v-list-item v-for="account in store.accounts" :key="account.id" :title="accountLabel(account.id)" :subtitle="account.last_error || account.last_successful_sync || 'Noch nie synchronisiert'">
               <template v-if="canSyncAccount(account.platform)" #append>
                 <v-btn size="small" color="primary" variant="tonal" prepend-icon="mdi-sync" :loading="loading === account.id" @click="sync(account.id)">Sync</v-btn>
               </template>
@@ -128,7 +128,12 @@ async function repairMetadata() {
 function accountLabel(id?: number | null) {
   if (!id) return '-'
   const account = store.accounts.find((item) => item.id === id)
-  return account ? `${platformLabel(account.platform)}: ${account.display_name || account.account_id}` : id
+  if (!account) return id
+  const participant = participantLabel(account.participant_id)
+  const providerName = meaningfulAccountName(account.platform, account.display_name)
+  return providerName
+    ? `${participant} · ${platformLabel(account.platform)}: ${providerName}`
+    : `${participant} · ${platformLabel(account.platform)}`
 }
 
 function participantLabel(id?: number | null) {
@@ -147,6 +152,17 @@ function platformLabel(platform: string) {
     xbox: 'Xbox Live'
   }
   return labels[platform] || platform
+}
+
+function meaningfulAccountName(platform: string, displayName: string) {
+  const value = (displayName || '').trim()
+  if (!value) return ''
+  const normalized = value.toLocaleLowerCase('de-DE').replace(/_/g, ' ')
+  if (normalized === platform.replace(/_/g, ' ').toLocaleLowerCase('de-DE')) return ''
+  if (normalized === platformLabel(platform).toLocaleLowerCase('de-DE')) return ''
+  if (normalized.startsWith('playnite ')) return ''
+  if (normalized.endsWith(' (teilnehmer)')) return ''
+  return value
 }
 
 function canSyncAccount(platform: string) {

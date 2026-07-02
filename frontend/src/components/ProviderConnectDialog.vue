@@ -667,7 +667,7 @@ async function ensureAccount() {
     participant_id: props.target.participant.id,
     platform: props.target.platform,
     account_id: '',
-    display_name: platformTitle(props.target.platform)
+    display_name: ''
   })
 }
 

@@ -16,7 +16,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import Account, Game, Platform, SyncRun
+from app.models import Account, Game, Participant, Platform, SyncRun
+from app.services.account_identity import is_placeholder_display_name
 from app.services.import_providers import ImportedGame, _as_int, _as_list, _parse_date, _parse_datetime
 from app.services.genre_utils import sanitize_genres
 from app.services.metadata_service import METADATA_SYNC_LOCK, enrich_all_game_metadata
@@ -689,12 +690,16 @@ def _imported_game_from_playnite_entry(entry: dict[str, Any]) -> tuple[ImportedG
 
 
 def _account_for_import(db: Session, participant_id: int, platform: Platform) -> tuple[Account, bool]:
+    participant = db.get(Participant, participant_id)
+    participant_label = participant.nickname if participant else str(participant_id)
     existing = db.scalar(
         select(Account)
         .where(Account.participant_id == participant_id, Account.platform == platform)
         .order_by(Account.id)
     )
     if existing:
+        if existing.account_id.startswith("playnite:") and is_placeholder_display_name(existing):
+            existing.display_name = f"{participant_label} (Playnite)"
         existing.last_successful_sync = datetime.utcnow()
         existing.last_error = None
         return existing, False
@@ -703,7 +708,7 @@ def _account_for_import(db: Session, participant_id: int, platform: Platform) ->
         participant_id=participant_id,
         platform=platform,
         account_id=f"playnite:{participant_id}:{platform.value}",
-        display_name=f"Playnite {platform.value}",
+        display_name=f"{participant_label} (Playnite)",
         last_successful_sync=datetime.utcnow(),
         last_error=None,
     )

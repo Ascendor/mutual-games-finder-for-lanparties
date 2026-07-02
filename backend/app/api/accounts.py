@@ -45,8 +45,6 @@ def _repair_blank_provider_account_ids(db: Session) -> None:
             sequence += 1
             candidate = _local_account_id(account.platform, account.participant_id, sequence)
         account.account_id = candidate
-        if not account.display_name:
-            account.display_name = _platform_value(account.platform).title()
         changed = True
     if changed:
         db.commit()
@@ -81,7 +79,7 @@ def create_account(payload: AccountCreate, db: Session = Depends(get_db)):
         return existing
     if data["platform"] in LOCAL_ID_PLATFORMS and not data.get("account_id"):
         data["account_id"] = _local_account_id(data["platform"], data["participant_id"], 1)
-    if not data.get("display_name"):
+    if not data.get("display_name") and data["platform"] not in LOCAL_ID_PLATFORMS:
         data["display_name"] = _platform_value(data["platform"]).title()
     account = Account(**data)
     db.add(account)

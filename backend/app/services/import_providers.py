@@ -18,6 +18,7 @@ import yaml
 
 from app.core.config import settings
 from app.models import Account, Platform
+from app.services.account_identity import apply_account_identity, is_placeholder_display_name
 from app.services.normalization import normalize_title
 
 GOG_CLIENT_ID = "46899977096215655"
@@ -721,6 +722,18 @@ class EpicProvider:
         return "digitalextras" not in category_paths
 
     def sync_account(self, account: Account) -> list[ImportedGame]:
+        if is_placeholder_display_name(account):
+            status_result = run_legendary_for_account(account, ["status", "--json"], timeout=30)
+            if status_result.returncode == 0:
+                try:
+                    status_payload = json.loads(status_result.stdout or "{}")
+                except json.JSONDecodeError:
+                    status_payload = {}
+                if isinstance(status_payload, dict) and status_payload.get("account"):
+                    apply_account_identity(
+                        account,
+                        {"provider_display_name": status_payload["account"]},
+                    )
         result = run_legendary_for_account(account, ["list", "--json"], timeout=120)
         if result.returncode != 0:
             output = (result.stderr or result.stdout or "").strip()
@@ -817,7 +830,7 @@ class GOGProvider:
     platform = Platform.gog
     authoritative_library = True
 
-    def sync_account(self, account: Account) -> list[ImportedGame]:
+    def sync_account(self, account: Account) -> list[ImportedGame] | ImportBatch:
         credentials = GOGAuthStore(str(gog_auth_config_path(account.id))).get_credentials()
         token = credentials.get("access_token")
         if not token:
@@ -828,6 +841,34 @@ class GOGProvider:
             "Accept-Language": "en-US",
         }
         with httpx.Client(headers=headers, timeout=30) as client:
+            if is_placeholder_display_name(account):
+                try:
+                    profile_response = client.get(f"{GOG_EMBED_URL}/userData.json")
+                    if profile_response.is_success:
+                        profile = profile_response.json()
+                        if isinstance(profile, dict):
+                            apply_account_identity(
+                                account,
+                                {
+                                    "provider_display_name": _first(
+                                        profile,
+                                        "username",
+                                        "displayName",
+                                        "display_name",
+                                        default=None,
+                                    ),
+                                    "provider_account_id": _first(
+                                        profile,
+                                        "userId",
+                                        "user_id",
+                                        "accountId",
+                                        "account_id",
+                                        default=credentials.get("user_id"),
+                                    ),
+                                },
+                            )
+                except Exception:
+                    pass
             owned_response = client.get(f"{GOG_EMBED_URL}/user/data/games")
             owned_response.raise_for_status()
             owned_ids = owned_response.json().get("owned", [])
@@ -897,6 +938,30 @@ class UbisoftProvider:
 
     def sync_account(self, account: Account) -> list[ImportedGame]:
         credentials = load_provider_auth_json(Platform.ubisoft, account.id)
+        if is_placeholder_display_name(account):
+            apply_account_identity(
+                account,
+                {
+                    "provider_display_name": _first(
+                        credentials,
+                        "nameOnPlatform",
+                        "username",
+                        "displayName",
+                        "display_name",
+                        default=None,
+                    ),
+                    "provider_account_id": _first(
+                        credentials,
+                        "profileId",
+                        "profile_id",
+                        "userId",
+                        "user_id",
+                        "accountId",
+                        "account_id",
+                        default=None,
+                    ),
+                },
+            )
         ticket = credentials.get("ticket") or credentials.get("access_token") or credentials.get("accessToken")
         profile_id = credentials.get("profileId") or credentials.get("profile_id") or credentials.get("userId") or credentials.get("user_id") or credentials.get("accountId") or credentials.get("account_id") or account.account_id
         if not ticket or not profile_id:

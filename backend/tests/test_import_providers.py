@@ -7,6 +7,7 @@ import pytest
 
 import app.services.import_providers as import_providers
 from app.models import Account, Platform
+from app.services.account_identity import apply_account_identity, is_placeholder_display_name
 from app.services.import_providers import (
     AmazonProvider,
     BattleNetProvider,
@@ -49,6 +50,8 @@ class FakeClient:
         return False
 
     def get(self, url):
+        if url.endswith("/userData.json"):
+            return FakeResponse({"userId": "gog-user-7", "username": "PlayerOneOnGOG"})
         if url.endswith("/user/data/games"):
             return FakeResponse({"owned": [101]})
         if url.endswith("/products/101"):
@@ -120,7 +123,13 @@ def test_gog_provider_uses_auth_cache_and_direct_api(monkeypatch, tmp_path):
     monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: FakeClient(**kwargs))
 
     provider = GOGProvider()
-    account = Account(id=7, participant_id=1, platform=Platform.gog, account_id="ignored")
+    account = Account(
+        id=7,
+        participant_id=1,
+        platform=Platform.gog,
+        account_id="ignored",
+        display_name="GOG",
+    )
 
     batch = provider.sync_account(account)
     assert isinstance(batch, ImportBatch)
@@ -133,6 +142,48 @@ def test_gog_provider_uses_auth_cache_and_direct_api(monkeypatch, tmp_path):
     assert batch.warnings == []
     assert batch.authoritative_snapshot is True
     assert provider.authoritative_library is True
+    assert account.display_name == "PlayerOneOnGOG"
+
+
+def test_epic_provider_repairs_placeholder_display_name_from_legendary_status(monkeypatch):
+    account = Account(
+        id=42,
+        participant_id=1,
+        platform=Platform.epic,
+        account_id="local-epic-1-1",
+        display_name="Epic Games",
+    )
+
+    def fake_run(command, *args, **kwargs):
+        if "status" in command:
+            return SimpleNamespace(
+                stdout=json.dumps({"account": "EpicPlayerOne"}),
+                stderr="",
+                returncode=0,
+            )
+        return SimpleNamespace(stdout="[]", stderr="", returncode=0)
+
+    monkeypatch.setattr(import_providers.subprocess, "run", fake_run)
+
+    EpicProvider().sync_account(account)
+
+    assert account.display_name == "EpicPlayerOne"
+
+
+def test_account_identity_uses_participant_only_as_placeholder_fallback():
+    from app.models import Participant
+
+    participant = Participant(nickname="PlayerOne")
+    account = Account(
+        participant=participant,
+        platform=Platform.humble,
+        account_id="local-humble-1-1",
+        display_name="Humble",
+    )
+
+    assert is_placeholder_display_name(account) is True
+    assert apply_account_identity(account, participant_fallback=True) is True
+    assert account.display_name == "PlayerOne (Teilnehmer)"
 
 
 def test_gog_provider_skips_one_unresolved_product_without_claiming_complete_snapshot(
@@ -380,7 +431,7 @@ def test_provider_auth_status_accepts_string_platform(monkeypatch, tmp_path):
 
 
 def test_provider_auth_cleans_common_epic_paste_variants():
-    from app.services.provider_auth import _clean_epic_code
+    from app.services.provider_auth import _clean_epic_code, _epic_identity_from_output
 
     assert _clean_epic_code('"abc-123"') == "abc-123"
     assert _clean_epic_code("'abc-123'") == "abc-123"
@@ -388,6 +439,9 @@ def test_provider_auth_cleans_common_epic_paste_variants():
     assert _clean_epic_code('```json\n{"AuthorizationCode": "abc-123"}\n```') == "abc-123"
     assert _clean_epic_code('authorizationCode: "abc-123"') == "abc-123"
     assert _clean_epic_code("https://example.test/callback?authorizationCode=abc-123") == "abc-123"
+    assert _epic_identity_from_output('Successfully logged in as "EpicPlayerOne"') == {
+        "provider_display_name": "EpicPlayerOne"
+    }
 
 
 def test_provider_auth_cleans_common_gog_paste_variants():
@@ -397,6 +451,74 @@ def test_provider_auth_cleans_common_gog_paste_variants():
     assert _clean_gog_code('{"code": "gog-code"}') == "gog-code"
     assert _clean_gog_code("code='gog-code'") == "gog-code"
     assert _clean_gog_code("https://embed.gog.com/on_login_success?code=gog-code") == "gog-code"
+
+
+def test_gog_login_returns_provider_identity(monkeypatch, tmp_path):
+    from app.services import provider_auth
+
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+
+    def fake_get(url, **kwargs):
+        if url == import_providers.GOG_AUTH_URL:
+            return FakeResponse(
+                {
+                    "access_token": "gog-access",
+                    "refresh_token": "gog-refresh",
+                    "expires_in": 3600,
+                    "user_id": "gog-user-7",
+                }
+            )
+        return FakeResponse({"userId": "gog-user-7", "username": "PlayerOneOnGOG"})
+
+    monkeypatch.setattr(provider_auth.httpx, "get", fake_get)
+    account = Account(
+        id=37,
+        participant_id=1,
+        platform=Platform.gog,
+        account_id="local-gog-1-1",
+        display_name="GOG",
+    )
+
+    result = provider_auth.complete_gog(account, "gog-code")
+
+    assert result["provider_account_id"] == "gog-user-7"
+    assert result["provider_display_name"] == "PlayerOneOnGOG"
+
+
+def test_provider_login_persists_resolved_identity(monkeypatch, db):
+    from app.api import provider_auth as provider_auth_api
+    from app.models import Participant
+
+    participant = Participant(nickname="PlayerOne")
+    db.add(participant)
+    db.flush()
+    account = Account(
+        participant_id=participant.id,
+        platform=Platform.gog,
+        account_id="local-gog-1-1",
+        display_name="GOG",
+    )
+    db.add(account)
+    db.commit()
+    monkeypatch.setattr(
+        provider_auth_api.provider_auth,
+        "complete",
+        lambda *args, **kwargs: {
+            "authenticated": True,
+            "provider_account_id": "gog-user-7",
+            "provider_display_name": "PlayerOneOnGOG",
+        },
+    )
+
+    provider_auth_api.complete_login(
+        account.id,
+        provider_auth_api.ProviderCodePayload(code="accepted"),
+        db,
+    )
+
+    db.refresh(account)
+    assert account.account_id == "gog-user-7"
+    assert account.display_name == "PlayerOneOnGOG"
 
 
 def test_provider_auth_extracts_firefox_curl_and_cookie_json():

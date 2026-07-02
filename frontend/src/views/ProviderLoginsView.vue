@@ -23,12 +23,17 @@
         einfachste Importweg.
       </p>
       <p class="mb-2">
+        Besonders für EA App, Rockstar Games und weitere unten nicht aufgeführte Plattformen ist Playnite der
+        vorgesehene Importweg.
+      </p>
+      <p class="mb-2">
         Öffne in Playnite das Hauptmenü, wähle <strong>Bibliothek → Bibliothek sichern</strong> und erstelle ein
         ZIP-Backup. Diese ZIP-Datei kannst du unten direkt im Feld <strong>Playnite-Backup</strong> auswählen und
         importieren.
       </p>
       <p class="mb-0">
-        Alternativ kannst du deine Plattformen darunter einzeln verbinden und deren Bibliotheken direkt aktualisieren.
+        Alternativ kannst du die unten aufgeführten Plattformen einzeln verbinden und deren Bibliotheken direkt
+        aktualisieren.
       </p>
     </v-alert>
     <v-alert v-if="!loading && slotsByParticipant.length === 0" type="info" variant="tonal">
@@ -176,7 +181,6 @@ const loginPlatforms: Platform[] = [
   'gog',
   'ubisoft',
   'xbox',
-  'ea',
   'amazon',
   'battle_net',
   'humble',

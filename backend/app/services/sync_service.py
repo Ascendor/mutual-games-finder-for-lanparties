@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Account, Game, Ownership, Platform, PlatformGameMapping, SyncRun
+from app.services.account_identity import apply_account_identity
 from app.services.import_providers import ImportBatch, ImportedGame, PROVIDERS
 from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
@@ -317,6 +318,7 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
                 imported_game_ids_by_platform.get(platform, set()),
                 platform,
             )
+        apply_account_identity(account, participant_fallback=True)
         account.last_successful_sync = datetime.utcnow()
         account.last_error = None
         run.success = True
