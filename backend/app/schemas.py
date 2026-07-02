@@ -55,6 +55,19 @@ class AccountRead(AccountBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SteamProfileRead(BaseModel):
+    steam_id: str
+    display_name: str
+    profile_url: str
+    avatar_url: str | None = None
+    library_accessible: bool
+    game_count: int | None = None
+
+
+class SteamConnectionRead(SteamProfileRead):
+    account: AccountRead
+
+
 class GameBase(BaseModel):
     title: str
     description: str = ""

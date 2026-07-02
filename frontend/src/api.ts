@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, Game, GameOption, GameOwner, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SyncRun } from './types'
+import type { Account, Game, GameOption, GameOwner, Ownership, Participant, PlayniteImportResult, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -79,6 +79,21 @@ export const api = {
     }
   },
   providerAuthStatus: () => request<ProviderAuthStatus[]>('/provider-auth/status'),
+  resolveSteamProfile: (profile: string) =>
+    request<SteamProfile>('/provider-auth/steam/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ profile })
+    }),
+  connectSteam: (participantId: number, profile: string) =>
+    request<SteamConnection>('/provider-auth/steam/connect', {
+      method: 'POST',
+      body: JSON.stringify({ participant_id: participantId, profile })
+    }),
+  startSteamLogin: (participantId: number, origin: string) =>
+    request<SteamLoginStart>('/provider-auth/steam/start', {
+      method: 'POST',
+      body: JSON.stringify({ participant_id: participantId, origin })
+    }),
   startProviderLogin: (accountId: number) => request<ProviderLoginStart>(`/provider-auth/accounts/${accountId}/start`),
   pollProviderLogin: (accountId: number) =>
     request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/poll`, { method: 'POST' }),

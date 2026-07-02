@@ -44,19 +44,81 @@
 
         <template v-else-if="stage === 2">
           <template v-if="target.platform === 'steam'">
-            <h2 class="text-h6 mb-2">Steam-Profil angeben</h2>
+            <h2 class="text-h6 mb-2">Mit Steam anmelden</h2>
             <p class="text-body-2 text-medium-emphasis mb-4">
-              Öffne dein Steam-Profil und kopiere die Adresse aus der Browserzeile. Eine SteamID64 funktioniert ebenfalls.
+              Du meldest dich direkt bei Steam an. Die App erhält nur deine bestätigte SteamID und niemals dein Passwort.
             </p>
-            <v-text-field
-              v-model="steamProfile"
-              label="Steam-Profil-Link oder SteamID64"
-              prepend-inner-icon="mdi-steam"
-              autocomplete="off"
-              autofocus
+            <v-btn
+              color="primary"
+              size="large"
+              prepend-icon="mdi-steam"
+              :loading="steamLoginPending"
               :disabled="busy"
-              @keyup.enter="submit"
-            />
+              @click="startSteamLogin"
+            >
+              Mit Steam anmelden
+            </v-btn>
+            <v-alert v-if="steamLoginPending" type="info" variant="tonal" class="mt-4">
+              Schließe die Anmeldung im geöffneten Steam-Fenster ab. Danach werden deine Spiele hier automatisch geladen.
+            </v-alert>
+
+            <div v-if="steamResolvedProfile" class="steam-profile-preview mt-4">
+              <v-avatar size="48">
+                <v-img v-if="steamResolvedProfile.avatar_url" :src="steamResolvedProfile.avatar_url" alt="" />
+                <v-icon v-else icon="mdi-account-circle" />
+              </v-avatar>
+              <div>
+                <div class="font-weight-bold">{{ steamResolvedProfile.display_name }}</div>
+                <div class="text-caption text-medium-emphasis">
+                  <template v-if="steamResolvedProfile.library_accessible">
+                    {{ steamResolvedProfile.game_count }} Spiele sichtbar
+                  </template>
+                  <template v-else>Spielebibliothek ist nicht öffentlich</template>
+                </div>
+              </div>
+            </div>
+
+            <v-alert
+              v-if="steamResolvedProfile && !steamResolvedProfile.library_accessible"
+              type="warning"
+              variant="tonal"
+              class="mt-4"
+            >
+              Setze bei Steam unter Profil bearbeiten → Privatsphäre die Spieldetails auf „Öffentlich“ und prüfe danach erneut.
+              <div class="mt-2">
+                <v-btn
+                  href="https://steamcommunity.com/my/edit/settings"
+                  target="_blank"
+                  size="small"
+                  variant="text"
+                  prepend-icon="mdi-open-in-new"
+                >
+                  Steam-Privatsphäre öffnen
+                </v-btn>
+              </div>
+            </v-alert>
+
+            <v-divider class="my-5" />
+            <v-expansion-panels variant="accordion">
+              <v-expansion-panel title="Profil stattdessen manuell angeben">
+                <v-expansion-panel-text>
+                  <p class="text-body-2 text-medium-emphasis mb-3">
+                    Funktioniert die Anmeldung nicht, reichen auch dein Steam-Profilname, der Profillink oder eine SteamID64.
+                  </p>
+                  <v-text-field
+                    v-model="steamProfile"
+                    label="Steam-Profilname oder Link"
+                    prepend-inner-icon="mdi-account-search-outline"
+                    autocomplete="off"
+                    :disabled="busy"
+                    hint="Beispiel: nickname oder https://steamcommunity.com/id/nickname"
+                    persistent-hint
+                    @keyup.enter="submit"
+                  />
+
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
           </template>
 
           <template v-else-if="target.platform === 'epic'">
@@ -325,7 +387,7 @@
           :loading="busy"
           @click="submit"
         >
-          {{ needs2fa ? 'Code bestätigen' : target.platform === 'steam' ? 'Verbinden und Spiele laden' : 'Anmeldung abschließen' }}
+          {{ needs2fa ? 'Code bestätigen' : target.platform === 'steam' ? steamActionLabel : 'Anmeldung abschließen' }}
         </v-btn>
         <v-btn
           v-else-if="stage === 2 && target.platform === 'xbox'"
@@ -349,9 +411,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
-import type { Account, Participant, Platform, ProviderLoginStart } from '../types'
+import type { Account, Participant, Platform, ProviderLoginStart, SteamProfile } from '../types'
 
 interface ProviderTarget {
   participant: Participant
@@ -433,6 +495,9 @@ const account = ref<Account | undefined>()
 const loginStart = ref<ProviderLoginStart>()
 const code = ref('')
 const steamProfile = ref('')
+const steamResolvedProfile = ref<SteamProfile>()
+const steamLoginPending = ref(false)
+const steamLoginState = ref('')
 const needs2fa = ref(false)
 const resultMessage = ref('')
 const playniteFile = ref<File | File[] | null>(null)
@@ -441,6 +506,8 @@ const xboxChecking = ref(false)
 const codeCopied = ref(false)
 const browserFamily = ref<BrowserFamily>(detectBrowser())
 let xboxPollTimer: ReturnType<typeof setTimeout> | undefined
+let steamPopup: Window | null = null
+let steamPopupTimer: ReturnType<typeof setInterval> | undefined
 
 const progress = computed(() => stage.value * 25)
 const browserGuide = computed(() => browserGuides[browserFamily.value])
@@ -462,7 +529,7 @@ const selectedPlayniteFile = computed(() => {
 })
 const canSubmit = computed(() => {
   const platform = props.target?.platform
-  if (platform === 'steam') return Boolean(extractSteamId(steamProfile.value))
+  if (platform === 'steam') return Boolean(steamProfile.value.trim()) && !steamLoginPending.value
   if (platform === 'ubisoft') {
     return needs2fa.value
       ? Boolean(ubisoft.twoFactorCode.trim())
@@ -471,13 +538,18 @@ const canSubmit = computed(() => {
   if (platform === 'ea' || platform === 'xbox') return false
   return Boolean(code.value.trim())
 })
+const steamActionLabel = computed(() => {
+  if (!steamResolvedProfile.value) return 'Profil prüfen'
+  if (!steamResolvedProfile.value.library_accessible) return 'Erneut prüfen'
+  return 'Verbinden und Spiele laden'
+})
 const isBrowserSessionPlatform = computed(() =>
   ['battle_net', 'humble', 'meta'].includes(props.target?.platform || '')
 )
 const introTitle = computed(() => `${platformTitle(props.target?.platform || '')} verbinden`)
 const introText = computed(() => {
   const platform = props.target?.platform
-  if (platform === 'steam') return 'Du brauchst nur den Link zu deinem öffentlichen Steam-Profil. Danach werden deine Spiele automatisch geladen.'
+  if (platform === 'steam') return 'Du bestätigst dein Konto einmalig direkt bei Steam. SteamID, Profilname und Bibliothek werden danach automatisch übernommen.'
   if (platform === 'epic') return 'Die Anmeldung findet auf der offiziellen Epic-Seite statt. Danach gibst du die angezeigte Bestätigung hier zurück.'
   if (platform === 'gog') return 'Die Anmeldung findet auf der offiziellen GOG-Seite statt. Danach übernimmt die App den Bestätigungscode.'
   if (platform === 'ubisoft') return 'Du meldest dich direkt mit deinem Ubisoft-Konto an. Falls 2FA aktiv ist, führt der Assistent automatisch zum nächsten Schritt.'
@@ -490,7 +562,7 @@ const introText = computed(() => {
 })
 const introSteps = computed(() => {
   const platform = props.target?.platform
-  if (platform === 'steam') return ['Steam-Profil-Link einfügen', 'Bibliothek automatisch laden', 'Fertig']
+  if (platform === 'steam') return ['Bei Steam bestätigen', 'Profil und Freigabe automatisch prüfen', 'Bibliothek automatisch laden']
   if (platform === 'epic' || platform === 'gog') return ['Offizielle Loginseite öffnen', 'Bestätigung kopieren und einfügen', 'Bibliothek automatisch laden']
   if (platform === 'ubisoft') return ['E-Mail und Passwort eingeben', 'Falls nötig 2FA bestätigen', 'Bibliothek automatisch laden']
   if (platform === 'xbox') return ['Einmaligen Code anzeigen', 'Bei Microsoft bestätigen', 'Bibliothek automatisch laden']
@@ -503,6 +575,7 @@ watch(
   () => props.modelValue,
   (open) => {
     clearXboxPoll()
+    clearSteamLogin()
     if (!open || !props.target) return
     stage.value = 1
     busy.value = false
@@ -513,6 +586,9 @@ watch(
     steamProfile.value = props.target.platform === 'steam' && props.target.account && !props.target.account.account_id.startsWith('playnite:')
       ? props.target.account.account_id
       : ''
+    steamResolvedProfile.value = undefined
+    steamLoginPending.value = false
+    steamLoginState.value = ''
     needs2fa.value = false
     resultMessage.value = ''
     playniteFile.value = null
@@ -522,6 +598,12 @@ watch(
     Object.assign(ubisoft, { email: '', password: '', twoFactorCode: '' })
   }
 )
+
+watch(steamProfile, (value) => {
+  if (steamResolvedProfile.value?.steam_id !== value.trim()) {
+    steamResolvedProfile.value = undefined
+  }
+})
 
 async function prepare() {
   if (!props.target) return
@@ -566,14 +648,17 @@ async function submit() {
   error.value = ''
   try {
     if (props.target.platform === 'steam') {
-      const steamId = extractSteamId(steamProfile.value)
-      if (!steamId) throw new Error('Bitte einen Steam-Profil-Link oder eine 17-stellige SteamID64 eingeben.')
-      account.value = await api.createAccount({
-        participant_id: props.target.participant.id,
-        platform: 'steam',
-        account_id: steamId,
-        display_name: props.target.participant.nickname
-      })
+      if (!steamResolvedProfile.value || !steamResolvedProfile.value.library_accessible) {
+        steamResolvedProfile.value = await api.resolveSteamProfile(steamProfile.value)
+        if (!steamResolvedProfile.value.library_accessible) return
+        return
+      }
+      const connection = await api.connectSteam(
+        props.target.participant.id,
+        steamResolvedProfile.value.steam_id
+      )
+      account.value = connection.account
+      steamResolvedProfile.value = connection
       await syncLibrary()
       return
     }
@@ -635,6 +720,80 @@ async function importPlaynite() {
   }
 }
 
+async function startSteamLogin() {
+  if (!props.target) return
+  error.value = ''
+  steamPopup = window.open('', 'steam-login', 'popup,width=760,height=720')
+  if (!steamPopup) {
+    error.value = 'Das Steam-Fenster wurde vom Browser blockiert. Erlaube Pop-ups für diese Seite und versuche es erneut.'
+    return
+  }
+
+  busy.value = true
+  try {
+    const result = await api.startSteamLogin(props.target.participant.id, window.location.origin)
+    steamLoginState.value = result.state
+    steamLoginPending.value = true
+    steamPopup.location.href = result.login_url
+    steamPopupTimer = setInterval(() => {
+      if (steamPopup?.closed) {
+        clearInterval(steamPopupTimer)
+        steamPopupTimer = undefined
+        steamPopup = null
+        steamLoginPending.value = false
+      }
+    }, 500)
+  } catch (err) {
+    steamPopup.close()
+    steamPopup = null
+    error.value = readableError(err)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function handleSteamLoginMessage(event: MessageEvent) {
+  if (event.origin !== window.location.origin) return
+  const data = event.data as {
+    type?: string
+    state?: string
+    success?: boolean
+    message?: string
+    account?: Account
+    profile?: SteamProfile
+  }
+  if (data.type !== 'steam-login-result' || data.state !== steamLoginState.value) return
+
+  clearSteamLogin()
+  if (!data.success || !data.profile) {
+    error.value = data.message || 'Steam konnte nicht verbunden werden.'
+    return
+  }
+
+  steamProfile.value = data.profile.steam_id
+  steamResolvedProfile.value = data.profile
+  if (!data.profile.library_accessible) {
+    error.value = ''
+    return
+  }
+  if (!data.account) {
+    error.value = 'Steam wurde bestätigt, aber der Account konnte nicht gespeichert werden.'
+    return
+  }
+  account.value = data.account
+  await syncLibrary()
+}
+
+function clearSteamLogin() {
+  if (steamPopupTimer) {
+    clearInterval(steamPopupTimer)
+    steamPopupTimer = undefined
+  }
+  if (steamPopup && !steamPopup.closed) steamPopup.close()
+  steamPopup = null
+  steamLoginPending.value = false
+}
+
 function scheduleXboxPoll(delaySeconds: number) {
   clearXboxPoll()
   xboxPollTimer = setTimeout(() => {
@@ -688,13 +847,6 @@ async function pasteCode() {
   }
 }
 
-function extractSteamId(value: string) {
-  const cleaned = value.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
-  return cleaned.match(/(?:^|profiles\/)(\d{17})(?:\/|$|\?)/)?.[1]
-    || cleaned.match(/^\d{17}$/)?.[0]
-    || ''
-}
-
 function detectBrowser(): BrowserFamily {
   if (typeof navigator === 'undefined') return 'other'
   const userAgent = navigator.userAgent
@@ -728,15 +880,22 @@ function readableError(value: unknown) {
 function close() {
   if (busy.value) return
   clearXboxPoll()
+  clearSteamLogin()
   emit('update:modelValue', false)
 }
 
 function finish() {
   clearXboxPoll()
+  clearSteamLogin()
   emit('update:modelValue', false)
 }
 
-onBeforeUnmount(clearXboxPoll)
+onMounted(() => window.addEventListener('message', handleSteamLoginMessage))
+onBeforeUnmount(() => {
+  clearXboxPoll()
+  clearSteamLogin()
+  window.removeEventListener('message', handleSteamLoginMessage)
+})
 
 function platformTitle(platform: Platform | '') {
   const titles: Record<string, string> = {
@@ -795,6 +954,12 @@ function platformIcon(platform: Platform) {
 
 .browser-select {
   max-width: 320px;
+}
+
+.steam-profile-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .xbox-code-row {

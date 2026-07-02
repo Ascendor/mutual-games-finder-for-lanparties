@@ -144,6 +144,24 @@ export interface ProviderLoginStart {
   interval?: number
 }
 
+export interface SteamProfile {
+  steam_id: string
+  display_name: string
+  profile_url: string
+  avatar_url?: string | null
+  library_accessible: boolean
+  game_count?: number | null
+}
+
+export interface SteamConnection extends SteamProfile {
+  account: Account
+}
+
+export interface SteamLoginStart {
+  login_url: string
+  state: string
+  expires_in: number
+}
 
 
 
