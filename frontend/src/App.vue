@@ -2,7 +2,7 @@
   <v-app>
     <v-navigation-drawer v-if="route.path !== '/player'" permanent width="260">
       <v-list v-model:opened="openedGroups" nav density="compact">
-        <v-list-item title="LAN Party Game Finder" subtitle="Local library matcher" />
+        <v-list-item title="LAN Party Game Finder" subtitle="Game library matcher" />
         <v-divider class="my-2" />
         <v-list-item
           to="/player"
@@ -60,9 +60,9 @@ const currentParticipant = computed(() =>
 const mainItems = [
   { title: 'Start', icon: 'mdi-home-outline', to: '/' },
   { title: 'Dashboard', icon: 'mdi-view-dashboard-outline', to: '/dashboard' },
-  { title: 'Accounts & Logins', icon: 'mdi-key-chain-variant', to: '/logins' },
   { title: 'Was können wir spielen?', icon: 'mdi-star-outline', to: '/recommendations' },
-  { title: 'Mitspieler:in finden', icon: 'mdi-account-search-outline', to: '/find-players' }
+  { title: 'Mitspieler:in finden', icon: 'mdi-account-search-outline', to: '/find-players' },
+  { title: 'Accounts & Logins', icon: 'mdi-key-chain-variant', to: '/logins' },
 ]
 
 watch(
