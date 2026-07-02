@@ -54,6 +54,18 @@ export interface Game {
   is_free: boolean
 }
 
+export interface GameListItem extends Game {
+  owner_count: number
+}
+
+export interface GamePage {
+  items: GameListItem[]
+  total: number
+  page: number
+  per_page: number
+  genres: string[]
+}
+
 export interface GameOption {
   id: number
   title: string
@@ -159,4 +171,3 @@ export interface SteamLoginStart {
   state: string
   expires_in: number
 }
-

@@ -202,6 +202,32 @@ def test_metadata_sync_applies_igdb_before_rawg(db, monkeypatch):
     assert game.metadata_sources["description"] == "rawg"
 
 
+def test_metadata_sync_preserves_sources_from_other_providers(db, monkeypatch):
+    game = Game(
+        title="Team Fortress 2",
+        normalized_title=normalize_title("Team Fortress 2"),
+        is_free=True,
+        metadata_sources={"is_free": "steam_store"},
+    )
+    db.add(game)
+    db.commit()
+
+    monkeypatch.setattr(metadata_service, "_igdb_access_token", lambda: "token")
+    monkeypatch.setattr(metadata_service, "_rawg_availability", lambda: (True, None))
+
+    def fake_fetch(job):
+        record = MetadataRecord(primary_source="igdb", external_id="440")
+        record.set("multiplayer", True, "igdb")
+        return job[0], record, False, False
+
+    monkeypatch.setattr(metadata_service, "_fetch_game_metadata", fake_fetch)
+
+    metadata_service.enrich_all_game_metadata(db, game_ids={game.id})
+
+    assert game.metadata_sources["is_free"] == "steam_store"
+    assert game.metadata_sources["multiplayer"] == "igdb"
+
+
 def test_metadata_sync_soft_excludes_software_from_existing_genres(db, monkeypatch):
     game = Game(
         title="VR Video Player",

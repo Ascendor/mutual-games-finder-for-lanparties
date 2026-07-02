@@ -88,6 +88,111 @@ def test_game_options_are_compact_searchable_and_cacheable():
     app.dependency_overrides.clear()
 
 
+def test_game_page_is_paginated_filtered_and_sorted_on_the_server():
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_db():
+        db = Session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_db
+    db = Session()
+    try:
+        games = [
+            models.Game(
+                title=f"Network Game {index:03d}",
+                normalized_title=f"network game {index:03d}",
+                genres=["Action"] if index % 2 else ["Strategy"],
+                multiplayer=True,
+                min_players=1,
+                max_players=8,
+                player_count_known=True,
+            )
+            for index in range(250)
+        ]
+        solo = models.Game(
+            title="Only Solo",
+            normalized_title="only solo",
+            singleplayer=True,
+        )
+        software = models.Game(
+            title="Video Tool",
+            normalized_title="video tool",
+            is_game=False,
+            genres=["Utilities"],
+        )
+        db.add_all([*games, solo, software])
+        db.flush()
+
+        participants = [
+            models.Participant(nickname=f"Player {index}", present=True)
+            for index in range(3)
+        ]
+        db.add_all(participants)
+        db.flush()
+        accounts = [
+            models.Account(
+                participant_id=participant.id,
+                platform=models.Platform.steam,
+                account_id=f"steam-{participant.id}",
+            )
+            for participant in participants
+        ]
+        db.add_all(accounts)
+        db.flush()
+        for participant, account in zip(participants, accounts, strict=True):
+            db.add(
+                models.Ownership(
+                    participant_id=participant.id,
+                    account_id=account.id,
+                    game_id=games[42].id,
+                    platform=models.Platform.steam,
+                )
+            )
+        db.commit()
+
+        client = TestClient(app)
+        second_page = client.get("/api/games/page?page=2&per_page=25")
+        assert second_page.status_code == 200
+        payload = second_page.json()
+        assert payload["total"] == 250
+        assert len(payload["items"]) == 25
+        assert payload["page"] == 2
+        assert payload["per_page"] == 25
+        assert payload["genres"] == ["Action", "Strategy"]
+
+        by_owners = client.get(
+            "/api/games/page?per_page=25&sort_by=owner_count&sort_desc=true"
+        ).json()
+        assert by_owners["items"][0]["id"] == games[42].id
+        assert by_owners["items"][0]["owner_count"] == 3
+
+        searched = client.get("/api/games/page?search=game%20042").json()
+        assert [item["id"] for item in searched["items"]] == [games[42].id]
+
+        with_solo = client.get(
+            "/api/games/page?include_pure_singleplayer=true&search=only%20solo"
+        ).json()
+        assert [item["id"] for item in with_solo["items"]] == [solo.id]
+
+        with_software = client.get(
+            "/api/games/page?include_non_games=true&search=video%20tool"
+        ).json()
+        assert [item["id"] for item in with_software["items"]] == [software.id]
+    finally:
+        db.close()
+        app.dependency_overrides.clear()
+
+
 
 
 def test_game_owners_endpoint_returns_present_deduplicated_owners():

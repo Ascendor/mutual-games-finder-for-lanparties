@@ -103,6 +103,142 @@ def test_known_free_steam_game_is_available_to_every_selected_player(db):
     assert common[0].platforms == [Platform.steam]
 
 
+def test_free_games_with_broader_library_adoption_rank_higher(db):
+    players = [
+        Participant(nickname="Ada", present=True),
+        Participant(nickname="Linus", present=True),
+        Participant(nickname="Grace", present=True),
+    ]
+    widely_owned = Game(
+        title="Widely Owned Free Game",
+        normalized_title=normalize_title("Widely Owned Free Game"),
+        is_free=True,
+        multiplayer=True,
+    )
+    barely_owned = Game(
+        title="Barely Owned Free Game",
+        normalized_title=normalize_title("Barely Owned Free Game"),
+        is_free=True,
+        multiplayer=True,
+    )
+    db.add_all([*players, widely_owned, barely_owned])
+    db.flush()
+    add_owned(db, players[0], widely_owned, 10)
+    add_owned(db, players[1], widely_owned, 10)
+    add_owned(db, players[0], barely_owned, 10_000)
+    db.commit()
+
+    recommendations = find_common_games(db, [player.id for player in players])
+
+    assert [item.game.title for item in recommendations] == [
+        "Widely Owned Free Game",
+        "Barely Owned Free Game",
+    ]
+    assert recommendations[0].owner_count == 2
+    assert recommendations[0].available_player_count == 3
+
+
+def test_common_games_rank_full_ownership_then_free_then_partial(db):
+    players = [
+        Participant(nickname="Ada", present=True),
+        Participant(nickname="Linus", present=True),
+        Participant(nickname="Grace", present=True),
+    ]
+    fully_owned = Game(
+        title="Fully Owned",
+        normalized_title=normalize_title("Fully Owned"),
+        multiplayer=True,
+    )
+    broadly_owned_free = Game(
+        title="Broad Free",
+        normalized_title=normalize_title("Broad Free"),
+        is_free=True,
+        multiplayer=True,
+    )
+    barely_owned_free = Game(
+        title="Barely Free",
+        normalized_title=normalize_title("Barely Free"),
+        is_free=True,
+        multiplayer=True,
+    )
+    partially_owned = Game(
+        title="Partial Paid",
+        normalized_title=normalize_title("Partial Paid"),
+        multiplayer=True,
+    )
+    db.add_all(
+        [
+            *players,
+            fully_owned,
+            broadly_owned_free,
+            barely_owned_free,
+            partially_owned,
+        ]
+    )
+    db.flush()
+    for player in players:
+        add_owned(db, player, fully_owned)
+    for player in players[:2]:
+        add_owned(db, player, broadly_owned_free)
+        add_owned(db, player, partially_owned)
+    add_owned(db, players[0], barely_owned_free)
+    db.commit()
+
+    recommendations = find_common_games(
+        db,
+        [player.id for player in players],
+        minimum_coverage=0,
+    )
+
+    assert [item.game.title for item in recommendations] == [
+        "Fully Owned",
+        "Broad Free",
+        "Barely Free",
+        "Partial Paid",
+    ]
+
+
+def test_free_games_can_be_counted_only_for_actual_owners(db):
+    players = [
+        Participant(nickname="Ada", present=True),
+        Participant(nickname="Linus", present=True),
+        Participant(nickname="Grace", present=True),
+    ]
+    anchor = Game(
+        title="Anchor",
+        normalized_title=normalize_title("Anchor"),
+        multiplayer=True,
+    )
+    free_game = Game(
+        title="Free Arena",
+        normalized_title=normalize_title("Free Arena"),
+        is_free=True,
+        multiplayer=True,
+    )
+    db.add_all([*players, anchor, free_game])
+    db.flush()
+    for player in players:
+        add_owned(db, player, anchor)
+    add_owned(db, players[0], free_game)
+    db.commit()
+
+    counted_for_all = find_common_games(
+        db,
+        [player.id for player in players],
+        minimum_coverage=0.75,
+        free_games_as_owned=True,
+    )
+    actual_owners_only = find_common_games(
+        db,
+        [player.id for player in players],
+        minimum_coverage=0.75,
+        free_games_as_owned=False,
+    )
+
+    assert "Free Arena" in [item.game.title for item in counted_for_all]
+    assert "Free Arena" not in [item.game.title for item in actual_owners_only]
+
+
 def test_common_games_ignore_unreadable_library_and_apply_coverage_threshold(db):
     ada = Participant(nickname="Ada", present=True)
     linus = Participant(nickname="Linus", present=True)

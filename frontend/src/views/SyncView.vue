@@ -53,11 +53,7 @@ const headers = [
 const rows = computed(() =>
   store.syncRuns.map((run) => ({
     ...run,
-    account: run.kind === 'metadata'
-      ? 'Metadaten'
-      : run.kind === 'playnite'
-        ? `Playnite: ${participantLabel(run.participant_id)}`
-        : accountLabel(run.account_id),
+    account: syncRunLabel(run),
     status: !run.finished_at
       ? run.progress_total > 0
         ? `${run.progress_current}/${run.progress_total}`
@@ -71,7 +67,9 @@ const rows = computed(() =>
     statusColor: !run.finished_at ? 'primary' : run.success ? 'secondary' : 'error'
   }))
 )
-const metadataRunning = computed(() => store.syncRuns.some((run) => run.kind === 'metadata' && !run.finished_at))
+const metadataRunning = computed(() =>
+  store.syncRuns.some((run) => isMetadataRun(run.kind) && !run.finished_at)
+)
 let pollTimer: number | undefined
 
 onMounted(async () => {
@@ -139,6 +137,18 @@ function accountLabel(id?: number | null) {
 function participantLabel(id?: number | null) {
   if (!id) return 'Unbekannt'
   return store.participants.find((participant) => participant.id === id)?.nickname || 'Unbekannt'
+}
+
+function syncRunLabel(run: { kind: string; account_id?: number | null; participant_id?: number | null }) {
+  if (run.kind === 'metadata') return 'Alle Metadaten'
+  if (run.kind === 'game_metadata') return 'Metadaten eines Spiels'
+  if (run.kind === 'steam_metadata') return 'Steam-Metadaten vollständig'
+  if (run.kind === 'playnite') return `Playnite: ${participantLabel(run.participant_id)}`
+  return accountLabel(run.account_id)
+}
+
+function isMetadataRun(kind: string) {
+  return ['metadata', 'game_metadata', 'steam_metadata'].includes(kind)
 }
 
 function platformLabel(platform: string) {

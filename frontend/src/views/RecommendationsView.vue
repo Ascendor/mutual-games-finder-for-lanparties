@@ -3,7 +3,7 @@
     <h1 class="text-h4 mb-4">Was können wir spielen?</h1>
     <v-row class="mb-4">
       <v-col cols="12" md="9">
-        <v-select v-model="selected" :items="otherParticipants" item-title="nickname" item-value="id" label="Mitspieler:innen" multiple chips density="compact" />
+        <v-select v-model="selected" :items="participants" item-title="nickname" item-value="id" label="Spieler:innen" multiple chips density="compact" />
       </v-col>
       <v-col cols="12" md="3" class="d-flex align-center">
         <v-btn color="primary" prepend-icon="mdi-star-search-outline" :loading="loading || commonLoading" :disabled="!currentParticipant" @click="load">Berechnen</v-btn>
@@ -35,11 +35,20 @@
             <v-btn :value="75">75 %</v-btn>
             <v-btn :value="50">50 %</v-btn>
           </v-btn-toggle>
+          <v-switch
+            v-model="freeGamesAsOwned"
+            label="Free Games wie Besitz werten"
+            color="primary"
+            density="compact"
+            hide-details
+            @update:model-value="loadCommon"
+          />
         </div>
         <RecommendationTable
           :items="common"
           :loading="loading || commonLoading"
           show-availability
+          :free-games-as-owned="freeGamesAsOwned"
         />
       </v-window-item>
       <v-window-item value="coop"><RecommendationTable :items="coop" :loading="loading" /></v-window-item>
@@ -72,17 +81,13 @@ const newForGroup = ref<Recommendation[]>([])
 const loading = ref(false)
 const commonLoading = ref(false)
 const minimumCoverage = ref(75)
+const freeGamesAsOwned = ref(true)
 const error = ref('')
 const currentParticipant = computed(() =>
   store.participants.find((participant) => participant.id === currentParticipantId.value)
 )
-const otherParticipants = computed(() =>
-  store.sortedParticipants.filter((participant) => participant.id !== currentParticipantId.value)
-)
-const selectedPlayerIds = computed(() => {
-  if (!currentParticipantId.value) return []
-  return [currentParticipantId.value, ...selected.value.filter((id) => id !== currentParticipantId.value)]
-})
+const participants = computed(() => store.sortedParticipants)
+const selectedPlayerIds = computed(() => [...new Set(selected.value)])
 
 onMounted(async () => {
   await store.refreshParticipants()
@@ -92,8 +97,10 @@ onMounted(async () => {
     return
   }
   const queryPlayers = typeof route.query.players === 'string' ? route.query.players.split(',').map((item) => Number(item)).filter(Boolean) : []
-  selected.value = (queryPlayers.length ? queryPlayers : store.presentParticipants.map((participant) => participant.id))
-    .filter((id) => id !== currentParticipantId.value)
+  const initialPlayers = queryPlayers.length
+    ? queryPlayers
+    : store.presentParticipants.map((participant) => participant.id)
+  selected.value = [...new Set([currentParticipantId.value!, ...initialPlayers])]
   if (typeof route.query.tab === 'string') tab.value = route.query.tab
   await load()
 })
@@ -104,7 +111,7 @@ async function load() {
   error.value = ''
   try {
     const [commonGames, coopGames, lanGames, popularGames, newGames] = await Promise.all([
-      api.common(selectedPlayerIds.value, minimumCoverage.value),
+      api.common(selectedPlayerIds.value, minimumCoverage.value, freeGamesAsOwned.value),
       api.coop(selectedPlayerIds.value),
       api.lanForGroup(selectedPlayerIds.value),
       api.recommendations('popular'),
@@ -127,7 +134,11 @@ async function loadCommon() {
   commonLoading.value = true
   error.value = ''
   try {
-    common.value = await api.common(selectedPlayerIds.value, minimumCoverage.value)
+    common.value = await api.common(
+      selectedPlayerIds.value,
+      minimumCoverage.value,
+      freeGamesAsOwned.value
+    )
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -144,5 +155,3 @@ async function loadCommon() {
   flex-wrap: wrap;
 }
 </style>
-
-

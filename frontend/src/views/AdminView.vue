@@ -55,14 +55,13 @@
           <v-card variant="flat">
             <v-card-title>Spiele</v-card-title>
             <v-card-text>
-              <GameFilterBar v-model="gameFilters" :games="store.games" />
-              <v-data-table class="compact-table" :headers="gameHeaders" :items="gameRows" :items-per-page="-1" density="compact" hide-default-footer>
-                <template #item.actions="{ item }">
-                  <div class="text-right">
-                    <v-btn size="small" color="error" variant="text" prepend-icon="mdi-delete-outline" :loading="busy === `game:${item.id}`" @click="deleteGame(item.id)">Löschen</v-btn>
-                  </div>
-                </template>
-              </v-data-table>
+              <p class="text-medium-emphasis">
+                Die paginierte Spieleverwaltung enthält Suche, Filter, Metadatenpflege und den vollständigen
+                Steam-Store-Metadatenabgleich.
+              </p>
+              <v-btn to="/admin/games" color="primary" variant="tonal" prepend-icon="mdi-gamepad-variant-outline">
+                Spiele verwalten
+              </v-btn>
             </v-card-text>
           </v-card>
         </v-col>
@@ -76,8 +75,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminUnlocked, tryUnlockAdmin } from '../adminAccess'
 import { api } from '../api'
-import GameFilterBar from '../components/GameFilterBar.vue'
-import { createGameFilterState, matchesGameFilters } from '../gameFilters'
 import { useLanStore } from '../store'
 import type { Platform } from '../types'
 
@@ -90,7 +87,6 @@ const loading = ref(false)
 const busy = ref('')
 const error = ref('')
 const message = ref('')
-const gameFilters = ref(createGameFilterState())
 const participantHeaders = [
   { title: 'Nickname', key: 'nickname' },
   { title: 'Status', key: 'status' },
@@ -101,11 +97,6 @@ const accountHeaders = [
   { title: 'Spieler', key: 'participant' },
   { title: 'Provider', key: 'provider' },
   { title: 'Account', key: 'account' },
-  { title: '', key: 'actions', sortable: false }
-]
-const gameHeaders = [
-  { title: 'Titel', key: 'title' },
-  { title: 'Besitzer', key: 'owner_count' },
   { title: '', key: 'actions', sortable: false }
 ]
 
@@ -124,18 +115,6 @@ const accountRows = computed(() =>
     participant: participantName(account.participant_id),
     provider: platformTitle(account.platform),
     account: account.display_name || account.account_id
-  }))
-)
-
-const filteredGames = computed(() => {
-  return store.games.filter((game) => matchesGameFilters(game, gameFilters.value)).slice(0, 100)
-})
-
-const gameRows = computed(() =>
-  filteredGames.value.map((game) => ({
-    id: game.id,
-    title: game.title,
-    owner_count: ownerCount(game.id)
   }))
 )
 
@@ -161,7 +140,12 @@ function unlock() {
 async function load() {
   loading.value = true
   try {
-    await store.refresh()
+    const [participants, accounts] = await Promise.all([
+      api.participants(),
+      api.accounts()
+    ])
+    store.participants = participants
+    store.accounts = accounts
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -175,10 +159,6 @@ function accountsFor(participantId: number) {
 
 function participantName(participantId: number) {
   return store.participants.find((participant) => participant.id === participantId)?.nickname ?? `Teilnehmer ${participantId}`
-}
-
-function ownerCount(gameId: number) {
-  return store.ownerships.filter((ownership) => ownership.game_id === gameId).length
 }
 
 function platformTitle(platform: Platform) {
@@ -197,13 +177,6 @@ async function deleteAccount(id: number) {
   const label = account ? `${platformTitle(account.platform)} / ${participantName(account.participant_id)}` : `Account ${id}`
   if (!window.confirm(`${label} wirklich löschen? Besitzdaten dieses Accounts werden entfernt.`)) return
   await runDelete(`account:${id}`, () => api.deleteAccount(id), `${label} gelöscht.`)
-}
-
-async function deleteGame(id: number) {
-  const game = store.games.find((item) => item.id === id)
-  const label = game?.title ?? `Spiel ${id}`
-  if (!window.confirm(`${label} wirklich löschen? Alle Ownerships zu diesem Spiel werden ebenfalls entfernt.`)) return
-  await runDelete(`game:${id}`, () => api.deleteGame(id), `${label} gelöscht.`)
 }
 
 async function runDelete(key: string, action: () => Promise<void>, success: string) {

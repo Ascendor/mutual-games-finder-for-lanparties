@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, Game, GameOption, GameOwner, Ownership, Participant, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
+import type { Account, Game, GameOption, GameOwner, GamePage, Ownership, Participant, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -34,6 +34,30 @@ export const api = {
   createAccount: (payload: Partial<Account>) => request<Account>('/accounts', { method: 'POST', body: JSON.stringify(payload) }),
   deleteAccount: (id: number) => request<void>(`/accounts/${id}`, { method: 'DELETE' }),
   games: (search = '') => request<Game[]>(`/games${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  gamesPage: (params: {
+    page: number
+    perPage: number
+    search?: string
+    genres?: string[]
+    features?: string[]
+    includePureSingleplayer?: boolean
+    includeNonGames?: boolean
+    sortBy?: string
+    sortDesc?: boolean
+  }) => {
+    const query = new URLSearchParams({
+      page: String(params.page),
+      per_page: String(params.perPage),
+      include_pure_singleplayer: String(Boolean(params.includePureSingleplayer)),
+      include_non_games: String(Boolean(params.includeNonGames)),
+      sort_by: params.sortBy || 'title',
+      sort_desc: String(Boolean(params.sortDesc))
+    })
+    if (params.search?.trim()) query.set('search', params.search.trim())
+    params.genres?.forEach((genre) => query.append('genres', genre))
+    params.features?.forEach((feature) => query.append('features', feature))
+    return request<GamePage>(`/games/page?${query}`)
+  },
   gameOptions: (search = '', limit?: number) => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
@@ -51,10 +75,11 @@ export const api = {
   recommendations: (kind: 'popular' | 'lan' | 'present' | 'new', limit?: number) =>
     request<Recommendation[]>(`/recommendations/${kind}${limit ? `?limit=${limit}` : ''}`),
   newForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/new${players.length ? `?${players.map((id) => `players=${id}`).join('&')}` : ''}`),
-  common: (players: number[], minimumCoverage = 75) => {
+  common: (players: number[], minimumCoverage = 75, freeGamesAsOwned = true) => {
     const params = new URLSearchParams()
     players.forEach((id) => params.append('players', String(id)))
     params.set('minimum_coverage', String(minimumCoverage))
+    params.set('free_games_as_owned', String(freeGamesAsOwned))
     return request<Recommendation[]>(`/recommendations/common?${params}`)
   },
   coop: (players: number[]) => request<Recommendation[]>(`/recommendations/coop?${players.map((id) => `players=${id}`).join('&')}`),
@@ -62,7 +87,12 @@ export const api = {
   syncAccount: (id: number) => request<SyncRun>(`/sync/accounts/${id}`, { method: 'POST' }),
   syncMetadata: () => request<SyncRun>('/sync/metadata', { method: 'POST' }),
   repairMetadata: () => request<SyncRun>('/sync/metadata/repair', { method: 'POST' }),
+  syncGameMetadata: (gameId: number) =>
+    request<SyncRun>(`/sync/games/${gameId}/metadata`, { method: 'POST' }),
+  syncAllSteamMetadata: () =>
+    request<SyncRun>('/sync/steam/metadata', { method: 'POST' }),
   syncRuns: () => request<SyncRun[]>('/sync/runs'),
+  syncRun: (runId: number) => request<SyncRun>(`/sync/runs/${runId}`),
   importPlaynite: (participantId: number, file: File, onUploadProgress?: (percent: number) => void) => {
     const form = new FormData()
     form.append('participant_id', String(participantId))

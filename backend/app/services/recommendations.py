@@ -14,7 +14,7 @@ PLAYNITE_ONLY_PLATFORMS = {Platform.ea}
 
 
 def _score(game: Game, owner_count: int, participant_count: int, total: int, median_playtime: float, mode: RecommendationMode, group_size: int | None) -> float:
-    coverage = owner_count / participant_count if participant_count else 0
+    adoption = owner_count / participant_count if participant_count else 0
     playtime = min(total, 20000) / 100
     typical_playtime = min(median_playtime, 5000) / 100
     capacity_fit = 0
@@ -22,9 +22,9 @@ def _score(game: Game, owner_count: int, participant_count: int, total: int, med
     if target_size and game.player_count_known and game.min_players <= target_size <= game.max_players:
         capacity_fit = 300
     if mode == "common":
-        return typical_playtime * 2 + playtime + capacity_fit + (150 if game.multiplayer else 0)
+        return adoption * 1000 + typical_playtime * 2 + playtime + capacity_fit + (150 if game.multiplayer else 0)
     if mode == "coop":
-        return capacity_fit + playtime + (500 if game.online_coop else 0) + (250 if game.local_coop else 0) + (100 if game.shared_screen or game.split_screen else 0)
+        return adoption * 1000 + capacity_fit + playtime + (500 if game.online_coop else 0) + (250 if game.local_coop else 0) + (100 if game.shared_screen or game.split_screen else 0)
     if mode == "lan":
         return owner_count * 1200 + capacity_fit + playtime + (300 if game.lan else 0)
     if mode == "group_size":
@@ -32,22 +32,30 @@ def _score(game: Game, owner_count: int, participant_count: int, total: int, med
     if mode == "new":
         freshness = max(0, 5000 - median_playtime) / 10
         return owner_count * 1500 + freshness + capacity_fit - min(total, 20000) / 200
-    return coverage * 5000 + playtime + typical_playtime
+    return adoption * 5000 + playtime + typical_playtime
 
 
 def _sort_key(item: RecommendationRead, mode: RecommendationMode) -> tuple:
     game = item.game
     if mode == "common":
+        fully_owned = item.owner_count == item.selected_player_count
+        free_for_group = (
+            game.is_free
+            and not fully_owned
+            and item.available_player_count == item.selected_player_count
+        )
+        availability_group = 3 if fully_owned else 2 if free_for_group else 1
         return (
+            availability_group,
+            item.owner_count,
             item.coverage_percent,
-            item.available_player_count,
             item.median_playtime_minutes,
             item.total_playtime_minutes,
             game.max_players,
             game.title.casefold(),
         )
     if mode == "coop":
-        return (game.online_coop, game.local_coop, game.max_players, item.total_playtime_minutes, game.title.casefold())
+        return (game.online_coop, game.local_coop, item.owner_count, game.max_players, item.total_playtime_minutes, game.title.casefold())
     if mode == "lan":
         return (item.owner_count, game.max_players, item.total_playtime_minutes, game.title.casefold())
     if mode == "group_size":
@@ -66,6 +74,7 @@ def _recommendations_for_participants(
     lan: bool = False,
     group_size: int | None = None,
     minimum_coverage: float | None = None,
+    free_games_as_owned: bool = True,
 ) -> list[RecommendationRead]:
     participant_ids = sorted(set(participant_ids))
     if not participant_ids:
@@ -106,12 +115,15 @@ def _recommendations_for_participants(
                 | (Game.local_coop == True)  # noqa: E712
                 | (Game.online_coop == True)  # noqa: E712
             )
-    query = query.where(
-        or_(
-            Ownership.participant_id.in_(participant_ids),
-            Game.is_free == True,  # noqa: E712
+    if free_games_as_owned:
+        query = query.where(
+            or_(
+                Ownership.participant_id.in_(participant_ids),
+                Game.is_free == True,  # noqa: E712
+            )
         )
-    )
+    else:
+        query = query.where(Ownership.participant_id.in_(participant_ids))
     games = db.scalars(query).unique().all()
     recs = []
     for game in games:
@@ -120,9 +132,10 @@ def _recommendations_for_participants(
         game_platforms = {
             mapping.platform for mapping in game.mappings
         } | {ownership.platform for ownership in relevant}
+        free_for_group = game.is_free and free_games_as_owned
         unknown_ids = (
             set()
-            if game.is_free
+            if free_for_group
             else {
                 participant.id
                 for participant in participants
@@ -131,11 +144,11 @@ def _recommendations_for_participants(
             }
         )
         known_player_count = len(participant_ids) - len(unknown_ids)
-        available_player_count = len(participant_ids) if game.is_free else len(owner_ids)
+        available_player_count = len(participant_ids) if free_for_group else len(owner_ids)
         coverage = (
             available_player_count / known_player_count
             if known_player_count
-            else (1.0 if game.is_free else 0.0)
+            else (1.0 if free_for_group else 0.0)
         )
         required_coverage = minimum_coverage if minimum_coverage is not None else (1.0 if require_all else 0.0)
         if coverage < required_coverage:
@@ -204,12 +217,14 @@ def find_common_games(
     db: Session,
     players: list[int],
     minimum_coverage: float = 1.0,
+    free_games_as_owned: bool = True,
 ) -> list[RecommendationRead]:
     return _recommendations_for_participants(
         db,
         players,
         mode="common",
         minimum_coverage=minimum_coverage,
+        free_games_as_owned=free_games_as_owned,
     )
 
 

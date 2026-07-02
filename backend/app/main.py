@@ -9,6 +9,7 @@ from app.db.session import SessionLocal
 from app.services.metadata_service import close_interrupted_metadata_runs
 from app.services.playnite_import import close_interrupted_playnite_runs
 from app.services.recommendation_cache import warm_dashboard_recommendations
+from app.services.steam_metadata_service import close_interrupted_steam_metadata_runs
 
 app = FastAPI(title="LAN Party Game Finder", version="0.1.0")
 
@@ -37,6 +38,7 @@ def close_interrupted_syncs_on_startup() -> None:
     try:
         close_interrupted_metadata_runs(db)
         close_interrupted_playnite_runs(db)
+        close_interrupted_steam_metadata_runs(db)
     finally:
         db.close()
     Thread(

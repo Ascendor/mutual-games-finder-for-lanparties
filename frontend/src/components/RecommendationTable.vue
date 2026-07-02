@@ -6,6 +6,7 @@
       density="compact"
       :headers="headers"
       :items="rows"
+      v-model:sort-by="sortBy"
       :loading="loading"
       loading-text="Spiele werden geladen..."
       :items-per-page="-1"
@@ -17,8 +18,11 @@
       <div class="text-caption text-medium-emphasis">{{ item.players }}</div>
     </template>
     <template #item.owner_count="{ item }">{{ item.owner_display }}</template>
-    <template #item.coverage_percent="{ item }">
+    <template #item.availability_rank="{ item }">
       <strong>{{ item.availability_display }}</strong>
+      <div v-if="item.library_display" class="text-caption text-medium-emphasis">
+        {{ item.library_display }}
+      </div>
       <div v-if="item.unknown_display" class="text-caption text-medium-emphasis">
         {{ item.unknown_display }}
       </div>
@@ -49,12 +53,20 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   limit?: number
   showAvailability?: boolean
+  freeGamesAsOwned?: boolean
 }>(), {
   loading: false,
   limit: 0,
-  showAvailability: false
+  showAvailability: false,
+  freeGamesAsOwned: true
 })
 const filters = ref(createGameFilterState())
+const sortBy = ref<{ key: string; order: 'asc' | 'desc' }[]>([
+  {
+    key: props.showAvailability ? 'availability_rank' : 'owner_count',
+    order: 'desc'
+  }
+])
 const games = computed(() => props.items.map((item) => item.game))
 const filteredItems = computed(() => {
   const filtered = props.items.filter((item) => matchesGameFilters(item.game, filters.value))
@@ -64,7 +76,7 @@ const filteredItems = computed(() => {
 const headers = computed(() => [
   { title: 'Spiel', key: 'title' },
   props.showAvailability
-    ? { title: 'Verfügbarkeit', key: 'coverage_percent' }
+    ? { title: 'Verfügbarkeit', key: 'availability_rank' }
     : { title: 'Besitzer', key: 'owner_count' },
   { title: 'Gesamt', key: 'total_hours' },
   { title: 'Median', key: 'median_hours' },
@@ -74,28 +86,42 @@ const headers = computed(() => [
 ])
 
 const rows = computed(() =>
-  filteredItems.value.map((rec) => ({
-    id: rec.game.id,
-    title: rec.game.title,
-    players: playerLabel(rec.game),
-    owner_count: rec.owner_count,
-    owner_display: rec.game.is_free ? `Alle (${rec.owner_count} importiert)` : String(rec.owner_count),
-    coverage_percent: rec.coverage_percent,
-    availability_display: rec.game.is_free
-      ? 'Für alle kostenlos'
-      : `${rec.available_player_count} von ${rec.known_player_count} bestätigt`,
-    unknown_display: unknownPlayerLabel(rec),
-    total_hours: hours(rec.total_playtime_minutes),
-    median_hours: hours(rec.median_playtime_minutes),
-    average_hours: hours(rec.average_playtime_minutes),
-    lan: rec.game.lan,
-    coop: rec.game.local_coop || rec.game.online_coop,
-    split: rec.game.split_screen,
-    versus: rec.game.versus,
-    is_free: rec.game.is_free,
-    features: featureText(rec.game),
-    platforms: rec.platforms.map(platformLabel).join(', ')
-  }))
+  filteredItems.value.map((rec) => {
+    const fullyOwned = rec.owner_count === rec.selected_player_count
+    const freeForGroup = rec.game.is_free && props.freeGamesAsOwned && !fullyOwned
+    const availabilityGroup = fullyOwned ? 3 : freeForGroup ? 2 : 1
+    return {
+      id: rec.game.id,
+      title: rec.game.title,
+      players: playerLabel(rec.game),
+      owner_count: rec.owner_count,
+      owner_display: rec.game.is_free ? `Alle (${rec.owner_count} importiert)` : String(rec.owner_count),
+      coverage_percent: rec.coverage_percent,
+      availability_rank:
+        availabilityGroup * 1_000_000_000 +
+        rec.owner_count * 1_000_000 +
+        rec.coverage_percent * 1000,
+      availability_display: fullyOwned
+        ? `${rec.owner_count} von ${rec.selected_player_count} in der Bibliothek`
+        : freeForGroup
+          ? 'Für alle kostenlos'
+          : `${rec.owner_count} von ${rec.selected_player_count} in der Bibliothek`,
+      library_display: freeForGroup
+        ? `${rec.owner_count} von ${rec.selected_player_count} haben es in der Bibliothek`
+        : '',
+      unknown_display: unknownPlayerLabel(rec),
+      total_hours: hours(rec.total_playtime_minutes),
+      median_hours: hours(rec.median_playtime_minutes),
+      average_hours: hours(rec.average_playtime_minutes),
+      lan: rec.game.lan,
+      coop: rec.game.local_coop || rec.game.online_coop,
+      split: rec.game.split_screen,
+      versus: rec.game.versus,
+      is_free: rec.game.is_free,
+      features: featureText(rec.game),
+      platforms: rec.platforms.map(platformLabel).join(', ')
+    }
+  })
 )
 
 const hours = (minutes: number) => Math.round(minutes / 60)

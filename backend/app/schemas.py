@@ -142,6 +142,18 @@ class GameRead(GameBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class GameListItemRead(GameRead):
+    owner_count: int = 0
+
+
+class GamePageRead(BaseModel):
+    items: list[GameListItemRead]
+    total: int
+    page: int
+    per_page: int
+    genres: list[str] = Field(default_factory=list)
+
+
 class GameOptionRead(BaseModel):
     id: int
     title: str

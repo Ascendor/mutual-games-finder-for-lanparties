@@ -82,11 +82,22 @@ class MetadataRecord:
         self.sources[name] = source
 
 
-def create_metadata_sync_run(db: Session) -> SyncRun:
+def create_metadata_sync_run(
+    db: Session,
+    *,
+    kind: str = "metadata",
+    message: str = "Metadatensynchronisation wartet auf Start",
+    progress_total: int = 0,
+) -> SyncRun:
     if not METADATA_SYNC_LOCK.acquire(blocking=False):
         raise RuntimeError("Eine Metadatensynchronisation läuft bereits")
     try:
-        run = SyncRun(kind="metadata", message="Metadatensynchronisation wartet auf Start")
+        run = SyncRun(
+            kind=kind,
+            message=message,
+            stage="queued",
+            progress_total=progress_total,
+        )
         db.add(run)
         db.commit()
         db.refresh(run)
@@ -98,7 +109,10 @@ def create_metadata_sync_run(db: Session) -> SyncRun:
 
 def close_interrupted_metadata_runs(db: Session) -> None:
     runs = db.scalars(
-        select(SyncRun).where(SyncRun.kind == "metadata", SyncRun.finished_at.is_(None))
+        select(SyncRun).where(
+            SyncRun.kind.in_(("metadata", "game_metadata")),
+            SyncRun.finished_at.is_(None),
+        )
     ).all()
     if not runs:
         return
@@ -110,19 +124,24 @@ def close_interrupted_metadata_runs(db: Session) -> None:
     db.commit()
 
 
-def run_metadata_sync(run_id: int) -> None:
+def run_metadata_sync(run_id: int, game_ids: set[int] | None = None) -> None:
     db = SessionLocal()
     try:
         run = db.get(SyncRun, run_id)
         if not run:
             return
+        run.stage = "metadata"
         run.message = "IGDB-Verbindung wird geprüft"
+        if game_ids is not None:
+            run.progress_total = len(game_ids)
         db.commit()
 
         def update_progress(scanned: int, updated: int, igdb_errors: int, rawg_errors: int) -> None:
             progress_run = db.get(SyncRun, run_id)
             if progress_run:
                 progress_run.imported_games = updated
+                progress_run.progress_current = scanned
+                progress_run.progress_total = max(progress_run.progress_total, scanned)
                 progress_run.message = (
                     f"{scanned} Spiele geprüft, {updated} aktualisiert"
                     + (
@@ -133,12 +152,21 @@ def run_metadata_sync(run_id: int) -> None:
                 )
                 db.commit()
 
-        result = enrich_all_game_metadata(db, progress_callback=update_progress)
+        result = enrich_all_game_metadata(
+            db,
+            progress_callback=update_progress,
+            game_ids=game_ids,
+        )
         run = db.get(SyncRun, run_id)
         if not run:
             return
-        run.success = result.failed_games == 0
+        # Source failures are warnings: the other provider may still have supplied
+        # valid metadata, and all successfully fetched changes stay committed.
+        run.success = True
         run.finished_at = datetime.utcnow()
+        run.stage = "completed"
+        run.progress_current = result.scanned_games
+        run.progress_total = result.scanned_games
         run.imported_games = result.updated_games
         run.message = (
             f"{result.updated_games} von {result.scanned_games} Spielen aktualisiert"
@@ -165,6 +193,7 @@ def run_metadata_sync(run_id: int) -> None:
         if run:
             run.success = False
             run.finished_at = datetime.utcnow()
+            run.stage = "failed"
             run.message = f"Metadatensynchronisation fehlgeschlagen: {exc}"
             db.commit()
     finally:
@@ -632,7 +661,9 @@ def _apply_metadata_record(game: Game, record: MetadataRecord) -> bool:
         setattr(game, name, value)
     game.metadata_source = record.primary_source
     game.metadata_external_id = record.external_id
-    game.metadata_sources = dict(record.sources)
+    sources = dict(game.metadata_sources or {})
+    sources.update(record.sources)
+    game.metadata_sources = sources
     game.metadata_updated_at = datetime.utcnow()
     return _metadata_snapshot(game) != before
 
