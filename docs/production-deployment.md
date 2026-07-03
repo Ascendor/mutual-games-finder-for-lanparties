@@ -1,5 +1,9 @@
 # Produktionsbetrieb auf einem Debian-VServer
 
+Die auf einzelne Aufgaben aufgeteilten Betriebs-Runbooks fuer Nextcloud
+Collectives liegen unter
+[`docs/nextcloud-collective-betrieb/`](nextcloud-collective-betrieb/Readme.md).
+
 Diese Anleitung beschreibt die spaetere manuelle Installation unter
 `https://refjuplay-together.<deine-domain>`. Apache bleibt der einzige
 oeffentliche Webserver. Die Docker-Container lauschen ausschliesslich auf
