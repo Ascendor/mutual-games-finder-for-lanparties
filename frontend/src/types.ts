@@ -145,6 +145,7 @@ export interface ProviderLoginStart {
   participant_id: number
   platform: Platform
   login_url: string
+  capture_url?: string
   code_label: string
   message: string
   verification_uri?: string

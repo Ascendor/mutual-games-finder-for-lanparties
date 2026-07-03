@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import hashlib
@@ -28,6 +28,7 @@ from app.services.import_providers import (
     platform_value,
     run_legendary_for_account,
     save_provider_auth_json,
+    validate_ea_access_token,
 )
 
 EPIC_LOGIN_URL = "https://legendary.gl/epiclogin"
@@ -181,6 +182,36 @@ def _extract_browser_cookie(value: str) -> str:
         cookie = text.removeprefix("Cookie:").strip()
         return re.sub(r"\^(?=[&|<>()^$!])", "", cookie)
     return ""
+
+
+def _extract_ea_bearer(value: str) -> str:
+    text = _unwrap_pasted_value(value)
+    if not text:
+        return ""
+    normalized = re.sub(r"\^(?=[\"'&|<>()^$!])", "", text)
+    if normalized.startswith(("{", "[")):
+        try:
+            payload = json.loads(normalized)
+        except json.JSONDecodeError:
+            payload = None
+        authorization = _extract_case_insensitive(payload, "authorization")
+        if authorization:
+            normalized = str(authorization)
+    curl_input = bool(re.search(r"(?:^|\s)curl(?:\.exe)?(?:\s|$)", normalized, flags=re.IGNORECASE))
+    if curl_input and "service-aggregation-layer.juno.ea.com/graphql" not in normalized.casefold():
+        raise ValueError(
+            "Das ist nicht die EA-Bibliotheksanfrage. Filtere im Netzwerk-Tab nach "
+            "'juno.ea.com/graphql' und kopiere diese Anfrage als cURL."
+        )
+    match = re.search(
+        r"""Authorization\s*:\s*Bearer\s+([^\s"'\\]+)""",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).rstrip("^")
+    match = re.fullmatch(r"""(?:Bearer\s+)?([^\s"'\\]{20,})""", normalized, flags=re.IGNORECASE)
+    return match.group(1) if match else ""
 
 
 def _cookie_value(cookie_header: str, name: str) -> str | None:
@@ -434,6 +465,8 @@ def generic_json_status(account: Account) -> dict[str, Any]:
         authenticated = bool(credentials.get("cookie"))
     elif platform == Platform.meta:
         authenticated = bool(credentials.get("access_token"))
+    elif platform == Platform.ea:
+        authenticated = bool(credentials.get("access_token"))
     message = f"{label} auth data is stored" if authenticated else f"{label} is not connected"
     if needs_2fa:
         message = "Ubisoft wartet auf 2FA-Code"
@@ -505,9 +538,10 @@ def start(account: Account) -> dict[str, Any]:
             "account_id": account.id,
             "participant_id": account.participant_id,
             "platform": platform,
-            "login_url": "",
-            "code_label": "",
-            "message": "EA bietet keinen stabilen Drittanbieter-Login. Bitte ein Playnite-Backup importieren.",
+            "login_url": "https://www.ea.com/login",
+            "capture_url": "https://www.ea.com/sales/deals",
+            "code_label": "Kopierte EA-Bibliotheksanfrage",
+            "message": "Bei EA anmelden und die GraphQL-Bibliotheksanfrage als cURL kopieren.",
         }
     if platform == Platform.amazon:
         return _amazon_login(account)
@@ -740,6 +774,36 @@ def complete_generic_json(account: Account, code: str, fields: dict[str, Any] | 
     return {"account_id": account.id, "participant_id": account.participant_id, "platform": platform, "authenticated": True, "message": f"{platform_value(platform)} connected"}
 
 
+def complete_ea(account: Account, code: str) -> dict[str, Any]:
+    token = _extract_ea_bearer(code)
+    if not token:
+        raise ValueError(
+            "In der kopierten Anfrage fehlt der EA-Bearer-Token. Kopiere im Netzwerk-Tab eine erfolgreiche "
+            "Anfrage an 'service-aggregation-layer.juno.ea.com/graphql' vollständig als cURL."
+        )
+    data = validate_ea_access_token(token)
+    save_provider_auth_json(
+        Platform.ea,
+        account.id,
+        {
+            "access_token": token,
+            "captured_at": int(time.time()),
+        },
+    )
+    me = data.get("me") if isinstance(data.get("me"), dict) else {}
+    identity = _identity_from_payload(me)
+    if me.get("id"):
+        identity["provider_account_id"] = str(me["id"])
+    return {
+        "account_id": account.id,
+        "participant_id": account.participant_id,
+        "platform": Platform.ea,
+        "authenticated": True,
+        "message": "EA wurde verbunden. Die Bibliothek wird jetzt geladen.",
+        **identity,
+    }
+
+
 def complete(account: Account, code: str, fields: dict[str, Any] | None = None) -> dict[str, Any]:
     _supported_account(account)
     platform = _account_platform(account)
@@ -750,7 +814,7 @@ def complete(account: Account, code: str, fields: dict[str, Any] | None = None) 
     if platform == Platform.ubisoft:
         return complete_ubisoft(account, code, fields)
     if platform == Platform.ea:
-        raise ValueError("EA kann nicht direkt verbunden werden. Bitte ein Playnite-Backup importieren.")
+        return complete_ea(account, code)
     if platform == Platform.amazon:
         return complete_amazon(account, code)
     if platform in {Platform.battle_net, Platform.humble, Platform.meta}:

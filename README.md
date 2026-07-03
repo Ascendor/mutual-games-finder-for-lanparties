@@ -55,6 +55,7 @@ POSTGRES_PASSWORD=lanparty
 - GOG: direkt ueber GOG-Web-APIs mit Auth-Cache
 - Ubisoft Connect: dialoggefuehrter Login mit optionaler 2FA
 - Xbox Live: dialoggefuehrter Microsoft-Geraetecode-Login
+- EA App: dialoggefuehrte Uebernahme der einmalig angemeldeten Browser-Sitzung
 
 ### Xbox Live einmalig einrichten
 
@@ -73,7 +74,7 @@ Danach `docker compose up -d --build backend frontend` ausfuehren. Auf `Accounts
 
 Der Xbox-Webdienst liefert normalen Drittanbietern keine vollstaendige Microsoft-Store-Besitzliste. Importiert werden deshalb Eintraege aus der Xbox-Titelhistorie, die Microsoft mit dem Geraet `PC` kennzeichnet. Noch nie gestartete und nicht installierte Store-Spiele koennen fehlen; Konsolentitel werden bewusst ausgeschlossen. Ein Playnite-Backup kann diese Liste ergaenzen.
 
-EA App wird mangels stabiler Drittanbieter-Anmeldung ueber ein Playnite-Backup importiert.
+EA App kann ueber einen gefuehrten Browser-Login direkt synchronisiert oder alternativ ueber ein Playnite-Backup importiert werden. Der Assistent erkennt den Browser, erklaert das Kopieren der EA-GraphQL-Anfrage als cURL und speichert daraus nur den Bearer-Token. Die komplette cURL-Anfrage und darin enthaltene Cookies werden verworfen.
 
 ## Playnite-Import
 
@@ -100,10 +101,11 @@ Einen RAWG-Schluessel gibt es unter `https://rawg.io/apidocs`. HTTP 401 oder 403
 Diese Plattformen koennen unter **Accounts & Logins** fuer jeden Teilnehmer getrennt verbunden werden:
 
 - Amazon Games verwendet den Anmeldeablauf des Amazon Games Launchers. Nach der Anmeldung wird die komplette Adresse der Abschlussseite in den Assistenten eingefuegt. Das gespeicherte Geraetetoken kann automatisch erneuert werden.
-- Battle.net und Humble verwenden die angemeldete Browser-Sitzung. Der Assistent erklaert in Firefox das Kopieren der passenden Netzwerkanfrage als cURL und liest die Cookies selbst aus.
+- Battle.net und Humble verwenden die angemeldete Browser-Sitzung. Der Assistent erkennt den Browser, erklaert das Kopieren der passenden Netzwerkanfrage als cURL und liest die Cookies selbst aus.
 - Meta/Oculus verwendet ebenfalls eine kopierte Browser-Anfrage. Aus ihr wird ausschliesslich das fuer die Oculus-GraphQL-Bibliothek erforderliche `oc_ac_at`-Token gespeichert.
+- EA verwendet eine kopierte Anfrage an `service-aggregation-layer.juno.ea.com/graphql`. Gespeichert wird ausschliesslich der Bearer-Token; Bibliothek und Spielzeiten werden anschliessend direkt von EA geladen.
 
-Die drei Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen der Anbieter ausfallen oder eine erneute Anmeldung verlangen. Zugangspasswoerter werden dabei nicht an die Anwendung uebermittelt. Playnite-Backups bleiben fuer alle Plattformen als Fallback verfuegbar.
+Die Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen der Anbieter ausfallen oder eine erneute Anmeldung verlangen. Zugangspasswoerter werden dabei nicht an die Anwendung uebermittelt. Playnite-Backups bleiben fuer alle Plattformen als Fallback verfuegbar.
 
 ## Entwicklung ohne Docker
 

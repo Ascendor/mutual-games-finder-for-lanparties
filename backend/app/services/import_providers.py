@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import logging
@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import urlencode
 
 import httpx
 import yaml
@@ -32,6 +33,9 @@ GOG_API_URL = "https://api.gog.com"
 GOG_DEFAULT_CACHE = Path.home() / ".config" / "heroic_gogdl" / "auth.json"
 AMAZON_ENTITLEMENTS_URL = "https://gaming.amazon.com/api/distribution/entitlements"
 AMAZON_TOKEN_URL = "https://api.amazon.com/auth/token"
+EA_GRAPHQL_URL = "https://service-aggregation-layer.juno.ea.com/graphql"
+EA_OWNED_GAMES_QUERY_HASH = "779f1cd1355699752e20c0b3877847f4e3010ef5de131c248e98f8eff84f0718"
+EA_PLAY_TIMES_QUERY_HASH = "3f09b35e06b75c74d8ec3e520a598ebb5e2992b1e1268b6dd3b8ed99b9fafb29"
 LOGGER = logging.getLogger(__name__)
 
 def platform_value(platform: Platform | str) -> str:
@@ -64,6 +68,111 @@ def save_provider_auth_json(platform: Platform, account_id: int, payload: dict[s
     path = provider_auth_json_path(platform, account_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _ea_graphql_url(operation_name: str, variables: dict[str, Any], query_hash: str) -> str:
+    query = urlencode(
+        {
+            "operationName": operation_name,
+            "variables": json.dumps(variables, separators=(",", ":")),
+            "extensions": json.dumps(
+                {
+                    "persistedQuery": {
+                        "version": 1,
+                        "sha256Hash": query_hash,
+                    }
+                },
+                separators=(",", ":"),
+            ),
+        }
+    )
+    return f"{EA_GRAPHQL_URL}?{query}"
+
+
+def ea_owned_games_url(offset: str = "0", limit: int = 500) -> str:
+    return _ea_graphql_url(
+        "getPreloadedOwnedGames",
+        {
+            "isMac": False,
+            "addFieldsToPreloadGames": True,
+            "locale": "en",
+            "limit": limit,
+            "next": offset,
+            "type": ["DIGITAL_FULL_GAME", "PACKAGED_FULL_GAME"],
+            "entitlementEnabled": True,
+            "storefronts": ["EA", "STEAM", "EPIC"],
+            "ownershipMethods": [
+                "UNKNOWN",
+                "ASSOCIATION",
+                "PURCHASE",
+                "REDEMPTION",
+                "GIFT_RECEIPT",
+                "ENTITLEMENT_GRANT",
+                "DIRECT_ENTITLEMENT",
+                "PRE_ORDER_PURCHASE",
+                "VAULT",
+                "XGP_VAULT",
+                "STEAM",
+                "STEAM_VAULT",
+                "STEAM_SUBSCRIPTION",
+                "EPIC",
+                "EPIC_VAULT",
+                "EPIC_SUBSCRIPTION",
+            ],
+            "platforms": ["PC"],
+        },
+        EA_OWNED_GAMES_QUERY_HASH,
+    )
+
+
+def ea_request_headers(access_token: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+        "Origin": "https://www.ea.com",
+        "Referer": "https://www.ea.com/",
+        "User-Agent": "Mozilla/5.0 LANPartyGameFinder/1.0",
+        "X-Request-Source": "SPA",
+    }
+
+
+def _ea_graphql_data(response: httpx.Response, operation_name: str) -> dict[str, Any]:
+    if response.status_code in {401, 403}:
+        raise RuntimeError("Die EA-Anmeldung ist abgelaufen. Bitte EA erneut verbinden.")
+    response.raise_for_status()
+    payload = response.json()
+    errors = payload.get("errors") if isinstance(payload, dict) else None
+    if errors:
+        message = next(
+            (
+                str(item.get("message"))
+                for item in errors
+                if isinstance(item, dict) and item.get("message")
+            ),
+            "unbekannter GraphQL-Fehler",
+        )
+        raise RuntimeError(f"EA {operation_name} fehlgeschlagen: {message}")
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        raise RuntimeError(f"EA {operation_name} hat keine verwertbaren Daten geliefert.")
+    return data
+
+
+def validate_ea_access_token(access_token: str) -> dict[str, Any]:
+    response = httpx.get(
+        ea_owned_games_url(limit=1),
+        headers=ea_request_headers(access_token),
+        timeout=30,
+    )
+    data = _ea_graphql_data(response, "Anmeldung")
+    me = data.get("me")
+    owned_games = me.get("ownedGameProducts") if isinstance(me, dict) else None
+    if not isinstance(owned_games, dict) or not isinstance(owned_games.get("items"), list):
+        raise RuntimeError(
+            "EA hat die Bibliothek nicht freigegeben. Kopiere eine neue erfolgreiche "
+            "GraphQL-Anfrage an 'service-aggregation-layer.juno.ea.com'."
+        )
+    return data
 
 
 def _cookie_headers(credentials: dict[str, Any]) -> dict[str, str]:
@@ -214,93 +323,6 @@ def _ubisoft_games_from_applications(payload: Any, client: httpx.Client | None =
                 details = {}
         game = _ubisoft_detail_game(item, details or item)
         if game:
-            games.append(game)
-    return games
-
-
-def _ea_pid_from_payload(payload: Any) -> str | None:
-    if isinstance(payload, dict):
-        for key in ("pidId", "pid_id", "pid", "userId", "user_id", "nucleusId", "nucleus_id"):
-            value = payload.get(key)
-            if value not in (None, ""):
-                return str(value)
-        for nested_key in ("pid", "user", "account", "persona"):
-            nested = payload.get(nested_key)
-            value = _ea_pid_from_payload(nested)
-            if value:
-                return value
-        for value in payload.values():
-            nested = _ea_pid_from_payload(value)
-            if nested:
-                return nested
-    elif isinstance(payload, list):
-        for item in payload:
-            value = _ea_pid_from_payload(item)
-            if value:
-                return value
-    return None
-
-
-def _ea_game_from_entitlement(item: dict[str, Any], index: int) -> ImportedGame | None:
-    data = _flatten_candidate(item)
-    platform_game_id = str(
-        _first(
-            data,
-            "offerId",
-            "offer_id",
-            "productId",
-            "product_id",
-            "entitlementId",
-            "entitlement_id",
-            "contentId",
-            "content_id",
-            "masterTitleId",
-            "master_title_id",
-            default=f"ea-{index}",
-        )
-    )
-    title = _first(
-        data,
-        "displayName",
-        "display_name",
-        "title",
-        "name",
-        "productTitle",
-        "product_title",
-        "masterTitle",
-        "master_title",
-    )
-    if not title:
-        title = str(platform_game_id)
-    return ImportedGame(
-        platform_game_id=platform_game_id,
-        title=str(title),
-        owned_since=_parse_datetime(_first(data, "grantDate", "grant_date", "createdDate", "created_date", "date_purchased")),
-        description=str(_first(data, "description", "longDescription", "shortDescription", default="") or ""),
-        cover_url=_first(data, "packArtLarge", "packArtSmall", "image", "boxArt", "coverUrl", "cover_url"),
-        release_date=_parse_date(_first(data, "releaseDate", "release_date")),
-        genres=_as_list(_first(data, "genre", "genres")),
-        multiplayer=True,
-        min_players=1,
-        max_players=1,
-        feature_metadata_known=False,
-    )
-
-
-def _ea_games_from_payload(payload: Any) -> list[ImportedGame]:
-    candidates = _collect_game_candidates(payload)
-    if not candidates and isinstance(payload, dict):
-        for key in ("entitlements", "baseGameEntitlements", "basegames", "games", "items", "offers"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                candidates = [item for item in value if isinstance(item, dict)]
-                break
-    games: list[ImportedGame] = []
-    seen: set[str] = set()
-    for index, item in enumerate(candidates):
-        game = _ea_game_from_entitlement(item, index)
-        if game and game.platform_game_id not in seen:
-            seen.add(game.platform_game_id)
             games.append(game)
     return games
 
@@ -1017,63 +1039,219 @@ class XboxProvider:
         return games
 
 
+def _ea_owned_games_container(data: dict[str, Any]) -> dict[str, Any]:
+    me = data.get("me")
+    if not isinstance(me, dict):
+        return {}
+    for key in ("ownedGameProducts", "preloadedOwnedGames", "ownedGames"):
+        value = me.get(key)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def _ea_product_image(product: dict[str, Any]) -> str | None:
+    for path in (
+        ("packArt", "large"),
+        ("packArt", "medium"),
+        ("image", "url"),
+        ("keyArt", "url"),
+        ("heroImage", "url"),
+    ):
+        value: Any = product
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            return value
+    return None
+
+
+def _ea_genres(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        name = item.get("name") if isinstance(item, dict) else item
+        if name:
+            result.append(str(name))
+    return result
+
+
+def _ea_imported_game(item: dict[str, Any]) -> tuple[ImportedGame, str | None] | None:
+    product = item.get("product")
+    if not isinstance(product, dict):
+        product = item
+    title = product.get("name") or product.get("title") or item.get("name")
+    product_id = (
+        item.get("originOfferId")
+        or item.get("offerId")
+        or item.get("entitlementId")
+        or product.get("offerId")
+        or product.get("id")
+    )
+    if not title or not product_id:
+        return None
+    game_slug = product.get("gameSlug") or item.get("gameSlug")
+    product_user = product.get("gameProductUser")
+    if not isinstance(product_user, dict):
+        product_user = {}
+    game = ImportedGame(
+        platform_game_id=str(product_id),
+        title=str(title).strip(),
+        playtime_minutes=0,
+        owned_since=_parse_datetime(
+            product_user.get("initialEntitlementDate")
+            or item.get("initialEntitlementDate")
+            or item.get("entitlementDate")
+        ),
+        description=str(product.get("shortDescription") or product.get("description") or ""),
+        cover_url=_ea_product_image(product),
+        release_date=_parse_date(product.get("releaseDate") or product.get("releaseDateTime")),
+        genres=_ea_genres(product.get("genres")),
+    )
+    return game, str(game_slug) if game_slug else None
+
+
+def _ea_play_times(data: dict[str, Any]) -> dict[str, tuple[int, datetime | None]]:
+    result: dict[str, tuple[int, datetime | None]] = {}
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            slug = value.get("gameSlug")
+            seconds = value.get("totalPlayTimeSeconds")
+            if slug and seconds is not None:
+                try:
+                    minutes = max(0, int(float(seconds) // 60))
+                except (TypeError, ValueError):
+                    minutes = 0
+                result[str(slug)] = (minutes, _parse_datetime(value.get("lastSessionEndDate")))
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(data)
+    return result
+
+
 class EAProvider:
     platform = Platform.ea
+    authoritative_library = True
 
-    def sync_account(self, account: Account) -> list[ImportedGame]:
+    def sync_account(self, account: Account) -> ImportBatch:
         credentials = load_provider_auth_json(Platform.ea, account.id)
-        token = credentials.get("access_token") or credentials.get("bearer") or credentials.get("token")
-        cookie = credentials.get("cookie") or credentials.get("cookies")
-        if not token and not cookie:
-            raise RuntimeError("EA auth needs an access_token or browser cookie")
-        headers: dict[str, str] = {
-            "User-Agent": "EA app/13.0 LANPartyGameFinder",
-            "Accept": "application/json",
-        }
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        if cookie:
-            headers["Cookie"] = str(cookie)
-        pid = credentials.get("pid") or credentials.get("pidId") or credentials.get("user_id") or credentials.get("userId") or credentials.get("nucleus_id") or credentials.get("nucleusId")
-        errors: list[str] = []
-        with httpx.Client(headers=headers, timeout=30) as client:
-            if not pid:
-                for url in (
-                    "https://gateway.ea.com/proxy/identity/pids/me",
-                    "https://gateway.ea.com/proxy/identity/personas/me",
-                    "https://signin.ea.com/p/web2/pid/me",
-                ):
-                    response = client.get(url)
-                    if response.is_success:
-                        pid = _ea_pid_from_payload(response.json())
-                        if pid:
-                            break
-                        errors.append(f"{url}: no pid found")
-                    else:
-                        errors.append(f"{url}: {response.status_code}")
-            if not pid:
-                raise RuntimeError("EA sync needs a pid/user_id or a token that can read pids/me: " + "; ".join(errors[-3:]))
-            machine_hash = str(credentials.get("machine_hash") or credentials.get("machineHash") or "1")
-            urls = [
-                f"https://api1.origin.com/ecommerce2/basegames/{pid}/entitlements?machine_hash={machine_hash}",
-                f"https://api1.origin.com/ecommerce2/basegames/{pid}/entitlements",
-                f"https://gateway.ea.com/proxy/ecommerce2/basegames/{pid}/entitlements?machine_hash={machine_hash}",
-                f"https://gateway.ea.com/proxy/ecommerce2/basegames/{pid}/entitlements",
-            ]
-            custom_url = credentials.get("entitlements_url") or credentials.get("library_url")
-            if custom_url:
-                urls.insert(0, str(custom_url))
-            for url in urls:
-                response = client.get(url)
-                if response.is_success:
-                    payload = response.json()
-                    games = _ea_games_from_payload(payload) or _games_from_payload(payload, "ea")
-                    if games:
-                        return games
-                    errors.append(f"{url}: no games found")
-                else:
-                    errors.append(f"{url}: {response.status_code}")
-        raise RuntimeError("EA sync did not return a library: " + "; ".join(errors[-4:]))
+        token = str(credentials.get("access_token") or "").strip()
+        if not token:
+            raise RuntimeError("EA ist nicht verbunden. Bitte den Account unter Accounts & Logins neu verbinden.")
+
+        games_by_id: dict[str, ImportedGame] = {}
+        slugs_by_id: dict[str, str] = {}
+        warnings: list[str] = []
+        offset = "0"
+        seen_offsets: set[str] = set()
+        page_size = 500
+        received_items = 0
+        declared_total: int | None = None
+        unresolved_items = 0
+        pagination_complete = True
+
+        with httpx.Client(headers=ea_request_headers(token), timeout=45) as client:
+            while True:
+                if offset in seen_offsets:
+                    warnings.append(
+                        "EA wiederholte denselben Bibliotheks-Cursor; die bereits gelesenen Spiele wurden übernommen, "
+                        "bestehende EA-Besitzstände aber nicht gelöscht."
+                    )
+                    pagination_complete = False
+                    break
+                seen_offsets.add(offset)
+                try:
+                    response = client.get(ea_owned_games_url(offset=offset, limit=page_size))
+                    data = _ea_graphql_data(response, "Bibliotheksabfrage")
+                except (httpx.HTTPError, RuntimeError, ValueError) as exc:
+                    if not games_by_id:
+                        raise
+                    warnings.append(
+                        f"Eine EA-Bibliotheksseite konnte nicht geladen werden: {exc}. "
+                        "Die bereits gelesenen Spiele wurden übernommen; bestehende EA-Besitzstände wurden nicht gelöscht."
+                    )
+                    pagination_complete = False
+                    break
+                container = _ea_owned_games_container(data)
+                items = container.get("items")
+                if not isinstance(items, list):
+                    if not games_by_id:
+                        raise RuntimeError(
+                            "EA hat keine verwertbare Spieleliste zurückgegeben; vorhandene Daten bleiben erhalten."
+                        )
+                    warnings.append(
+                        "Eine EA-Bibliotheksseite enthielt keine Spieleliste. Die bereits gelesenen Spiele wurden "
+                        "übernommen; bestehende EA-Besitzstände wurden nicht gelöscht."
+                    )
+                    pagination_complete = False
+                    break
+                received_items += len(items)
+                try:
+                    declared_total = int(container.get("totalCount"))
+                except (TypeError, ValueError):
+                    pass
+                for item in items:
+                    parsed = _ea_imported_game(item) if isinstance(item, dict) else None
+                    if not parsed:
+                        unresolved_items += 1
+                        continue
+                    game, slug = parsed
+                    games_by_id[game.platform_game_id] = game
+                    if slug:
+                        slugs_by_id[game.platform_game_id] = slug
+
+                next_offset = container.get("next")
+                if isinstance(next_offset, dict):
+                    next_offset = next_offset.get("offset") or next_offset.get("cursor")
+                if not next_offset:
+                    break
+                offset = str(next_offset)
+
+            if declared_total is not None and received_items < declared_total:
+                warnings.append(
+                    f"EA meldete {declared_total} Einträge, lieferte für die gefilterte PC-Bibliothek aber "
+                    f"{received_items}. Die gelieferten Spiele wurden übernommen; bestehende EA-Besitzstände "
+                    "wurden nicht gelöscht."
+                )
+                pagination_complete = False
+            slug_items = list(dict.fromkeys(slugs_by_id.values()))
+            play_times: dict[str, tuple[int, datetime | None]] = {}
+            for start in range(0, len(slug_items), 50):
+                batch = slug_items[start : start + 50]
+                url = _ea_graphql_url(
+                    "GetGamePlayTimes",
+                    {"gameSlugs": batch},
+                    EA_PLAY_TIMES_QUERY_HASH,
+                )
+                try:
+                    play_times.update(_ea_play_times(_ea_graphql_data(client.get(url), "Spielzeitabfrage")))
+                except (httpx.HTTPError, RuntimeError, ValueError) as exc:
+                    warnings.append(f"EA-Spielzeiten konnten teilweise nicht geladen werden: {exc}")
+                    break
+
+        if not games_by_id and declared_total != 0:
+            raise RuntimeError("EA hat keine Spielebibliothek zurückgegeben; vorhandene Daten bleiben erhalten.")
+        if unresolved_items:
+            warnings.append(
+                f"{unresolved_items} EA-Bibliothekseinträge hatten keinen auflösbaren Titel oder keine Offer-ID; "
+                "bestehende EA-Besitzstände wurden deshalb nicht gelöscht."
+            )
+        for product_id, slug in slugs_by_id.items():
+            timing = play_times.get(slug)
+            if not timing:
+                continue
+            games_by_id[product_id].playtime_minutes = timing[0]
+        return ImportBatch(
+            games=list(games_by_id.values()),
+            warnings=warnings,
+            authoritative_snapshot=pagination_complete and unresolved_items == 0,
+        )
 
 
 def _amazon_credentials(account: Account) -> dict[str, Any]:

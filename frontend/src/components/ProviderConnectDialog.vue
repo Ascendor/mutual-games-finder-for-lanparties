@@ -37,9 +37,6 @@
               :title="item"
             />
           </v-list>
-          <v-alert v-if="target.platform === 'ea'" type="info" variant="tonal">
-            Der einfachste Weg für diese Plattform ist ein Playnite-Backup. Du kannst es im nächsten Schritt direkt auswählen.
-          </v-alert>
         </template>
 
         <template v-else-if="stage === 2">
@@ -251,41 +248,6 @@
             </v-alert>
           </template>
 
-          <template v-else-if="target.platform === 'ea'">
-            <h2 class="text-h6 mb-2">Playnite-Backup importieren</h2>
-            <p class="text-body-2 mb-4">
-              Erstelle in Playnite ein Backup und wähle die ZIP-Datei hier aus. Die enthaltenen Spiele werden {{ target.participant.nickname }} zugeordnet.
-            </p>
-            <v-file-input
-              v-model="playniteFile"
-              label="Playnite-Backup auswählen"
-              accept="application/zip,.zip,application/json,.json"
-              prepend-icon="mdi-file-upload-outline"
-              :disabled="busy"
-            />
-            <v-btn
-              color="primary"
-              prepend-icon="mdi-import"
-              :disabled="!selectedPlayniteFile"
-              :loading="busy"
-              @click="importPlaynite"
-            >
-              Backup importieren
-            </v-btn>
-            <div v-if="playniteProgress" class="mt-4">
-              <v-progress-linear
-                :model-value="playniteProgress.percent"
-                :indeterminate="playniteProgress.indeterminate"
-                :color="playniteProgress.phase === 'failed' ? 'error' : 'primary'"
-                height="8"
-              />
-              <div class="text-caption text-medium-emphasis mt-1">
-                {{ playniteProgress.message }}
-              </div>
-            </div>
-
-          </template>
-
           <template v-else-if="target.platform === 'amazon'">
             <h2 class="text-h6 mb-2">Bei Amazon anmelden</h2>
             <p class="text-body-2 mb-4">
@@ -331,20 +293,35 @@
               class="browser-select mb-4"
             />
             <ol class="session-steps mb-4">
-              <li v-for="step in browserGuide.steps" :key="step">{{ step }}</li>
+              <li v-for="step in sessionGuideSteps" :key="step">{{ step }}</li>
             </ol>
             <v-alert type="info" variant="tonal" density="compact" class="mb-4">
               {{ browserRequestHint }}
             </v-alert>
-            <v-btn
-              :href="loginStart?.login_url"
-              target="_blank"
-              color="primary"
-              prepend-icon="mdi-open-in-new"
-              class="mb-4"
-            >
-              {{ platformTitle(target.platform) }} öffnen
-            </v-btn>
+            <v-alert v-if="target.platform === 'ea'" type="success" variant="tonal" density="compact" class="mb-4">
+              Das ist nur einmal nötig. Die App prüft den enthaltenen EA-Token und verwirft die übrige cURL-Anfrage
+              einschließlich ihrer Cookies.
+            </v-alert>
+            <div class="d-flex flex-wrap ga-2 mb-4">
+              <v-btn
+                :href="loginStart?.login_url"
+                target="_blank"
+                color="primary"
+                prepend-icon="mdi-open-in-new"
+              >
+                {{ target.platform === 'ea' ? 'EA-Login öffnen' : `${platformTitle(target.platform)} öffnen` }}
+              </v-btn>
+              <v-btn
+                v-if="target.platform === 'ea'"
+                :href="loginStart?.capture_url"
+                target="_blank"
+                color="primary"
+                variant="tonal"
+                prepend-icon="mdi-gamepad-variant-outline"
+              >
+                Danach EA-Bibliothek öffnen
+              </v-btn>
+            </div>
             <v-textarea
               v-model="code"
               label="Komplette cURL-Anfrage einfügen"
@@ -362,22 +339,14 @@
 
         <template v-else-if="stage === 3">
           <div class="sync-state">
-            <v-progress-linear
-              v-if="busy && playniteProgress"
-              class="sync-progress"
-              :model-value="playniteProgress.percent"
-              :indeterminate="playniteProgress.indeterminate"
-              color="primary"
-              height="8"
-            />
-            <v-progress-circular v-else-if="busy" indeterminate color="primary" size="48" />
+            <v-progress-circular v-if="busy" indeterminate color="primary" size="48" />
             <v-icon v-else-if="error" color="error" size="48">mdi-alert-circle-outline</v-icon>
             <v-icon v-else color="primary" size="48">mdi-cloud-download-outline</v-icon>
             <h2 class="text-h6 mt-4">
-              {{ playniteProgress ? 'Playnite-Bibliothek wird verarbeitet' : 'Spiele werden geladen' }}
+              Spiele werden geladen
             </h2>
             <p class="text-body-2 text-medium-emphasis">
-              {{ playniteProgress?.message || 'Die Verbindung steht. Jetzt wird die Bibliothek einmal vollständig synchronisiert.' }}
+              Die Verbindung steht. Jetzt wird die Bibliothek einmal vollständig synchronisiert.
             </p>
           </div>
         </template>
@@ -401,7 +370,7 @@
           Weiter
         </v-btn>
         <v-btn
-          v-else-if="stage === 2 && target.platform !== 'ea' && target.platform !== 'xbox'"
+          v-else-if="stage === 2 && target.platform !== 'xbox'"
           color="primary"
           append-icon="mdi-arrow-right"
           :disabled="!canSubmit"
@@ -424,7 +393,7 @@
           v-else-if="stage === 3 && error && !busy"
           color="primary"
           prepend-icon="mdi-refresh"
-          @click="target.platform === 'ea' ? importPlaynite() : syncLibrary()"
+          @click="syncLibrary"
         >
           Erneut versuchen
         </v-btn>
@@ -439,7 +408,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
-import { stateFromRun, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
 import type { Account, Participant, Platform, ProviderLoginStart, SteamProfile } from '../types'
 
 interface ProviderTarget {
@@ -527,8 +495,6 @@ const steamLoginPending = ref(false)
 const steamLoginState = ref('')
 const needs2fa = ref(false)
 const resultMessage = ref('')
-const playniteFile = ref<File | File[] | null>(null)
-const playniteProgress = ref<PlayniteProgressState>()
 const ubisoft = reactive({ email: '', password: '', twoFactorCode: '' })
 const xboxChecking = ref(false)
 const codeCopied = ref(false)
@@ -539,6 +505,18 @@ let steamPopupTimer: ReturnType<typeof setInterval> | undefined
 
 const progress = computed(() => stage.value * 25)
 const browserGuide = computed(() => browserGuides[browserFamily.value])
+const sessionGuideSteps = computed(() => {
+  if (props.target?.platform !== 'ea') return browserGuide.value.steps
+  return [
+    'Öffne den EA-Login und melde dich vollständig an.',
+    'Kehre zu diesem Dialog zurück und öffne danach über den zweiten Button die EA-Bibliothek.',
+    browserGuide.value.steps[1],
+    'Lade die EA-Bibliotheksseite neu, damit die Bibliotheksanfrage in der Liste erscheint.',
+    'Filtere im Netzwerk-Tab nach „GetUserOwnedGameProducts“ oder nach „juno.ea.com/graphql“.',
+    browserGuide.value.steps[3],
+    'Füge die komplette kopierte Anfrage unten ein.'
+  ]
+})
 const browserRequestHint = computed(() => {
   if (props.target?.platform === 'battle_net') {
     return 'Am einfachsten ist die Anfrage „games-and-subs“ mit Status 200.'
@@ -549,11 +527,10 @@ const browserRequestHint = computed(() => {
   if (props.target?.platform === 'meta') {
     return 'Kopiere eine erfolgreiche Anfrage an „secure.oculus.com“ aus der neu geladenen Profilseite.'
   }
+  if (props.target?.platform === 'ea') {
+    return 'Kopiere die erfolgreiche Anfrage „GetUserOwnedGameProducts“ an „juno.ea.com/graphql“ als cURL.'
+  }
   return 'Wähle eine erfolgreiche Anfrage an den gerade geöffneten Anbieter.'
-})
-const selectedPlayniteFile = computed(() => {
-  const value = playniteFile.value
-  return Array.isArray(value) ? value[0] : value
 })
 const canSubmit = computed(() => {
   const platform = props.target?.platform
@@ -563,7 +540,7 @@ const canSubmit = computed(() => {
       ? Boolean(ubisoft.twoFactorCode.trim())
       : Boolean(ubisoft.email.trim() && ubisoft.password)
   }
-  if (platform === 'ea' || platform === 'xbox') return false
+  if (platform === 'xbox') return false
   return Boolean(code.value.trim())
 })
 const steamActionLabel = computed(() => {
@@ -572,7 +549,7 @@ const steamActionLabel = computed(() => {
   return 'Verbinden und Spiele laden'
 })
 const isBrowserSessionPlatform = computed(() =>
-  ['battle_net', 'humble', 'meta'].includes(props.target?.platform || '')
+  ['battle_net', 'humble', 'meta', 'ea'].includes(props.target?.platform || '')
 )
 const introTitle = computed(() => `${platformTitle(props.target?.platform || '')} verbinden`)
 const introText = computed(() => {
@@ -582,6 +559,7 @@ const introText = computed(() => {
   if (platform === 'gog') return 'Die Anmeldung findet auf der offiziellen GOG-Seite statt. Danach übernimmt die App den Bestätigungscode.'
   if (platform === 'ubisoft') return 'Du meldest dich direkt mit deinem Ubisoft-Konto an. Falls 2FA aktiv ist, führt der Assistent automatisch zum nächsten Schritt.'
   if (platform === 'xbox') return 'Du bestätigst die Verbindung einmalig bei Microsoft. Danach lädt die App automatisch deine auf dem PC gespielten Xbox-Titel.'
+  if (platform === 'ea') return 'Du meldest dich einmalig auf der offiziellen EA-Seite an. Der Assistent übernimmt danach die Bibliotheksberechtigung aus einer Browser-Anfrage und lädt deine PC-Spiele.'
   if (platform === 'amazon') return 'Du meldest dich einmalig bei Amazon an. Die App speichert eine erneuerbare Geräteanmeldung und lädt deine Amazon-Games-Bibliothek.'
   if (platform === 'battle_net') return 'Die App übernimmt einmalig deine angemeldete Battle.net-Browsersitzung und kann damit deine PC-Spiele laden.'
   if (platform === 'humble') return 'Die App übernimmt einmalig deine angemeldete Humble-Browsersitzung und lädt daraus deine Windows-Spiele.'
@@ -595,7 +573,7 @@ const introSteps = computed(() => {
   if (platform === 'ubisoft') return ['E-Mail und Passwort eingeben', 'Falls nötig 2FA bestätigen', 'Bibliothek automatisch laden']
   if (platform === 'xbox') return ['Einmaligen Code anzeigen', 'Bei Microsoft bestätigen', 'Bibliothek automatisch laden']
   if (platform === 'amazon') return ['Amazon-Anmeldung öffnen', 'Adresse zurückgeben', 'Bibliothek automatisch laden']
-  if (['battle_net', 'humble', 'meta'].includes(platform || '')) return ['Anbieterseite öffnen', 'Browser-Anfrage kopieren', 'Bibliothek automatisch laden']
+  if (['battle_net', 'humble', 'meta', 'ea'].includes(platform || '')) return ['Anbieterseite öffnen und anmelden', 'Bibliotheksanfrage kopieren', 'Bibliothek automatisch laden']
   return ['Playnite-Backup auswählen', 'Backup importieren', 'Spiele prüfen']
 })
 
@@ -619,8 +597,6 @@ watch(
     steamLoginState.value = ''
     needs2fa.value = false
     resultMessage.value = ''
-    playniteFile.value = null
-    playniteProgress.value = undefined
     xboxChecking.value = false
     codeCopied.value = false
     browserFamily.value = detectBrowser()
@@ -643,10 +619,6 @@ async function prepare() {
   }
   busy.value = true
   try {
-    if (props.target.platform === 'ea') {
-      stage.value = 2
-      return
-    }
     account.value = await ensureAccount()
     loginStart.value = await api.startProviderLogin(account.value.id)
     stage.value = 2
@@ -728,53 +700,6 @@ async function syncLibrary() {
     emit('finished')
   } catch (err) {
     error.value = readableError(err)
-  } finally {
-    busy.value = false
-  }
-}
-
-async function importPlaynite() {
-  if (!props.target || !selectedPlayniteFile.value) return
-  busy.value = true
-  error.value = ''
-  playniteProgress.value = {
-    phase: 'upload',
-    percent: 0,
-    indeterminate: false,
-    message: 'Playnite-Backup wird hochgeladen: 0 %'
-  }
-  try {
-    const job = await api.importPlaynite(
-      props.target.participant.id,
-      selectedPlayniteFile.value,
-      (percent) => {
-        playniteProgress.value = {
-          phase: 'upload',
-          percent,
-          indeterminate: false,
-          message: percent < 100
-            ? `Playnite-Backup wird hochgeladen: ${percent} %`
-            : 'Upload abgeschlossen. Der Server bereitet den Import vor.'
-        }
-      }
-    )
-    stage.value = 3
-    playniteProgress.value = stateFromRun(job)
-    const result = await waitForPlayniteImport(job.id, (run) => {
-      playniteProgress.value = stateFromRun(run)
-    })
-    if (!result.success) throw new Error(result.message)
-    resultMessage.value = result.message
-    stage.value = 4
-    emit('finished')
-  } catch (err) {
-    error.value = readableError(err)
-    playniteProgress.value = {
-      phase: 'failed',
-      percent: 100,
-      indeterminate: false,
-      message: error.value
-    }
   } finally {
     busy.value = false
   }

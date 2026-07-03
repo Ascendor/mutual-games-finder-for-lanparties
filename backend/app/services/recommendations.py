@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from statistics import median
 from typing import Literal
@@ -10,7 +10,6 @@ from app.models import Game, Ownership, Participant, Platform
 from app.schemas import RecommendationRead
 
 RecommendationMode = Literal["common", "coop", "lan", "popular", "group_size", "new"]
-PLAYNITE_ONLY_PLATFORMS = {Platform.ea}
 
 
 def _score(game: Game, owner_count: int, participant_count: int, total: int, median_playtime: float, mode: RecommendationMode, group_size: int | None) -> float:
@@ -185,12 +184,7 @@ def _library_is_unknown_for_game(
     participant: Participant,
     game_platforms: set[Platform],
 ) -> bool:
-    library_accounts = [
-        account
-        for account in participant.accounts
-        if account.platform not in PLAYNITE_ONLY_PLATFORMS
-        or account.last_successful_sync is not None
-    ]
+    library_accounts = list(participant.accounts)
     if not library_accounts:
         return True
     relevant_accounts = [

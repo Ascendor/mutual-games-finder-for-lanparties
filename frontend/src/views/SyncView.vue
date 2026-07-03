@@ -176,7 +176,7 @@ function meaningfulAccountName(platform: string, displayName: string) {
 }
 
 function canSyncAccount(platform: string) {
-  return ['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'amazon', 'battle_net', 'humble', 'meta'].includes(platform)
+  return ['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'ea', 'amazon', 'battle_net', 'humble', 'meta'].includes(platform)
 }
 
 async function refreshRuns() {

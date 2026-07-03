@@ -23,7 +23,7 @@
         einfachste Importweg.
       </p>
       <p class="mb-2">
-        Besonders für EA App, Rockstar Games und weitere unten nicht aufgeführte Plattformen ist Playnite der
+        Besonders für Rockstar Games und weitere unten nicht aufgeführte Plattformen ist Playnite der
         vorgesehene Importweg.
       </p>
       <p class="mb-2">
@@ -181,6 +181,7 @@ const loginPlatforms: Platform[] = [
   'gog',
   'ubisoft',
   'xbox',
+  'ea',
   'amazon',
   'battle_net',
   'humble',

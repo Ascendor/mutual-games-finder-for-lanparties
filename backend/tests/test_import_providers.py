@@ -1,4 +1,4 @@
-﻿import json
+import json
 import time
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
@@ -392,28 +392,153 @@ def test_xbox_provider_parses_title_history(monkeypatch, tmp_path):
     assert games[0].playtime_minutes == 120
 
 
-def test_ea_provider_parses_configured_library_endpoint(monkeypatch, tmp_path):
+def test_ea_provider_reads_graphql_library_and_playtime(monkeypatch, tmp_path):
     monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
     import_providers.save_provider_auth_json(
         Platform.ea,
         10,
-        {"access_token": "token", "library_url": "https://ea.example/library"},
+        {"access_token": "token"},
     )
+
     class EAClient(FakeClient):
         def get(self, url):
-            if url.endswith("/pids/me"):
-                return FakeResponse({"pid": {"pidId": "123"}})
-            if url == "https://ea.example/library":
-                return FakeResponse({"games": [{"productId": "ea-1", "title": "Mass Effect"}]})
+            query = parse_qs(urlparse(url).query)
+            if query.get("operationName") == ["getPreloadedOwnedGames"]:
+                return FakeResponse(
+                    {
+                        "data": {
+                            "me": {
+                                "ownedGameProducts": {
+                                    "next": None,
+                                    "totalCount": 1,
+                                    "items": [
+                                        {
+                                            "originOfferId": "ea-1",
+                                            "product": {
+                                                "name": "Mass Effect",
+                                                "gameSlug": "mass-effect",
+                                                "gameProductUser": {
+                                                    "initialEntitlementDate": "2024-01-02T12:00:00Z",
+                                                },
+                                            },
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                )
+            if query.get("operationName") == ["GetGamePlayTimes"]:
+                return FakeResponse(
+                    {
+                        "data": {
+                            "me": {
+                                "recentGames": {
+                                    "items": [
+                                        {
+                                            "gameSlug": "mass-effect",
+                                            "totalPlayTimeSeconds": 7200,
+                                            "lastSessionEndDate": "2026-01-01T12:00:00Z",
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                )
             return FakeResponse({}, ok=False)
 
     monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: EAClient(**kwargs))
 
-    games = EAProvider().sync_account(Account(id=10, participant_id=1, platform=Platform.ea, account_id="ea"))
+    result = EAProvider().sync_account(Account(id=10, participant_id=1, platform=Platform.ea, account_id="ea"))
 
-    assert len(games) == 1
-    assert games[0].title == "Mass Effect"
-    assert games[0].platform_game_id == "ea-1"
+    assert isinstance(result, ImportBatch)
+    assert len(result.games) == 1
+    assert result.games[0].title == "Mass Effect"
+    assert result.games[0].platform_game_id == "ea-1"
+    assert result.games[0].playtime_minutes == 120
+
+
+def test_ea_provider_accepts_filtered_count_without_next_cursor(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(Platform.ea, 10, {"access_token": "token"})
+
+    class PartialEAClient(FakeClient):
+        def get(self, url):
+            return FakeResponse(
+                {
+                    "data": {
+                        "me": {
+                            "ownedGameProducts": {
+                                "items": [
+                                    {
+                                        "originOfferId": "ea-1",
+                                        "product": {"name": "Mass Effect", "gameSlug": "mass-effect"},
+                                    }
+                                ],
+                                "next": None,
+                                "totalCount": 2,
+                            }
+                        }
+                    }
+                }
+            )
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: PartialEAClient(**kwargs))
+
+    result = EAProvider().sync_account(
+        Account(id=10, participant_id=1, platform=Platform.ea, account_id="ea")
+    )
+
+    assert len(result.games) == 1
+    assert result.authoritative_snapshot is False
+    assert any("meldete 2 Einträge" in warning for warning in result.warnings)
+
+
+def test_ea_provider_keeps_valid_games_when_later_page_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(Platform.ea, 10, {"access_token": "token"})
+
+    class FailingSecondPageEAClient(FakeClient):
+        def get(self, url):
+            query = parse_qs(urlparse(url).query)
+            if query.get("operationName") == ["GetGamePlayTimes"]:
+                return FakeResponse({"data": {"me": {"recentGames": {"items": []}}}})
+            variables = json.loads(query["variables"][0])
+            if variables["next"] == "0":
+                return FakeResponse(
+                    {
+                        "data": {
+                            "me": {
+                                "ownedGameProducts": {
+                                    "items": [
+                                        {
+                                            "originOfferId": "ea-1",
+                                            "product": {"name": "Mass Effect", "gameSlug": "mass-effect"},
+                                        }
+                                    ],
+                                    "next": "page-2",
+                                    "totalCount": 2,
+                                }
+                            }
+                        }
+                    }
+                )
+            return FakeResponse({}, ok=False)
+
+    monkeypatch.setattr(
+        import_providers.httpx,
+        "Client",
+        lambda **kwargs: FailingSecondPageEAClient(**kwargs),
+    )
+
+    result = EAProvider().sync_account(
+        Account(id=10, participant_id=1, platform=Platform.ea, account_id="ea")
+    )
+
+    assert [game.title for game in result.games] == ["Mass Effect"]
+    assert result.authoritative_snapshot is False
+    assert any("Bibliotheksseite" in warning for warning in result.warnings)
 
 
 
@@ -641,13 +766,44 @@ def test_amazon_provider_reads_entitlements(monkeypatch, tmp_path):
     assert games[0].platform_game_id == "amazon-game-1"
 
 
-def test_provider_auth_rejects_direct_ea_login():
+def test_provider_auth_accepts_ea_curl_and_stores_only_token(monkeypatch, tmp_path):
+    from app.services import provider_auth
+
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    monkeypatch.setattr(
+        provider_auth,
+        "validate_ea_access_token",
+        lambda token: {"me": {"id": "ea-user-1", "displayName": "Commander Shepard"}},
+    )
+    account = Account(id=99, participant_id=1, platform=Platform.ea, account_id="local-ea")
+    curl = """curl 'https://service-aggregation-layer.juno.ea.com/graphql?operationName=getPreloadedOwnedGames' \
+      -H 'accept: application/json' \
+      -H 'authorization: Bearer ea-token.with.dots-1234567890' \
+      -H 'cookie: session=must-not-be-stored'"""
+
+    result = provider_auth.complete(account, curl)
+    stored = import_providers.load_provider_auth_json(Platform.ea, 99)
+
+    assert result["authenticated"] is True
+    assert stored["access_token"] == "ea-token.with.dots-1234567890"
+    assert "cookie" not in stored
+    assert "curl" not in stored
+    assert provider_auth._extract_ea_bearer(
+        'curl.exe ^"https://service-aggregation-layer.juno.ea.com/graphql^" '
+        '^-H ^"Authorization: Bearer edge-token.with.dots-1234567890^"'
+    ) == "edge-token.with.dots-1234567890"
+
+
+def test_provider_auth_rejects_wrong_ea_curl():
     from app.services import provider_auth
 
     account = Account(id=99, participant_id=1, platform=Platform.ea, account_id="local-ea")
 
-    with pytest.raises(ValueError, match="Playnite"):
-        provider_auth.complete(account, '{"access_token":"not-supported"}')
+    with pytest.raises(ValueError, match="juno.ea.com/graphql"):
+        provider_auth.complete(
+            account,
+            "curl 'https://www.ea.com/' -H 'Authorization: Bearer ea-token.with.dots-1234567890'",
+        )
 
 
 def test_ubisoft_complete_accepts_account_id_alias(monkeypatch, tmp_path):
