@@ -10,6 +10,7 @@ from app.models import Game, Ownership, Participant, Platform
 from app.schemas import RecommendationRead
 
 RecommendationMode = Literal["common", "coop", "lan", "popular", "group_size", "new"]
+OPTIONAL_UNSYNCED_ACCOUNT_PLATFORMS = {Platform.ea}
 
 
 def _score(game: Game, owner_count: int, participant_count: int, total: int, median_playtime: float, mode: RecommendationMode, group_size: int | None) -> float:
@@ -184,7 +185,12 @@ def _library_is_unknown_for_game(
     participant: Participant,
     game_platforms: set[Platform],
 ) -> bool:
-    library_accounts = list(participant.accounts)
+    library_accounts = [
+        account
+        for account in participant.accounts
+        if account.platform not in OPTIONAL_UNSYNCED_ACCOUNT_PLATFORMS
+        or account.last_successful_sync is not None
+    ]
     if not library_accounts:
         return True
     relevant_accounts = [
