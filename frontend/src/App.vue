@@ -27,7 +27,7 @@
         </v-list-group>
       </v-list>
     </v-navigation-drawer>
-    <v-main>
+    <v-main class="app-main">
       <v-progress-linear
         v-if="pendingRequests > 0"
         indeterminate
@@ -36,7 +36,25 @@
         :class="{ 'global-loader--full': route.path === '/player' }"
         aria-label="Daten werden geladen"
       />
-      <router-view />
+      <div class="app-content">
+        <router-view />
+      </div>
+      <footer class="app-footer">
+        <router-link to="/legal">Datenschutz &amp; Hinweise</router-link>
+        <span aria-hidden="true">·</span>
+        <span>Metadaten:</span>
+        <a href="https://www.igdb.com/" target="_blank" rel="noopener noreferrer">IGDB</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://rawg.io/" target="_blank" rel="noopener noreferrer">RAWG</a>
+        <span aria-hidden="true">·</span>
+        <a
+          href="https://codeberg.org/Ascendor/ref_ju_geeks-play-together"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Quellcode
+        </a>
+      </footer>
     </v-main>
   </v-app>
 </template>
@@ -88,5 +106,35 @@ function lockAdministration() {
 
 .global-loader--full {
   width: 100%;
+}
+
+.app-main {
+  min-height: 100vh;
+}
+
+.app-content {
+  min-height: calc(100vh - 42px);
+}
+
+.app-footer {
+  min-height: 42px;
+  padding: 8px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: rgba(var(--v-theme-on-background), 0.68);
+  font-size: 0.78rem;
+}
+
+.app-footer a {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+}
+
+.app-footer a:hover,
+.app-footer a:focus-visible {
+  text-decoration: underline;
 }
 </style>

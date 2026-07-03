@@ -1,27 +1,30 @@
 [project]
 name = "lan-party-game-finder-backend"
 version = "0.1.0"
+description = "Local game-library matcher for LAN parties"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi>=0.115.0",
-  "uvicorn[standard]>=0.30.0",
-  "sqlalchemy>=2.0.30",
-  "alembic>=1.13.0",
-  "pydantic>=2.7.0",
-  "pydantic-settings>=2.3.0",
-  "httpx>=0.27.0",
-  "rapidfuzz>=3.9.0",
-  "python-dateutil>=2.9.0",
-  "python-multipart>=0.0.9",
-  "psycopg[binary]>=3.2.0",
-  "legendary-gl>=0.20.0",
+  "fastapi==0.138.2",
+  "uvicorn[standard]==0.49.0",
+  "sqlalchemy==2.0.51",
+  "alembic==1.18.5",
+  "pydantic==2.13.4",
+  "pydantic-settings==2.14.2",
+  "httpx==0.28.1",
+  "rapidfuzz==3.14.5",
+  "python-dateutil==2.9.0.post0",
+  "python-multipart==0.0.32",
+  "psycopg[binary]==3.3.4",
+  "legendary-gl==0.20.34",
+  "PyYAML==6.0.3",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.2.0",
-  "pytest-asyncio>=0.23.0",
-  "freezegun>=1.5.0",
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "freezegun==1.5.5",
 ]
 
 [tool.pytest.ini_options]

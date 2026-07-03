@@ -109,6 +109,8 @@ Die Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen d
 
 ## Entwicklung ohne Docker
 
+Das Frontend benoetigt ohne Docker Node.js 20.19 oder neuer.
+
 Backend:
 
 ```bash
@@ -116,7 +118,7 @@ cd backend
 set DATABASE_URL=postgresql+psycopg://lanparty:lanparty@localhost:5432/lanparty
 python -m venv .venv
 .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -r requirements.lock
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -150,3 +152,21 @@ Basic Auth, Backups, Updates und Rollback steht in
 [`docs/production-deployment.md`](docs/production-deployment.md). Als Vorlage
 fuer Secrets dient `.env.production.example`; echte Produktionswerte gehoeren
 in die ignorierte Datei `.env.production`.
+
+## Lizenz, Datenschutz und Drittanbieter
+
+Der eigene Quellcode steht unter der [MIT-Lizenz](LICENSE). Abhaengigkeiten,
+Playnite-Referenzen, Legendary und externe Datenquellen sind in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) dokumentiert. Die
+vollstaendigen Lizenztexte und versionierten Paketinventare liegen unter
+[`LICENSES/`](LICENSES/); dort befinden sich ausserdem CycloneDX-SBOMs fuer
+Backend und Frontend.
+
+Die Anwendung zeigt IGDB und RAWG als Metadatenquellen dauerhaft im Footer an.
+Unter `/legal` sind die tatsaechlich verarbeiteten Daten, externe Uebertragungen
+und inoffizielle Provider-Anbindungen beschrieben. Wer eine eigene Instanz
+oeffentlich betreibt, muss dort eigene Kontaktdaten und gegebenenfalls weitere
+Pflichtangaben ergaenzen.
+
+Die Release-Checkliste fuer eine spaetere Quellcode- oder Image-Veroeffentlichung
+steht in [`docs/open-source-compliance.md`](docs/open-source-compliance.md).

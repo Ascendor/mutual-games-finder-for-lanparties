@@ -2,6 +2,8 @@
   "name": "lan-party-game-finder-frontend",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "repository": "https://codeberg.org/Ascendor/ref_ju_geeks-play-together",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -9,16 +11,16 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@mdi/js": "^7.4.47",
-    "pinia": "^2.1.7",
-    "vue": "^3.4.29",
-    "vue-router": "^4.3.3",
-    "vuetify": "^3.6.10"
+    "@mdi/js": "7.4.47",
+    "pinia": "2.3.1",
+    "vue": "3.5.39",
+    "vue-router": "4.6.4",
+    "vuetify": "3.12.8"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.5",
-    "typescript": "^5.4.5",
-    "vite": "^5.3.1",
-    "vue-tsc": "^2.0.21"
+    "@vitejs/plugin-vue": "6.0.7",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vue-tsc": "2.2.12"
   }
 }

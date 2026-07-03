@@ -6,6 +6,7 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/player', component: () => import('./views/PlayerGateView.vue') },
+    { path: '/legal', component: () => import('./views/LegalView.vue') },
     { path: '/', component: () => import('./views/HomeView.vue') },
     { path: '/dashboard', component: () => import('./views/DashboardView.vue') },
     { path: '/participants', redirect: '/admin/participants' },
@@ -41,7 +42,7 @@ export const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (to.path !== '/player' && !currentParticipantId.value) {
+  if (!['/player', '/legal'].includes(to.path) && !currentParticipantId.value) {
     return { path: '/player', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAdmin && !adminUnlocked.value) {

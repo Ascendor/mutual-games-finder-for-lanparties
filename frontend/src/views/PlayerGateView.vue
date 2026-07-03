@@ -124,7 +124,7 @@ async function continueAsParticipant() {
 
 <style scoped>
 .player-gate {
-  min-height: 100vh;
+  min-height: calc(100vh - 42px);
   display: grid;
   place-items: center;
   padding: 24px;
