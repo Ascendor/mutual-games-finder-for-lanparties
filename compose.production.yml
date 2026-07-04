@@ -46,6 +46,14 @@ services:
       TMPDIR: /playnite-uploads
       PLAYNITE_UPLOAD_DIR: /playnite-uploads
       PLAYNITE_UPLOAD_MAX_BYTES: ${PLAYNITE_UPLOAD_MAX_BYTES:-4294967296}
+      ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-180}
+      PRIVACY_CONTROLLER_NAME: ${PRIVACY_CONTROLLER_NAME:-Betreiber:in dieser Installation}
+      PRIVACY_CONTROLLER_CONTACT: ${PRIVACY_CONTROLLER_CONTACT:-Kontakt über den internen LAN-Party-Gruppenkanal}
+      PRIVACY_HOSTING_PROVIDER: ${PRIVACY_HOSTING_PROVIDER:-VServer-Hostinganbieter der Betreiberperson}
+      PRIVACY_ACCESS_LOG_RETENTION_DAYS: ${PRIVACY_ACCESS_LOG_RETENTION_DAYS:-7}
+      PRIVACY_BACKUP_RETENTION_DAYS: ${PRIVACY_BACKUP_RETENTION_DAYS:-14}
+      PRIVACY_SUPERVISORY_AUTHORITY: ${PRIVACY_SUPERVISORY_AUTHORITY:-Zuständige Landesdatenschutzaufsichtsbehörde}
+      PRIVACY_SUPERVISORY_AUTHORITY_URL: ${PRIVACY_SUPERVISORY_AUTHORITY_URL:-https://www.datenschutzkonferenz-online.de/datenschutzaufsichtsbehoerden.html}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-18000}:8000"
     volumes:

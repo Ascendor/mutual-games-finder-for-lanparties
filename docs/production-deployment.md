@@ -48,6 +48,7 @@ beweglichen Branches verwendet werden.
 cd /opt/refjuplay-together
 cp .env.production.example .env.production
 chmod 600 .env.production
+joe .env.production
 openssl rand -hex 32
 ```
 
@@ -65,10 +66,21 @@ IGDB_CLIENT_SECRET=
 RAWG_API_KEY=
 XBOX_CLIENT_ID=
 PLAYNITE_UPLOAD_MAX_BYTES=4294967296
+PRIVACY_CONTROLLER_NAME=<name-der-verantwortlichen-person>
+PRIVACY_CONTROLLER_CONTACT=<kontaktmoeglichkeit>
+PRIVACY_HOSTING_PROVIDER=<name-des-vserver-hosters>
+PRIVACY_SUPERVISORY_AUTHORITY=<zustaendige-landesbehoerde>
+PRIVACY_SUPERVISORY_AUTHORITY_URL=<https-url-der-landesbehoerde>
+ANALYTICS_RETENTION_DAYS=180
+PRIVACY_ACCESS_LOG_RETENTION_DAYS=7
+PRIVACY_BACKUP_RETENTION_DAYS=14
 ```
 
 Die Datei darf nicht committet oder ausserhalb eines geschuetzten Backups
 kopiert werden.
+
+Die Datenschutzangaben werden auf der Seite `Datenschutz & Hinweise`
+angezeigt. Sie muessen fuer die konkrete Installation ausgefuellt werden.
 
 ## 4. Produktionskonfiguration pruefen und starten
 
@@ -109,7 +121,10 @@ Die Vorlage installieren:
 ```bash
 sudo cp deploy/apache/refjuplay-together.conf.example \
   /etc/apache2/sites-available/refjuplay-together.conf
-sudo editor /etc/apache2/sites-available/refjuplay-together.conf
+sudo joe /etc/apache2/sites-available/refjuplay-together.conf
+sudo install -o root -g root -m 0644 \
+  deploy/logrotate/refjuplay-together \
+  /etc/logrotate.d/refjuplay-together
 ```
 
 In der Kopie muessen der echte `ServerName` sowie die bereits vorhandenen

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { adminUnlocked } from './adminAccess'
 import { currentParticipantId } from './playerIdentity'
+import { trackUsage } from './usageAnalytics'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +18,11 @@ export const router = createRouter({
     { path: '/find-players', component: () => import('./views/FindPlayersView.vue') },
     { path: '/sync', redirect: '/admin/sync' },
     { path: '/admin', component: () => import('./views/AdminView.vue') },
+    {
+      path: '/admin/analytics',
+      component: () => import('./views/AnalyticsView.vue'),
+      meta: { requiresAdmin: true }
+    },
     {
       path: '/admin/logins',
       component: () => import('./views/ProviderLoginsView.vue'),
@@ -47,5 +53,11 @@ router.beforeEach((to) => {
   }
   if (to.meta.requiresAdmin && !adminUnlocked.value) {
     return { path: '/admin', query: { redirect: to.fullPath } }
+  }
+})
+
+router.afterEach((to) => {
+  if (to.path !== '/player') {
+    trackUsage('page_view', { path: to.path })
   }
 })

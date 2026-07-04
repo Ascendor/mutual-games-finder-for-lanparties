@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -162,7 +163,7 @@ class GameOptionRead(BaseModel):
 
 class OwnershipCreate(BaseModel):
     participant_id: int
-    account_id: int
+    account_id: int | None = None
     game_id: int
     platform: Platform
     playtime_minutes: int = 0
@@ -172,6 +173,36 @@ class OwnershipCreate(BaseModel):
 class OwnershipRead(OwnershipCreate):
     id: int
     last_seen: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ManualOwnershipCreate(BaseModel):
+    participant_id: int
+    game_id: int
+    platform: Platform
+
+
+class ManualOwnershipConfirmationRead(BaseModel):
+    id: int
+    platform: Platform
+
+
+class ManualOwnershipGameOptionRead(BaseModel):
+    id: int
+    title: str
+    release_date: date | None = None
+    owner_count: int = 0
+    platforms: list[Platform] = Field(default_factory=list)
+    owned: bool = False
+    manual_confirmations: list[ManualOwnershipConfirmationRead] = Field(default_factory=list)
+
+
+class ManualOwnershipRead(BaseModel):
+    id: int
+    participant_id: int
+    game_id: int
+    platform: Platform
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -222,6 +253,120 @@ class SyncRunRead(BaseModel):
     progress_total: int
     model_config = ConfigDict(from_attributes=True)
 
+
+UsageEventType = Literal[
+    "page_view",
+    "find_players_search",
+    "group_games_search",
+]
+AnalyticsPeriod = Literal[
+    "custom",
+    "before_party",
+    "party",
+    "all",
+]
+
+
+class UsageEventCreate(BaseModel):
+    participant_id: int | None = None
+    event_type: UsageEventType
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class UsageEventRead(BaseModel):
+    id: int
+    participant_id: int | None
+    participant_name: str
+    event_type: str
+    occurred_at: datetime
+    details: dict[str, Any]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AnalyticsCountRead(BaseModel):
+    key: str
+    count: int
+
+
+class AnalyticsDailyRead(BaseModel):
+    date: date
+    total_events: int
+    page_views: int
+    find_players_searches: int
+    group_games_searches: int
+
+
+class AnalyticsTopGameRead(BaseModel):
+    game_id: int | None = None
+    title: str
+    searches: int
+    unique_users: int
+
+
+class AnalyticsSelectedPlayerRead(BaseModel):
+    participant_id: int | None = None
+    nickname: str
+    selections: int
+    unique_searchers: int
+
+
+class AnalyticsParticipantRead(BaseModel):
+    participant_id: int
+    nickname: str
+    total_events: int
+    page_views: int
+    find_players_searches: int
+    group_games_searches: int
+    last_active_at: datetime
+
+
+class AnalyticsSummaryRead(BaseModel):
+    period: AnalyticsPeriod
+    date_from: date
+    date_to: date
+    total_events: int
+    active_users: int
+    page_views: int
+    find_players_searches: int
+    group_games_searches: int
+    daily: list[AnalyticsDailyRead]
+    event_counts: list[AnalyticsCountRead]
+    top_games: list[AnalyticsTopGameRead]
+    selected_players: list[AnalyticsSelectedPlayerRead]
+    participants: list[AnalyticsParticipantRead]
+
+
+class AnalyticsParticipantDetailRead(BaseModel):
+    participant_id: int
+    nickname: str
+    date_from: date
+    date_to: date
+    total_events: int
+    event_counts: list[AnalyticsCountRead]
+    daily: list[AnalyticsDailyRead]
+    top_games: list[AnalyticsTopGameRead]
+    recent_events: list[UsageEventRead]
+
+
+class AnalyticsConfigurationUpdate(BaseModel):
+    party_start_at: datetime
+    party_end_at: datetime | None = None
+
+
+class AnalyticsConfigurationRead(BaseModel):
+    party_start_at: datetime | None = None
+    party_end_at: datetime | None = None
+
+
+class PrivacyInfoRead(BaseModel):
+    controller_name: str
+    controller_contact: str
+    hosting_provider: str
+    analytics_retention_days: int
+    access_log_retention_days: int
+    backup_retention_days: int
+    supervisory_authority: str
+    supervisory_authority_url: str
 
 
 

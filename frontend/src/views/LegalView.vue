@@ -14,49 +14,117 @@
       <h1 class="text-h3 mb-3">Datenschutz &amp; Hinweise</h1>
       <p class="text-body-1 text-medium-emphasis">
         Diese Anwendung ist für eine private, nichtkommerzielle LAN-Gruppe
-        gedacht. Sie enthält kein Tracking, keine Werbung und keine
-        Benutzerprofile für fremde Zwecke.
+        gedacht. Sie enthält keine Werbung und keine externe
+        Nutzungsanalyse. Die interne Statistik dient ausschließlich der
+        Auswertung dieser LAN-Party.
       </p>
     </header>
 
     <section>
-      <h2>Wer ist verantwortlich?</h2>
+      <h2>Verantwortliche Stelle</h2>
       <p>
-        Verantwortlich für eine konkrete Installation ist die Person, die den
-        Server betreibt. Ihre Kontaktdaten werden innerhalb der LAN-Gruppe
-        bekanntgegeben. Wer diese Software selbst öffentlich bereitstellt,
-        muss diesen Abschnitt um eigene, erreichbare Kontaktdaten und
-        gegebenenfalls weitere Pflichtangaben ergänzen.
+        Verantwortlich für diese Installation ist
+        <strong>{{ privacy.controller_name }}</strong>.
+      </p>
+      <p>
+        Kontakt: <strong>{{ privacy.controller_contact }}</strong>
+      </p>
+      <p>
+        Die Anwendung wird bei <strong>{{ privacy.hosting_provider }}</strong>
+        betrieben. Ein Datenschutzbeauftragter ist für diese private
+        Installation nicht bestellt.
+      </p>
+      <p>
+        Die Anwendung ist für einen geschlossenen Freundeskreis bestimmt.
+        Ob die Ausnahme für ausschließlich persönliche oder familiäre
+        Tätigkeiten greift, hängt von der konkreten Nutzung ab. Die folgenden
+        Informationen werden vorsorglich auch für den Fall bereitgestellt,
+        dass die DSGVO anwendbar ist.
       </p>
     </section>
 
     <section>
-      <h2>Welche Daten werden gespeichert?</h2>
+      <h2>Verarbeitete Daten</h2>
       <ul>
         <li>Nickname, optionaler Realname, Anwesenheit und freiwillige Notizen</li>
         <li>Plattform, Account-ID und Anzeigename verbundener Spielekonten</li>
         <li>Spielebibliotheken, Besitzzuordnungen und Spielzeiten</li>
-        <li>lokal zwischengespeicherte Spielmetadaten und Synchronisationsprotokolle</li>
+        <li>Playnite-Importe und manuell bestätigte Besitzzuordnungen</li>
+        <li>lokal gespeicherte Spielmetadaten und Synchronisationsprotokolle</li>
         <li>
-          notwendige Provider-Tokens oder Sitzungsdaten im geschützten
+          Nutzungsereignisse mit Teilnehmer, Zeitpunkt, aufgerufener
+          Anwendungsseite, gesuchtem Spiel, Trefferzahl, ausgewählter Gruppe
+          und Anzahl der berechneten Ergebnisse
+        </li>
+        <li>
+          erforderliche Provider-Tokens oder Sitzungsdaten im geschützten
           Server-Speicher; Passwörter werden nicht gespeichert
         </li>
+        <li>
+          technische Webserver- und Fehlerprotokolle; dabei können
+          insbesondere IP-Adresse, Zeitpunkt, angeforderter Pfad und
+          Fehlerdetails verarbeitet werden
+        </li>
       </ul>
+    </section>
+
+    <section>
+      <h2>Zwecke und Rechtsgrundlagen</h2>
       <p>
-        Die Daten dienen ausschließlich dazu, gemeinsame Spiele zu finden,
-        Empfehlungen zu berechnen und Bibliotheken später erneut zu
-        synchronisieren.
+        Stammdaten, Bibliotheken und Spielzeiten werden verarbeitet, um
+        gemeinsame Spiele zu finden und Empfehlungen zu berechnen. Soweit die
+        DSGVO anwendbar ist, beruht dies auf dem berechtigten Interesse der
+        geschlossenen Gruppe an der Organisation der gemeinsamen LAN-Party
+        gemäß Art. 6 Abs. 1 lit. f DSGVO.
+      </p>
+      <p>
+        Das freiwillige Verbinden eines Spielekontos und die dazu notwendige
+        Verarbeitung von Sitzungsdaten beruhen auf der Einwilligung der
+        jeweiligen Person gemäß Art. 6 Abs. 1 lit. a DSGVO. Die Verbindung
+        kann jederzeit getrennt werden. Die Rechtmäßigkeit der Verarbeitung
+        bis zum Widerruf bleibt unberührt.
+      </p>
+      <p>
+        Die lokale Nutzungsanalyse dient dazu, die verwendeten Suchfunktionen
+        während der Veranstaltung zu verstehen und die Anwendung für die
+        Gruppe zu verbessern. Rechtsgrundlage ist, soweit erforderlich,
+        Art. 6 Abs. 1 lit. f DSGVO. Gegen diese Verarbeitung kann bei der
+        verantwortlichen Stelle Widerspruch eingelegt werden.
+      </p>
+      <p>
+        Serverprotokolle werden zur Fehlerdiagnose und Abwehr missbräuchlicher
+        Zugriffe verarbeitet. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO.
       </p>
     </section>
 
     <section>
-      <h2>Externe Dienste</h2>
+      <h2>Datenquellen</h2>
       <p>
-        Eine Übertragung an Spieleplattformen findet nur statt, wenn ein
+        Angaben werden direkt durch Teilnehmer eingegeben, aus freiwillig
+        hochgeladenen Playnite-Backups übernommen oder nach einer bewusst
+        eingerichteten Verbindung von der jeweiligen Spieleplattform
+        abgerufen. Spielmetadaten stammen außerdem von Steam, IGDB/Twitch und
+        gegebenenfalls RAWG.
+      </p>
+    </section>
+
+    <section>
+      <h2>Empfänger und externe Dienste</h2>
+      <p>
+        Die gemeinsam gepflegten Teilnehmer-, Bibliotheks- und
+        Empfehlungsdaten sind für die zugelassene LAN-Gruppe sichtbar. Die
+        Nutzungsanalyse ist über den Administrationsbereich erreichbar.
+        Technischer Empfänger ist außerdem der oben genannte Hostinganbieter.
+      </p>
+      <p>
+        Eine Übertragung an eine Spieleplattform findet nur statt, wenn deren
         Account verbunden oder synchronisiert wird. Für die
-        Metadatenanreicherung werden Spieltitel und Plattformangaben an
-        IGDB/Twitch und, sofern konfiguriert, RAWG gesendet. Dabei gelten die
-        Bedingungen und Datenschutzhinweise des jeweiligen Dienstes.
+        Metadatenanreicherung werden insbesondere Spieltitel und
+        Plattformangaben an IGDB/Twitch sowie, sofern konfiguriert, RAWG
+        übermittelt. Je nach Anbieter können Daten außerhalb der EU bzw. des
+        EWR verarbeitet werden. Dafür gelten zusätzlich die Bedingungen,
+        Datenschutzinformationen und Übermittlungsmechanismen des jeweiligen
+        Anbieters.
       </p>
       <div class="legal-links">
         <a href="https://steamcommunity.com/dev/apiterms" target="_blank" rel="noopener noreferrer">
@@ -78,23 +146,86 @@
     </section>
 
     <section>
+      <h2>Speicherdauer</h2>
+      <ul>
+        <li>
+          Teilnehmer-, Account- und Bibliotheksdaten bleiben bis zur Löschung
+          des Teilnehmers oder Accounts beziehungsweise bis zum Ende des
+          Betriebs gespeichert.
+        </li>
+        <li>
+          Provider-Tokens und Sitzungsdaten bleiben bis zum Trennen der
+          Verbindung oder Löschen des Accounts gespeichert.
+        </li>
+        <li>
+          Nutzungsereignisse werden regelmäßig und grundsätzlich nach
+          {{ privacy.analytics_retention_days }} Tagen automatisch gelöscht.
+          Sie können im Administrationsbereich vorher personenbezogen
+          gelöscht werden.
+        </li>
+        <li>
+          Webserver- und Fehlerprotokolle sollen nach höchstens
+          {{ privacy.access_log_retention_days }} Tagen rotiert werden.
+          Sicherheitsbedingte Sperrlisten können davon abweichend bestehen,
+          solange dies zur Abwehr erforderlich ist.
+        </li>
+        <li>
+          Backups werden in einem rollierenden Verfahren mit mindestens
+          {{ privacy.backup_retention_days }} Tagesständen geführt. Gelöschte
+          Daten verschwinden mit der turnusmäßigen Ersetzung auch aus den
+          Sicherungen; verschlüsselte externe Sicherungen können bis zum
+          nächsten geprüften Sicherungszyklus bestehen bleiben.
+        </li>
+      </ul>
+    </section>
+
+    <section>
       <h2>Speicherung im Browser</h2>
       <p>
-        Der Browser merkt sich lokal den ausgewählten Teilnehmer. Eine
+        Der Browser speichert lokal den ausgewählten Teilnehmer und im
+        Administrationsbereich den zuletzt gewählten Analysezeitraum. Eine
         entsperrte Administrationssitzung wird nur bis zum Schließen des Tabs
-        gespeichert. Die Anwendung setzt selbst keine Analyse- oder
-        Werbe-Cookies ein.
+        gespeichert. Diese Informationen sind für die ausdrücklich
+        angeforderten Funktionen erforderlich. Die Anwendung setzt keine
+        Analyse- oder Werbe-Cookies ein.
       </p>
     </section>
 
     <section>
-      <h2>Löschung und Kontrolle</h2>
+      <h2>Rechte betroffener Personen</h2>
       <p>
-        Alle Teilnehmer dürfen die gemeinsamen Daten bearbeiten. Accounts und
-        Teilnehmer können im Administrationsbereich gelöscht werden.
-        Provider-Zugänge lassen sich zusätzlich beim jeweiligen Anbieter
-        widerrufen. Für Auskunft, Berichtigung, Export oder Löschung ist die
-        betreibende Person anzusprechen.
+        Soweit die DSGVO anwendbar ist, bestehen insbesondere Rechte auf
+        Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung,
+        Datenübertragbarkeit und Widerspruch. Eine erteilte Einwilligung kann
+        jederzeit mit Wirkung für die Zukunft widerrufen werden. Zur Ausübung
+        dieser Rechte ist die oben genannte verantwortliche Stelle zu
+        kontaktieren.
+      </p>
+      <p>
+        Accounts, Teilnehmer und personenbezogene Nutzungsereignisse können
+        im Administrationsbereich gelöscht werden. Provider-Zugänge lassen
+        sich zusätzlich beim jeweiligen Anbieter widerrufen.
+      </p>
+      <p>
+        Es besteht außerdem ein Beschwerderecht bei einer
+        Datenschutzaufsichtsbehörde, insbesondere bei
+        <a
+          :href="privacy.supervisory_authority_url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ privacy.supervisory_authority }}
+        </a>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Automatisierte Entscheidungen</h2>
+      <p>
+        Die Anwendung berechnet Spielvorschläge anhand von Besitz,
+        Spielerzahl, Funktionen und Spielzeit. Diese Empfehlungen haben keine
+        rechtliche oder vergleichbar erhebliche Wirkung. Eine automatisierte
+        Entscheidungsfindung im Sinne von Art. 22 DSGVO findet nicht statt.
       </p>
     </section>
 
@@ -130,18 +261,38 @@
     </section>
 
     <v-alert type="info" variant="tonal" class="mt-8">
-      Diese Information beschreibt die Standardinstallation und ist keine
-      Rechtsberatung. Betreiber öffentlicher Instanzen müssen sie an ihre
-      tatsächliche Konfiguration und Rechtslage anpassen.
+      Stand: Juli 2026. Diese Information beschreibt die konfigurierte
+      Installation und ist keine Rechtsberatung.
     </v-alert>
   </main>
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { api } from '../api'
 import { currentParticipantId } from '../playerIdentity'
+import type { PrivacyInfo } from '../types'
 
 const router = useRouter()
+const privacy = ref<PrivacyInfo>({
+  controller_name: 'Betreiber:in dieser Installation',
+  controller_contact: 'Kontakt über den internen LAN-Party-Gruppenkanal',
+  hosting_provider: 'VServer-Hostinganbieter der Betreiberperson',
+  analytics_retention_days: 180,
+  access_log_retention_days: 7,
+  backup_retention_days: 14,
+  supervisory_authority: 'zuständige Landesdatenschutzaufsichtsbehörde',
+  supervisory_authority_url: 'https://www.datenschutzkonferenz-online.de/datenschutzaufsichtsbehoerden.html'
+})
+
+onMounted(async () => {
+  try {
+    privacy.value = await api.privacyInfo()
+  } catch {
+    // The fallback remains readable even if the backend is temporarily unavailable.
+  }
+})
 
 function goBack() {
   if (window.history.length > 1) {

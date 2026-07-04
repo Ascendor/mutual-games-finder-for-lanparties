@@ -7,7 +7,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Game, Ownership, Platform, PlatformGameMapping, SyncRun
+from app.models import Account, Game, ManualOwnership, Ownership, Platform, PlatformGameMapping, SyncRun
 from app.services.account_identity import apply_account_identity
 from app.services.import_providers import ImportBatch, ImportedGame, PROVIDERS
 from app.services.genre_utils import sanitize_genres
@@ -245,9 +245,10 @@ def upsert_ownership(db: Session, account: Account, game: Game, imported: Import
             platform=ownership_platform,
         )
         db.add(ownership)
-    elif imported.ownership_platform is not None:
+    elif ownership.account_id is None or imported.ownership_platform is not None:
         # A direct provider supersedes a synthetic Playnite ownership while
-        # retaining the participant/game/platform uniqueness contract.
+        # retaining the participant/game/platform uniqueness contract. It also
+        # enriches a previously account-less manual confirmation.
         ownership.account_id = account.id
     current_playtime = ownership.playtime_minutes or 0
     if imported.playtime_minutes > 0 or current_playtime <= 0:
@@ -276,6 +277,15 @@ def _reconcile_account_ownerships(
     if imported_game_ids:
         stmt = stmt.where(Ownership.game_id.not_in(imported_game_ids))
     for ownership in db.scalars(stmt).all():
+        manually_confirmed = db.scalar(
+            select(ManualOwnership.id).where(
+                ManualOwnership.participant_id == ownership.participant_id,
+                ManualOwnership.game_id == ownership.game_id,
+                ManualOwnership.platform == ownership.platform,
+            )
+        )
+        if manually_confirmed is not None:
+            continue
         db.delete(ownership)
 
 

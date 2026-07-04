@@ -71,10 +71,33 @@ export interface GameOption {
   title: string
 }
 
+export interface ManualOwnershipConfirmation {
+  id: number
+  platform: Platform
+}
+
+export interface ManualOwnershipGameOption {
+  id: number
+  title: string
+  release_date?: string | null
+  owner_count: number
+  platforms: Platform[]
+  owned: boolean
+  manual_confirmations: ManualOwnershipConfirmation[]
+}
+
+export interface ManualOwnership {
+  id: number
+  participant_id: number
+  game_id: number
+  platform: Platform
+  created_at: string
+}
+
 export interface Ownership {
   id: number
   participant_id: number
-  account_id: number
+  account_id?: number | null
   game_id: number
   platform: Platform
   playtime_minutes: number
@@ -171,4 +194,101 @@ export interface SteamLoginStart {
   login_url: string
   state: string
   expires_in: number
+}
+
+export type UsageEventType =
+  | 'page_view'
+  | 'find_players_search'
+  | 'group_games_search'
+
+export type AnalyticsPeriod = 'custom' | 'before_party' | 'party' | 'all'
+
+export interface AnalyticsConfiguration {
+  party_start_at?: string | null
+  party_end_at?: string | null
+}
+
+export interface UsageEvent {
+  id: number
+  participant_id?: number | null
+  participant_name: string
+  event_type: UsageEventType
+  occurred_at: string
+  details: Record<string, unknown>
+}
+
+export interface AnalyticsDaily {
+  date: string
+  total_events: number
+  page_views: number
+  find_players_searches: number
+  group_games_searches: number
+}
+
+export interface AnalyticsCount {
+  key: UsageEventType
+  count: number
+}
+
+export interface AnalyticsTopGame {
+  game_id?: number | null
+  title: string
+  searches: number
+  unique_users: number
+}
+
+export interface AnalyticsSelectedPlayer {
+  participant_id?: number | null
+  nickname: string
+  selections: number
+  unique_searchers: number
+}
+
+export interface AnalyticsParticipant {
+  participant_id: number
+  nickname: string
+  total_events: number
+  page_views: number
+  find_players_searches: number
+  group_games_searches: number
+  last_active_at: string
+}
+
+export interface AnalyticsSummary {
+  period: AnalyticsPeriod
+  date_from: string
+  date_to: string
+  total_events: number
+  active_users: number
+  page_views: number
+  find_players_searches: number
+  group_games_searches: number
+  daily: AnalyticsDaily[]
+  event_counts: AnalyticsCount[]
+  top_games: AnalyticsTopGame[]
+  selected_players: AnalyticsSelectedPlayer[]
+  participants: AnalyticsParticipant[]
+}
+
+export interface AnalyticsParticipantDetail {
+  participant_id: number
+  nickname: string
+  date_from: string
+  date_to: string
+  total_events: number
+  event_counts: AnalyticsCount[]
+  daily: AnalyticsDaily[]
+  top_games: AnalyticsTopGame[]
+  recent_events: UsageEvent[]
+}
+
+export interface PrivacyInfo {
+  controller_name: string
+  controller_contact: string
+  hosting_provider: string
+  analytics_retention_days: number
+  access_log_retention_days: number
+  backup_retention_days: number
+  supervisory_authority: string
+  supervisory_authority_url: string
 }

@@ -1,0 +1,16 @@
+/var/log/apache2/refjuplay-together-access.log /var/log/apache2/refjuplay-together-error.log {
+    daily
+    rotate 7
+    maxage 7
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    create 0640 root adm
+    postrotate
+        if invoke-rc.d apache2 status >/dev/null 2>&1; then
+            invoke-rc.d apache2 reload >/dev/null 2>&1
+        fi
+    endscript
+}

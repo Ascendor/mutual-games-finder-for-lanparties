@@ -18,6 +18,7 @@
           </template>
           <v-list-item to="/admin" prepend-icon="mdi-shield-key-outline" title="Adminbereich" />
           <template v-if="adminUnlocked">
+            <v-list-item to="/admin/analytics" prepend-icon="mdi-chart-box-outline" title="Nutzungsanalyse" />
             <v-list-item to="/admin/logins" prepend-icon="mdi-key-chain-variant" title="Accounts & Logins" />
             <v-list-item to="/admin/participants" prepend-icon="mdi-account-group-outline" title="Teilnehmer:innen" />
             <v-list-item to="/admin/games" prepend-icon="mdi-gamepad-variant-outline" title="Spiele" />

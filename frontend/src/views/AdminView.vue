@@ -21,6 +21,20 @@
 
     <template v-else>
       <v-row>
+        <v-col cols="12">
+          <v-card variant="flat">
+            <v-card-title>Nutzungsanalyse</v-card-title>
+            <v-card-text>
+              <p class="text-medium-emphasis">
+                Suchen, Seitenaufrufe und Nutzung pro Teilnehmer für das LAN-Wochenende auswerten.
+              </p>
+              <v-btn to="/admin/analytics" color="primary" variant="tonal" prepend-icon="mdi-chart-box-outline">
+                Analyse öffnen
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
         <v-col cols="12" lg="6">
           <v-card variant="flat">
             <v-card-title>Spieler</v-card-title>
@@ -130,7 +144,7 @@ function unlock() {
   }
   password.value = ''
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-  if (['/admin/logins', '/admin/participants', '/admin/games', '/admin/sync'].includes(redirect)) {
+  if (['/admin/analytics', '/admin/logins', '/admin/participants', '/admin/games', '/admin/sync'].includes(redirect)) {
     void router.replace(redirect)
     return
   }

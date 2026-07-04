@@ -226,10 +226,12 @@ def list_game_owners(game_id: int, present_only: bool = True, db: Session = Depe
             },
         )
         item["platforms"].add(ownership.platform)
-        if ownership.account.display_name:
+        if ownership.account and ownership.account.display_name:
             item["account_names"].add(ownership.account.display_name)
-        elif ownership.account.account_id:
+        elif ownership.account and ownership.account.account_id:
             item["account_names"].add(ownership.account.account_id)
+        else:
+            item["account_names"].add("Manuell bestätigt")
         item["total_playtime_minutes"] += ownership.playtime_minutes or 0
         if item["last_seen"] is None or ownership.last_seen > item["last_seen"]:
             item["last_seen"] = ownership.last_seen

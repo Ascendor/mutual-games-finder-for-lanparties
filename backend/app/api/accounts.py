@@ -1,9 +1,9 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import exists, select, update
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Account, Platform
+from app.models import Account, ManualOwnership, Ownership, Platform
 from app.schemas import AccountCreate, AccountRead, AccountUpdate
 
 router = APIRouter()
@@ -105,6 +105,18 @@ def delete_account(account_id: int, db: Session = Depends(get_db)):
     account = db.get(Account, account_id)
     if not account:
         raise HTTPException(404, "account not found")
+    db.execute(
+        update(Ownership)
+        .where(
+            Ownership.account_id == account.id,
+            exists().where(
+                ManualOwnership.participant_id == Ownership.participant_id,
+                ManualOwnership.game_id == Ownership.game_id,
+                ManualOwnership.platform == Ownership.platform,
+            ),
+        )
+        .values(account_id=None)
+    )
     db.delete(account)
     db.commit()
 

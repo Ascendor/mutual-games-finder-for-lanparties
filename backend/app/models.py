@@ -48,6 +48,14 @@ class Participant(TimestampMixin, Base):
 
     accounts: Mapped[list[Account]] = relationship(back_populates="participant", cascade="all, delete-orphan")
     ownerships: Mapped[list[Ownership]] = relationship(back_populates="participant", cascade="all, delete-orphan")
+    manual_ownerships: Mapped[list[ManualOwnership]] = relationship(
+        back_populates="participant",
+        cascade="all, delete-orphan",
+    )
+    usage_events: Mapped[list[UsageEvent]] = relationship(
+        back_populates="participant",
+        passive_deletes=True,
+    )
 
 
 class Account(TimestampMixin, Base):
@@ -63,7 +71,7 @@ class Account(TimestampMixin, Base):
     last_error: Mapped[str | None] = mapped_column(Text)
 
     participant: Mapped[Participant] = relationship(back_populates="accounts")
-    ownerships: Mapped[list[Ownership]] = relationship(back_populates="account", cascade="all, delete-orphan")
+    ownerships: Mapped[list[Ownership]] = relationship(back_populates="account", passive_deletes=True)
     sync_runs: Mapped[list[SyncRun]] = relationship(back_populates="account", cascade="all, delete-orphan")
 
 
@@ -105,6 +113,10 @@ class Game(TimestampMixin, Base):
     metadata_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     ownerships: Mapped[list[Ownership]] = relationship(back_populates="game", cascade="all, delete-orphan")
+    manual_ownerships: Mapped[list[ManualOwnership]] = relationship(
+        back_populates="game",
+        cascade="all, delete-orphan",
+    )
     mappings: Mapped[list[PlatformGameMapping]] = relationship(back_populates="game", cascade="all, delete-orphan")
 
 
@@ -128,7 +140,7 @@ class Ownership(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     participant_id: Mapped[int] = mapped_column(ForeignKey("participants.id", ondelete="CASCADE"), nullable=False)
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"))
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
     platform: Mapped[Platform] = mapped_column(String(40), nullable=False)
     playtime_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -136,8 +148,37 @@ class Ownership(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     participant: Mapped[Participant] = relationship(back_populates="ownerships")
-    account: Mapped[Account] = relationship(back_populates="ownerships")
+    account: Mapped[Account | None] = relationship(back_populates="ownerships")
     game: Mapped[Game] = relationship(back_populates="ownerships")
+
+
+class ManualOwnership(Base):
+    __tablename__ = "manual_ownerships"
+    __table_args__ = (
+        UniqueConstraint(
+            "participant_id",
+            "game_id",
+            "platform",
+            name="uq_manual_owner_game_platform",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    participant_id: Mapped[int] = mapped_column(
+        ForeignKey("participants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    game_id: Mapped[int] = mapped_column(
+        ForeignKey("games.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    platform: Mapped[Platform] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    participant: Mapped[Participant] = relationship(back_populates="manual_ownerships")
+    game: Mapped[Game] = relationship(back_populates="manual_ownerships")
 
 
 class SyncRun(Base):
@@ -157,6 +198,41 @@ class SyncRun(Base):
     progress_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     account: Mapped[Account | None] = relationship(back_populates="sync_runs")
+
+
+class UsageEvent(Base):
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    participant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("participants.id", ondelete="SET NULL"),
+        index=True,
+    )
+    participant_name: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    event_type: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+    participant: Mapped[Participant | None] = relationship(back_populates="usage_events")
+
+
+class AnalyticsConfiguration(Base):
+    __tablename__ = "analytics_configuration"
+
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    party_start_at: Mapped[datetime | None] = mapped_column(DateTime)
+    party_end_at: Mapped[datetime | None] = mapped_column(DateTime)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
 
 class RecommendationCacheRevision(Base):

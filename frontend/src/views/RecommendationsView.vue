@@ -92,6 +92,7 @@ import RecommendationTable from '../components/RecommendationTable.vue'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { useLanStore } from '../store'
 import type { Participant, Recommendation } from '../types'
+import { trackUsage } from '../usageAnalytics'
 
 const store = useLanStore()
 const route = useRoute()
@@ -147,6 +148,16 @@ async function load() {
     lan.value = lanGames
     popular.value = popularGames
     newForGroup.value = newGames
+    trackUsage('group_games_search', {
+      selected_players: selectedPlayerIds.value.map((id) => {
+        const participant = participants.value.find((item) => item.id === id)
+        return { id, nickname: participant?.nickname || `Teilnehmer ${id}` }
+      }),
+      group_size: selectedPlayerIds.value.length,
+      common_results: commonGames.length,
+      coop_results: coopGames.length,
+      lan_results: lanGames.length
+    })
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {

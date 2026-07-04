@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, Game, GameOption, GameOwner, GamePage, Ownership, Participant, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
+import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -72,6 +72,21 @@ export const api = {
   createOwnership: (payload: Partial<Ownership>) =>
     request<Ownership>('/ownerships', { method: 'POST', body: JSON.stringify(payload) }),
   deleteOwnership: (id: number) => request<void>(`/ownerships/${id}`, { method: 'DELETE' }),
+  manualOwnershipOptions: (participantId: number, search: string, limit = 25) => {
+    const params = new URLSearchParams({
+      participant_id: String(participantId),
+      search,
+      limit: String(limit)
+    })
+    return request<ManualOwnershipGameOption[]>(`/ownerships/manual/options?${params}`)
+  },
+  createManualOwnership: (payload: { participant_id: number; game_id: number; platform: Platform }) =>
+    request<ManualOwnership>('/ownerships/manual', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  deleteManualOwnership: (id: number) =>
+    request<void>(`/ownerships/manual/${id}`, { method: 'DELETE' }),
   recommendations: (kind: 'popular' | 'lan' | 'present' | 'new', limit?: number) =>
     request<Recommendation[]>(`/recommendations/${kind}${limit ? `?limit=${limit}` : ''}`),
   newForGroup: (players: number[]) => request<Recommendation[]>(`/recommendations/new${players.length ? `?${players.map((id) => `players=${id}`).join('&')}` : ''}`),
@@ -157,5 +172,31 @@ export const api = {
     request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/poll`, { method: 'POST' }),
   completeProviderLogin: (accountId: number, payload: { code?: string; email?: string; password?: string; two_factor_code?: string }) =>
     request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/complete`, { method: 'POST', body: JSON.stringify(payload) }),
-  logoutProvider: (accountId: number) => request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/logout`, { method: 'POST' })
+  logoutProvider: (accountId: number) => request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/logout`, { method: 'POST' }),
+  analyticsConfiguration: () =>
+    request<AnalyticsConfiguration>('/analytics/configuration'),
+  updateAnalyticsConfiguration: (payload: AnalyticsConfiguration) =>
+    request<AnalyticsConfiguration>('/analytics/configuration', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }),
+  analyticsSummary: (period: AnalyticsPeriod, dateFrom: string, dateTo: string) => {
+    const params = new URLSearchParams({ period })
+    if (period === 'custom') {
+      params.set('date_from', dateFrom)
+      params.set('date_to', dateTo)
+    }
+    return request<AnalyticsSummary>(`/analytics/summary?${params}`)
+  },
+  analyticsParticipant: (participantId: number, period: AnalyticsPeriod, dateFrom: string, dateTo: string) => {
+    const params = new URLSearchParams({ period })
+    if (period === 'custom') {
+      params.set('date_from', dateFrom)
+      params.set('date_to', dateTo)
+    }
+    return request<AnalyticsParticipantDetail>(`/analytics/participants/${participantId}?${params}`)
+  },
+  deleteParticipantAnalytics: (participantId: number) =>
+    request<void>(`/analytics/participants/${participantId}/events`, { method: 'DELETE' }),
+  privacyInfo: () => request<PrivacyInfo>('/privacy')
 }

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Participant
+from app.models import Participant, UsageEvent
 from app.schemas import ParticipantCreate, ParticipantRead, ParticipantUpdate
 
 router = APIRouter()
@@ -48,6 +48,6 @@ def delete_participant(participant_id: int, db: Session = Depends(get_db)):
     participant = db.get(Participant, participant_id)
     if not participant:
         raise HTTPException(404, "participant not found")
+    db.execute(delete(UsageEvent).where(UsageEvent.participant_id == participant_id))
     db.delete(participant)
     db.commit()
-

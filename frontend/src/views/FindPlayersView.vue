@@ -49,6 +49,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { useRoute } from 'vue-router'
+import { trackUsage } from '../usageAnalytics'
 import type { GameOption, GameOwner, Platform } from '../types'
 
 const route = useRoute()
@@ -78,6 +79,8 @@ const rows = computed(() =>
   }))
 )
 let searchTimer: number | undefined
+let lastTrackedSearch = ''
+let lastTrackedAt = 0
 
 onMounted(async () => {
   const initialGame = typeof route.query.game === 'string' ? route.query.game : ''
@@ -124,9 +127,26 @@ async function loadOwners() {
   loading.value = true
   try {
     owners.value = await api.gameOwners(selectedGameId.value, presentOnly.value)
+    trackOwnerSearch()
   } finally {
     loading.value = false
   }
+}
+
+function trackOwnerSearch() {
+  const game = games.value.find((item) => item.id === selectedGameId.value)
+  if (!game) return
+  const signature = `${game.id}:${presentOnly.value}`
+  const now = Date.now()
+  if (signature === lastTrackedSearch && now - lastTrackedAt < 30_000) return
+  lastTrackedSearch = signature
+  lastTrackedAt = now
+  trackUsage('find_players_search', {
+    game_id: game.id,
+    game_title: game.title,
+    present_only: presentOnly.value,
+    result_count: owners.value.length
+  })
 }
 
 function hours(minutes: number) {

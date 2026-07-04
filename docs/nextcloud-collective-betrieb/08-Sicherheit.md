@@ -75,9 +75,36 @@ sudo systemctl reload apache2
 
 Zertifikate und private Schluessel werden nicht nach Docker kopiert.
 
+## Datenschutzangaben und Logrotation
+
+Die installationsbezogenen Angaben in `.env.production` muessen aktuell
+gehalten werden:
+
+```bash
+cd /opt/refjuplay-together
+joe .env.production
+```
+
+Relevant sind insbesondere `PRIVACY_CONTROLLER_NAME`,
+`PRIVACY_CONTROLLER_CONTACT`, `PRIVACY_HOSTING_PROVIDER` und die
+Aufbewahrungsfristen. Nach einer Aenderung das Backend neu erzeugen.
+
+Die mitgelieferte Logrotation begrenzt die App-spezifischen Apache-Protokolle:
+
+```bash
+cd /opt/refjuplay-together
+sudo install -o root -g root -m 0644 \
+  deploy/logrotate/refjuplay-together \
+  /etc/logrotate.d/refjuplay-together
+sudo logrotate --debug /etc/logrotate.d/refjuplay-together
+```
+
+Der Apache-VHost verwendet ein minimales Access-Log ohne Client-IP,
+Query-String, Referrer und User-Agent. Fehlerprotokolle koennen weiterhin
+Verbindungsdetails enthalten und werden deshalb ebenfalls rotiert.
+
 ## Externe Backups
 
 Lokale Backups schuetzen nicht vor Serververlust. Das Verzeichnis
 `/var/backups/refjuplay-together` muss verschluesselt in das bestehende
 Offsite-Backup aufgenommen werden.
-

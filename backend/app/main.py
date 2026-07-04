@@ -2,13 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from threading import Thread
 
-from app.api import accounts, games, imports, ownerships, participants, provider_auth, recommendations, sync
+from app.api import accounts, analytics, games, imports, ownerships, participants, privacy, provider_auth, recommendations, sync
 from app.api.imports import remove_stale_uploads
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services.metadata_service import close_interrupted_metadata_runs
 from app.services.playnite_import import close_interrupted_playnite_runs
 from app.services.recommendation_cache import warm_dashboard_recommendations
+from app.services.analytics_service import purge_expired_usage_events
 from app.services.steam_metadata_service import close_interrupted_steam_metadata_runs
 
 app = FastAPI(title="LAN Party Game Finder", version="0.1.0")
@@ -29,6 +30,8 @@ app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(provider_auth.router, prefix="/api/provider-auth", tags=["provider-auth"])
 app.include_router(recommendations.router, prefix="/api/recommendations", tags=["recommendations"])
 app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(privacy.router, prefix="/api/privacy", tags=["privacy"])
 
 
 @app.on_event("startup")
@@ -36,6 +39,7 @@ def close_interrupted_syncs_on_startup() -> None:
     remove_stale_uploads()
     db = SessionLocal()
     try:
+        purge_expired_usage_events(db)
         close_interrupted_metadata_runs(db)
         close_interrupted_playnite_runs(db)
         close_interrupted_steam_metadata_runs(db)

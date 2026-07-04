@@ -83,6 +83,11 @@
               </div>
             </div>
 
+            <ManualOwnershipPicker
+              :participant="group.participant"
+              :accounts="accountsFor(group.participant.id)"
+            />
+
             <div v-for="slot in group.slots" :key="slot.key" class="provider-row">
               <v-icon size="28" color="primary">{{ platformIcon(slot.platform) }}</v-icon>
               <div class="provider-info">
@@ -156,6 +161,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
+import ManualOwnershipPicker from '../components/ManualOwnershipPicker.vue'
 import ProviderConnectDialog from '../components/ProviderConnectDialog.vue'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { stateFromRun, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
@@ -290,6 +296,10 @@ function providerDetail(slot: ProviderSlot) {
 
 function connectedCount(slots: ProviderSlot[]) {
   return slots.filter(isConnected).length
+}
+
+function accountsFor(participantId: number) {
+  return store.accounts.filter((account) => account.participant_id === participantId)
 }
 
 function selectedPlayniteFile(participantId: number) {
