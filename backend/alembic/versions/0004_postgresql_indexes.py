@@ -23,16 +23,12 @@ def upgrade() -> None:
     op.create_index("ix_platform_game_mappings_game_id", "platform_game_mappings", ["game_id"])
     op.create_index("ix_sync_runs_started_at", "sync_runs", ["started_at"])
 
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-        op.execute("CREATE INDEX ix_games_normalized_title_trgm ON games USING gin (normalized_title gin_trgm_ops)")
+    op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+    op.execute("CREATE INDEX ix_games_normalized_title_trgm ON games USING gin (normalized_title gin_trgm_ops)")
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.execute("DROP INDEX IF EXISTS ix_games_normalized_title_trgm")
+    op.execute("DROP INDEX IF EXISTS ix_games_normalized_title_trgm")
     op.drop_index("ix_sync_runs_started_at", table_name="sync_runs")
     op.drop_index("ix_platform_game_mappings_game_id", table_name="platform_game_mappings")
     op.drop_index("ix_accounts_participant_id", table_name="accounts")

@@ -2,16 +2,10 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import select
 
 from app.api import provider_auth as provider_auth_api
 from app.core.config import settings
-from app.db.base import Base
-from app.db.session import get_db
-from app.main import app
 from app.models import Account, Participant, Platform
 from app.services import steam_auth
 from app.services.steam_auth import SteamProfile
@@ -166,25 +160,10 @@ def test_connect_does_not_replace_existing_account_with_private_library(monkeypa
     assert existing.account_id == "76561198000000004"
 
 
-def test_steam_openid_callback_creates_account(monkeypatch):
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    db = Session()
+def test_steam_openid_callback_creates_account(monkeypatch, client, db):
     participant = Participant(nickname="Ada", present=True)
     db.add(participant)
     db.commit()
-
-    def override_db():
-        session = Session()
-        try:
-            yield session
-        finally:
-            session.close()
 
     profile = SteamProfile(
         steam_id="76561198000000006",
@@ -198,10 +177,8 @@ def test_steam_openid_callback_creates_account(monkeypatch):
     monkeypatch.setattr(provider_auth_api, "verify_steam_openid", lambda params: profile.steam_id)
     monkeypatch.setattr(provider_auth_api, "resolve_steam_profile", lambda reference: profile)
     provider_auth_api._pending_steam_logins.clear()
-    app.dependency_overrides[get_db] = override_db
 
     try:
-        client = TestClient(app)
         start = client.post(
             "/api/provider-auth/steam/start",
             json={"participant_id": participant.id, "origin": "https://play.example"},
@@ -221,15 +198,9 @@ def test_steam_openid_callback_creates_account(monkeypatch):
         assert "steam-login-result" in callback.text
         assert '"success": true' in callback.text
 
-        check = Session()
-        try:
-            account = check.scalar(select(Account).where(Account.platform == Platform.steam))
-            assert account is not None
-            assert account.participant_id == participant.id
-            assert account.account_id == profile.steam_id
-        finally:
-            check.close()
+        account = db.scalar(select(Account).where(Account.platform == Platform.steam))
+        assert account is not None
+        assert account.participant_id == participant.id
+        assert account.account_id == profile.steam_id
     finally:
         provider_auth_api._pending_steam_logins.clear()
-        app.dependency_overrides.clear()
-        db.close()

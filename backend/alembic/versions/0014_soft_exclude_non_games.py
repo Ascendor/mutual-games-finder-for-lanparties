@@ -15,16 +15,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("games") as batch_op:
-        batch_op.add_column(
-            sa.Column("is_game", sa.Boolean(), nullable=False, server_default=sa.true())
-        )
-        batch_op.add_column(sa.Column("non_game_reason", sa.String(length=255)))
-        batch_op.create_index("ix_games_is_game", ["is_game"], unique=False)
+    op.add_column("games", sa.Column("is_game", sa.Boolean(), nullable=False, server_default=sa.true()))
+    op.add_column("games", sa.Column("non_game_reason", sa.String(length=255)))
+    op.create_index("ix_games_is_game", "games", ["is_game"], unique=False)
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("games") as batch_op:
-        batch_op.drop_index("ix_games_is_game")
-        batch_op.drop_column("non_game_reason")
-        batch_op.drop_column("is_game")
+    op.drop_index("ix_games_is_game", table_name="games")
+    op.drop_column("games", "non_game_reason")
+    op.drop_column("games", "is_game")

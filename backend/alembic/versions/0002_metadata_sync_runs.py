@@ -15,14 +15,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("sync_runs") as batch_op:
-        batch_op.alter_column("account_id", existing_type=sa.Integer(), nullable=True)
-        batch_op.add_column(
-            sa.Column("kind", sa.String(length=40), nullable=False, server_default="account")
-        )
+    op.alter_column("sync_runs", "account_id", existing_type=sa.Integer(), nullable=True)
+    op.add_column("sync_runs", sa.Column("kind", sa.String(length=40), nullable=False, server_default="account"))
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("sync_runs") as batch_op:
-        batch_op.drop_column("kind")
-        batch_op.alter_column("account_id", existing_type=sa.Integer(), nullable=False)
+    op.drop_column("sync_runs", "kind")
+    op.alter_column("sync_runs", "account_id", existing_type=sa.Integer(), nullable=False)

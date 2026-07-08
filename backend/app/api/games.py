@@ -1,6 +1,6 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query, Request, Response
-from sqlalchemy import String, and_, cast, func, not_, or_, select
+from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
@@ -45,7 +45,7 @@ def _game_page_conditions(
         conditions.append(
             or_(
                 *(
-                    cast(Game.genres, String).ilike(f'%"{genre}"%')
+                    Game.genres.contains([genre])
                     for genre in genres
                 )
             )

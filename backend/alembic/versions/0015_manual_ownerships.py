@@ -15,12 +15,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("ownerships") as batch_op:
-        batch_op.alter_column(
-            "account_id",
-            existing_type=sa.Integer(),
-            nullable=True,
-        )
+    op.alter_column(
+        "ownerships",
+        "account_id",
+        existing_type=sa.Integer(),
+        nullable=True,
+    )
 
     op.create_table(
         "manual_ownerships",
@@ -63,9 +63,9 @@ def downgrade() -> None:
     op.drop_index("ix_manual_ownerships_game_id", table_name="manual_ownerships")
     op.drop_index("ix_manual_ownerships_participant_id", table_name="manual_ownerships")
     op.drop_table("manual_ownerships")
-    with op.batch_alter_table("ownerships") as batch_op:
-        batch_op.alter_column(
-            "account_id",
-            existing_type=sa.Integer(),
-            nullable=False,
-        )
+    op.alter_column(
+        "ownerships",
+        "account_id",
+        existing_type=sa.Integer(),
+        nullable=False,
+    )

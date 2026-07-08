@@ -93,9 +93,7 @@ docker compose --env-file .env.production -f compose.production.yml up -d
 docker compose --env-file .env.production -f compose.production.yml ps
 ```
 
-Alembic aktualisiert die leere PostgreSQL-Datenbank automatisch beim
-Backend-Start. Eine lokale SQLite-Datenbank wird in dieser Konfiguration nicht
-importiert.
+Alembic aktualisiert die PostgreSQL-Datenbank automatisch beim Backend-Start.
 
 Vor der Apache-Freigabe:
 

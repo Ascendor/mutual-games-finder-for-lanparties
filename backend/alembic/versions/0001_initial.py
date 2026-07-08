@@ -7,6 +7,7 @@ Create Date: 2026-06-22
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "0001_initial"
 down_revision = None
@@ -33,7 +34,7 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=False, server_default=""),
         sa.Column("cover_url", sa.String(800)),
         sa.Column("release_date", sa.Date()),
-        sa.Column("genres", sa.JSON(), nullable=False, server_default="[]"),
+        sa.Column("genres", JSONB(), nullable=False, server_default="[]"),
         sa.Column("singleplayer", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("multiplayer", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("lan", sa.Boolean(), nullable=False, server_default=sa.false()),
@@ -101,4 +102,3 @@ def downgrade() -> None:
     op.drop_table("accounts")
     op.drop_table("games")
     op.drop_table("participants")
-

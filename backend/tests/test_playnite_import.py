@@ -4,10 +4,6 @@ import uuid
 import zipfile
 from io import BytesIO
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.db.base import Base
 from app.models import Account, Participant, Platform
 from app.services import playnite_import
 from app.services.metadata_service import MetadataSyncResult
@@ -139,15 +135,9 @@ def test_playnite_import_reads_backup_zip_from_disk(db, tmp_path):
     assert participant.ownerships[0].game.title == "Into the Breach"
 
 
-def test_playnite_background_job_reports_progress_and_enriches_metadata(tmp_path, monkeypatch):
-    engine = create_engine(
-        f"sqlite:///{tmp_path / 'jobs.db'}",
-        connect_args={"timeout": 0.05},
-    )
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    monkeypatch.setattr(playnite_import, "SessionLocal", Session)
-    session = Session()
+def test_playnite_background_job_reports_progress_and_enriches_metadata(tmp_path, monkeypatch, session_factory):
+    monkeypatch.setattr(playnite_import, "SessionLocal", session_factory)
+    session = session_factory()
     participant = Participant(nickname="Progress", present=True)
     session.add(participant)
     session.commit()
@@ -180,7 +170,7 @@ def test_playnite_background_job_reports_progress_and_enriches_metadata(tmp_path
     monkeypatch.setattr(playnite_import, "enrich_all_game_metadata", fake_metadata)
     playnite_import.run_playnite_import(run.id, backup)
 
-    check = Session()
+    check = session_factory()
     try:
         completed = check.get(playnite_import.SyncRun, run.id)
         assert completed is not None

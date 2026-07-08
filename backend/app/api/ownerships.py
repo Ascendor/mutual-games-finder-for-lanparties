@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import String, cast, distinct, func, or_, select
+from sqlalchemy import distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -95,7 +95,7 @@ def participant_games(
         filters.append(
             or_(
                 *(
-                    cast(Game.genres, String).ilike(f'%"{genre}"%')
+                    Game.genres.contains([genre])
                     for genre in selected_genres
                 )
             )

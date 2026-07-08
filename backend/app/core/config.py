@@ -3,7 +3,6 @@
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://lanparty:lanparty@database:5432/lanparty"
-    sqlite_migration_path: str | None = "/legacy-data/lan_party_game_finder_migration_snapshot.db"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     steam_api_key: str | None = None
     steam_metadata_limit: int = 2000

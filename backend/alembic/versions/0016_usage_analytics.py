@@ -6,6 +6,7 @@ Revises: 0015_manual_ownerships
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 revision = "0016_usage_analytics"
@@ -38,7 +39,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "details",
-            sa.JSON(),
+            JSONB(),
             nullable=False,
             server_default=sa.text("'{}'"),
         ),

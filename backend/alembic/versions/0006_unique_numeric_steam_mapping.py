@@ -16,9 +16,6 @@ depends_on = None
 
 def upgrade() -> None:
     connection = op.get_bind()
-    if connection.dialect.name != "postgresql":
-        return
-
     duplicate_game_ids = connection.scalars(
         sa.text(
             """
@@ -78,5 +75,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    if op.get_bind().dialect.name == "postgresql":
-        op.execute("DROP INDEX IF EXISTS uq_one_numeric_steam_mapping_per_game")
+    op.execute("DROP INDEX IF EXISTS uq_one_numeric_steam_mapping_per_game")

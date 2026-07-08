@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -84,7 +85,7 @@ class Game(TimestampMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     cover_url: Mapped[str | None] = mapped_column(String(800))
     release_date: Mapped[date | None] = mapped_column(Date)
-    genres: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    genres: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     is_game: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     non_game_reason: Mapped[str | None] = mapped_column(String(255))
     is_free: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -109,7 +110,7 @@ class Game(TimestampMixin, Base):
     player_count_known: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     metadata_source: Mapped[str | None] = mapped_column(String(40))
     metadata_external_id: Mapped[str | None] = mapped_column(String(120))
-    metadata_sources: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, nullable=False)
+    metadata_sources: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict, nullable=False)
     metadata_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     ownerships: Mapped[list[Ownership]] = relationship(back_populates="game", cascade="all, delete-orphan")
@@ -216,7 +217,7 @@ class UsageEvent(Base):
         nullable=False,
         index=True,
     )
-    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    details: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
     participant: Mapped[Participant | None] = relationship(back_populates="usage_events")
 

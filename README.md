@@ -38,7 +38,7 @@ BASIC_AUTH_PASSWORD=QC4lF93bYgwTHRT4xRynsAIz3San1lDW
 
 Backend und Frontend werden im Docker-Compose-Betrieb nicht mehr direkt veroeffentlicht. Der Zugriff laeuft ueber den Gateway, damit TLS und Basic Auth nicht umgangen werden.
 
-PostgreSQL speichert seine Daten im Docker-Volume `postgres-data`. Beim ersten Start nach der Umstellung kopiert das Backend eine vorhandene SQLite-Datenbank aus dem bisherigen Volume `backend-data` automatisch und transaktional nach PostgreSQL. Das SQLite-Volume bleibt danach unverändert als Rueckfallkopie erhalten.
+PostgreSQL speichert seine Daten im Docker-Volume `postgres-data`. Es ist das einzige unterstuetzte Datenbanksystem der Anwendung.
 
 Die PostgreSQL-Zugangsdaten koennen in `.env` angepasst werden:
 
@@ -134,11 +134,14 @@ npm run dev
 ## Tests
 
 ```bash
-cd backend
-pytest
+docker compose run --rm backend pytest
 ```
 
-Getestet werden Matching Engine, Normalisierung, Importer-Verhalten und API-Integration.
+Die Tests legen pro Testfall ein eigenes temporaeres PostgreSQL-Schema an und
+entfernen es danach wieder. Ausserhalb von Docker muss `DATABASE_URL` oder
+`TEST_DATABASE_URL` auf eine erreichbare PostgreSQL-Datenbank zeigen.
+Getestet werden Matching Engine, Normalisierung, Importer-Verhalten und
+API-Integration.
 
 ## Produktion auf Debian
 
