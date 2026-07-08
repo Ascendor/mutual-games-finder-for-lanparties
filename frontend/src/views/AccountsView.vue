@@ -77,11 +77,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '../api'
+import { accountPlatforms, platformTitle } from '../platforms'
 import { useLanStore } from '../store'
 import type { Platform, ProviderLoginStart } from '../types'
 
 const store = useLanStore()
-const platforms: Platform[] = ['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'ea']
+const platforms = accountPlatforms
 const form = reactive({ participant_id: undefined as number | undefined, platform: 'steam' as Platform, account_id: '', display_name: '' })
 const activeLogin = ref<ProviderLoginStart | null>(null)
 const loginCode = ref('')
@@ -112,12 +113,7 @@ function canLogin(platform: Platform) {
 }
 
 function canSync(platform: Platform) {
-  return ['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'ea'].includes(platform)
-}
-
-function platformTitle(platform: Platform) {
-  const titles: Record<string, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App / Origin', amazon: 'Amazon Games', battle_net: 'Battle.net', bethesda: 'Bethesda', gamejolt: 'Game Jolt', humble: 'Humble', humble_key: 'Humble Key', meta: 'Meta / Oculus', itch: 'itch.io', legacy: 'Legacy Games', nintendo: 'Nintendo', playstation: 'PlayStation', riot: 'Riot', rockstar: 'Rockstar', local: 'Lokal' }
-  return titles[platform] ?? platform
+  return accountPlatforms.includes(platform)
 }
 
 async function create() {

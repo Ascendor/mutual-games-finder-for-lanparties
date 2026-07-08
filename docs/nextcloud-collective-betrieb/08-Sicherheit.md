@@ -4,7 +4,7 @@
 
 ## Gespeicherte Geheimnisse
 
-- `.env.production`: Datenbankpasswort und API-Schluessel
+- `.env.production`: Adminpasswort, Datenbankpasswort und API-Schluessel
 - Provider-Auth-Volume: Sitzungs- und Refresh-Tokens
 - Apache-htpasswd: Basic-Auth-Pruefsumme
 - Backup-Sets: Kopien aller genannten Daten
@@ -39,6 +39,19 @@ sudo htpasswd \
 sudo apachectl configtest
 sudo systemctl reload apache2
 ```
+
+## In-App-Adminpasswort aendern
+
+```bash
+cd /opt/refjuplay-together
+joe .env.production
+
+docker compose --env-file .env.production \
+  -f compose.production.yml up -d --remove-orphans backend
+```
+
+Relevant ist `ADMIN_PASSWORD`. Das Passwort entsperrt die internen
+Administrationsseiten; Apache Basic Auth bleibt davon unabhaengig.
 
 ## Provider-Zugang widerrufen
 

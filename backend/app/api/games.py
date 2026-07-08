@@ -3,6 +3,7 @@ from fastapi import Query, Request, Response
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import Game, Ownership, Participant
 from app.schemas import (
@@ -184,7 +185,10 @@ def list_game_options(
     ).one()
     etag = f'"games-{count}-{latest_update.isoformat() if latest_update else "empty"}"'
     cache_headers = {
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60",
+        "Cache-Control": (
+            f"private, max-age={settings.games_options_cache_seconds}, "
+            f"stale-while-revalidate={settings.games_options_stale_seconds}"
+        ),
         "ETag": etag,
     }
     if request.headers.get("if-none-match") == etag:

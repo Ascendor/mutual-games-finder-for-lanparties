@@ -6,33 +6,77 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
 from app.models import Game, Ownership, Participant, Platform
 from app.schemas import RecommendationRead
 
 RecommendationMode = Literal["common", "coop", "lan", "popular", "group_size", "new"]
-OPTIONAL_UNSYNCED_ACCOUNT_PLATFORMS = {Platform.ea}
+
+
+def _optional_unsynced_account_platforms() -> set[Platform]:
+    platforms = set()
+    for value in settings.recommendation_optional_unsynced_platforms.split(","):
+        value = value.strip()
+        if not value:
+            continue
+        try:
+            platforms.add(Platform(value))
+        except ValueError:
+            continue
+    return platforms
 
 
 def _score(game: Game, owner_count: int, participant_count: int, total: int, median_playtime: float, mode: RecommendationMode, group_size: int | None) -> float:
     adoption = owner_count / participant_count if participant_count else 0
-    playtime = min(total, 20000) / 100
-    typical_playtime = min(median_playtime, 5000) / 100
+    playtime = min(total, settings.recommendation_playtime_cap_minutes) / settings.recommendation_playtime_divisor
+    typical_playtime = min(
+        median_playtime,
+        settings.recommendation_median_playtime_cap_minutes,
+    ) / settings.recommendation_median_playtime_divisor
     capacity_fit = 0
     target_size = group_size or participant_count
     if target_size and game.player_count_known and game.min_players <= target_size <= game.max_players:
-        capacity_fit = 300
+        capacity_fit = settings.recommendation_capacity_fit_bonus
     if mode == "common":
-        return adoption * 1000 + typical_playtime * 2 + playtime + capacity_fit + (150 if game.multiplayer else 0)
+        return (
+            adoption * settings.recommendation_common_adoption_weight
+            + typical_playtime * settings.recommendation_common_median_weight
+            + playtime
+            + capacity_fit
+            + (settings.recommendation_common_multiplayer_bonus if game.multiplayer else 0)
+        )
     if mode == "coop":
-        return adoption * 1000 + capacity_fit + playtime + (500 if game.online_coop else 0) + (250 if game.local_coop else 0) + (100 if game.shared_screen or game.split_screen else 0)
+        return (
+            adoption * settings.recommendation_coop_adoption_weight
+            + capacity_fit
+            + playtime
+            + (settings.recommendation_coop_online_bonus if game.online_coop else 0)
+            + (settings.recommendation_coop_local_bonus if game.local_coop else 0)
+            + (settings.recommendation_coop_screen_bonus if game.shared_screen or game.split_screen else 0)
+        )
     if mode == "lan":
-        return owner_count * 1200 + capacity_fit + playtime + (300 if game.lan else 0)
+        return (
+            owner_count * settings.recommendation_lan_owner_weight
+            + capacity_fit
+            + playtime
+            + (settings.recommendation_lan_bonus if game.lan else 0)
+        )
     if mode == "group_size":
-        return owner_count * 1000 + capacity_fit + playtime + (150 if game.multiplayer or game.lan or game.online_coop else 0)
+        return (
+            owner_count * settings.recommendation_group_owner_weight
+            + capacity_fit
+            + playtime
+            + (settings.recommendation_group_multiplayer_bonus if game.multiplayer or game.lan or game.online_coop else 0)
+        )
     if mode == "new":
-        freshness = max(0, 5000 - median_playtime) / 10
-        return owner_count * 1500 + freshness + capacity_fit - min(total, 20000) / 200
-    return adoption * 5000 + playtime + typical_playtime
+        freshness = max(0, settings.recommendation_new_freshness_base_minutes - median_playtime) / settings.recommendation_new_freshness_divisor
+        return (
+            owner_count * settings.recommendation_new_owner_weight
+            + freshness
+            + capacity_fit
+            - min(total, settings.recommendation_playtime_cap_minutes) / settings.recommendation_new_playtime_penalty_divisor
+        )
+    return adoption * settings.recommendation_popular_adoption_weight + playtime + typical_playtime
 
 
 def _sort_key(item: RecommendationRead, mode: RecommendationMode) -> tuple:
@@ -188,7 +232,7 @@ def _library_is_unknown_for_game(
     library_accounts = [
         account
         for account in participant.accounts
-        if account.platform not in OPTIONAL_UNSYNCED_ACCOUNT_PLATFORMS
+        if account.platform not in _optional_unsynced_account_platforms()
         or account.last_successful_sync is not None
     ]
     if not library_accounts:

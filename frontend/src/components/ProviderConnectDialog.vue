@@ -408,6 +408,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { platformIcon, platformTitle } from '../platforms'
 import type { Account, Participant, Platform, ProviderLoginStart, SteamProfile } from '../types'
 
 interface ProviderTarget {
@@ -882,37 +883,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('message', handleSteamLoginMessage)
 })
 
-function platformTitle(platform: Platform | '') {
-  const titles: Record<string, string> = {
-    steam: 'Steam',
-    epic: 'Epic Games',
-    gog: 'GOG',
-    ubisoft: 'Ubisoft Connect',
-    xbox: 'Xbox Live',
-    ea: 'EA App',
-    amazon: 'Amazon Games',
-    battle_net: 'Battle.net',
-    humble: 'Humble',
-    meta: 'Meta / Oculus'
-  }
-  return titles[platform] || platform
-}
-
-function platformIcon(platform: Platform) {
-  const icons: Record<string, string> = {
-    steam: 'mdi-steam',
-    epic: 'mdi-gamepad-variant-outline',
-    gog: 'mdi-gamepad-square-outline',
-    ubisoft: 'mdi-alpha-u-circle-outline',
-    xbox: 'mdi-microsoft-xbox',
-    ea: 'mdi-alpha-e-circle-outline',
-    amazon: 'mdi-amazon',
-    battle_net: 'mdi-battle-net',
-    humble: 'mdi-alpha-h-circle-outline',
-    meta: 'mdi-virtual-reality'
-  }
-  return icons[platform] || 'mdi-gamepad-variant-outline'
-}
 </script>
 
 <style scoped>

@@ -15,7 +15,7 @@
       <v-card-title>Passwort</v-card-title>
       <v-card-text>
         <v-text-field v-model="password" label="Admin-Passwort" type="password" density="compact" hide-details="auto" @keyup.enter="unlock" />
-        <v-btn class="mt-4" color="primary" prepend-icon="mdi-lock-open-outline" @click="unlock">Entsperren</v-btn>
+        <v-btn class="mt-4" color="primary" prepend-icon="mdi-lock-open-outline" :loading="busy === 'unlock'" @click="unlock">Entsperren</v-btn>
       </v-card-text>
     </v-card>
 
@@ -89,8 +89,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminUnlocked, tryUnlockAdmin } from '../adminAccess'
 import { api } from '../api'
+import { platformTitle } from '../platforms'
 import { useLanStore } from '../store'
-import type { Platform } from '../types'
 
 const store = useLanStore()
 const route = useRoute()
@@ -136,11 +136,20 @@ onMounted(() => {
   if (unlocked.value) load()
 })
 
-function unlock() {
+async function unlock() {
   error.value = ''
-  if (!tryUnlockAdmin(password.value)) {
-    error.value = 'Falsches Passwort.'
+  busy.value = 'unlock'
+  try {
+    if (!await tryUnlockAdmin(password.value)) {
+      error.value = 'Falsches Passwort.'
+      return
+    }
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err)
+    error.value = raw.includes('401') ? 'Falsches Passwort.' : raw
     return
+  } finally {
+    busy.value = ''
   }
   password.value = ''
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
@@ -173,11 +182,6 @@ function accountsFor(participantId: number) {
 
 function participantName(participantId: number) {
   return store.participants.find((participant) => participant.id === participantId)?.nickname ?? `Teilnehmer ${participantId}`
-}
-
-function platformTitle(platform: Platform) {
-  const titles: Record<string, string> = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox Live', ubisoft: 'Ubisoft Connect', ea: 'EA App', amazon: 'Amazon Games', battle_net: 'Battle.net', bethesda: 'Bethesda', gamejolt: 'Game Jolt', humble: 'Humble', humble_key: 'Humble Key', meta: 'Meta / Oculus', itch: 'itch.io', legacy: 'Legacy Games', nintendo: 'Nintendo', playstation: 'PlayStation', riot: 'Riot', rockstar: 'Rockstar', local: 'Lokal' }
-  return titles[platform] ?? platform
 }
 
 async function deleteParticipant(id: number) {

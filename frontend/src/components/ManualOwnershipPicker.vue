@@ -95,6 +95,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { api } from '../api'
+import { platformTitle } from '../platforms'
 import type { Account, ManualOwnershipGameOption, Participant, Platform } from '../types'
 
 const props = defineProps<{
@@ -236,28 +237,6 @@ function gameMeta(game: ManualOwnershipGameOption) {
   if (game.release_date) parts.push(new Date(game.release_date).getFullYear().toString())
   if (game.platforms.length) parts.push(game.platforms.map(platformTitle).join(', '))
   return parts.join(' · ')
-}
-
-function platformTitle(platform: Platform) {
-  const names: Record<string, string> = {
-    steam: 'Steam',
-    epic: 'Epic Games',
-    gog: 'GOG',
-    xbox: 'Xbox / Microsoft Store',
-    ubisoft: 'Ubisoft Connect',
-    ea: 'EA App',
-    amazon: 'Amazon Games',
-    battle_net: 'Battle.net',
-    humble: 'Humble',
-    humble_key: 'Humble Key',
-    meta: 'Meta / Oculus',
-    itch: 'itch.io',
-    legacy: 'Legacy Games',
-    riot: 'Riot Games',
-    rockstar: 'Rockstar Games',
-    local: 'Lokal / andere Quelle'
-  }
-  return names[platform] || platform
 }
 
 function readableError(value: unknown) {

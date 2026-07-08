@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import Participant
 from app.db.session import get_db
 from app.schemas import RecommendationRead
@@ -33,7 +34,7 @@ def _cached(
     items, revision, cache_hit = recommendation_cache.get(key, factory)
     etag = recommendation_cache.etag(key, revision, database_revision, limit)
     headers = {
-        "Cache-Control": "private, max-age=30",
+        "Cache-Control": f"private, max-age={settings.recommendation_http_cache_seconds}",
         "ETag": etag,
         "X-Recommendation-Cache": "HIT" if cache_hit else "MISS",
     }
@@ -48,7 +49,7 @@ def common_games(
     request: Request,
     response: Response,
     players: list[int] = Query(default=[]),
-    minimum_coverage: int = Query(75, ge=50, le=100),
+    minimum_coverage: int = Query(settings.recommendation_common_minimum_coverage_default, ge=50, le=100),
     free_games_as_owned: bool = True,
     db: Session = Depends(get_db),
 ):

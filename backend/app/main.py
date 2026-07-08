@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from threading import Thread
 
-from app.api import accounts, analytics, games, imports, ownerships, participants, privacy, provider_auth, recommendations, sync
+from app.api import accounts, admin, analytics, games, imports, ownerships, participants, privacy, provider_auth, recommendations, sync
 from app.api.imports import remove_stale_uploads
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -32,6 +32,7 @@ app.include_router(recommendations.router, prefix="/api/recommendations", tags=[
 app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
 app.include_router(analytics.router, prefix="/api/app-log", tags=["app-log"])
 app.include_router(privacy.router, prefix="/api/privacy", tags=["privacy"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 
 @app.on_event("startup")

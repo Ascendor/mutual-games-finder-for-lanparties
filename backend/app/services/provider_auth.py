@@ -14,6 +14,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import Account, Platform
 from app.services.import_providers import (
     GOG_AUTH_URL,
@@ -31,8 +32,8 @@ from app.services.import_providers import (
     validate_ea_access_token,
 )
 
-EPIC_LOGIN_URL = "https://legendary.gl/epiclogin"
-UBISOFT_APP_ID = "f68a4bb5-608a-4ff2-8123-be8ef797e0a6"
+EPIC_LOGIN_URL = settings.epic_login_url
+UBISOFT_APP_ID = settings.ubisoft_app_id
 LOGIN_PLATFORMS = {
     Platform.epic,
     Platform.gog,
@@ -44,8 +45,8 @@ LOGIN_PLATFORMS = {
     Platform.humble,
     Platform.meta,
 }
-AMAZON_DEVICE_TYPE = "A2UMVHOX7UP4V7"
-AMAZON_LOGIN_URL = "https://www.amazon.com/ap/signin"
+AMAZON_DEVICE_TYPE = settings.amazon_device_type
+AMAZON_LOGIN_URL = settings.amazon_login_url
 
 
 def _account_platform(account: Account) -> Platform:

@@ -57,6 +57,7 @@ folgende Werte anpassen:
 
 ```env
 APP_HOST=refjuplay-together.example.org
+ADMIN_PASSWORD=<zufaelliges-admin-passwort>
 POSTGRES_DB=lanparty
 POSTGRES_USER=lanparty
 POSTGRES_PASSWORD=<zufaelliger-hex-wert>

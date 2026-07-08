@@ -150,6 +150,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api'
 import ManualOwnershipPicker from '../components/ManualOwnershipPicker.vue'
 import { clearParticipant, currentParticipantId, currentParticipantName } from '../playerIdentity'
+import { platformTitle } from '../platforms'
 import { useLanStore } from '../store'
 import type { Account, Game, PersonalGame, Platform } from '../types'
 
@@ -297,30 +298,6 @@ function formatPlaytime(minutes: number) {
   if (!minutes) return '0 h'
   const hours = Math.round(minutes / 60)
   return `${hours} h`
-}
-
-function platformTitle(platform: Platform) {
-const titles: Record<string, string> = {
-    steam: 'Steam',
-    epic: 'Epic Games',
-    gog: 'GOG',
-    ubisoft: 'Ubisoft Connect',
-    xbox: 'Xbox Live',
-    ea: 'EA App',
-    amazon: 'Amazon Games',
-    battle_net: 'Battle.net',
-    bethesda: 'Bethesda',
-    gamejolt: 'Game Jolt',
-    humble: 'Humble',
-    humble_key: 'Humble Key',
-    meta: 'Meta / Oculus',
-    itch: 'itch.io',
-    legacy: 'Legacy Games',
-    riot: 'Riot Games',
-    rockstar: 'Rockstar',
-    local: 'Lokal'
-  }
-  return titles[platform] || platform
 }
 
 const modeOptions = [

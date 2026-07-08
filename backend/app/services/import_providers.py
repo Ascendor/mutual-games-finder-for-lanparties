@@ -23,19 +23,19 @@ from app.services.account_identity import apply_account_identity, is_placeholder
 from app.services.game_classification import classify_game
 from app.services.normalization import normalize_title
 
-GOG_CLIENT_ID = "46899977096215655"
-GOG_CLIENT_SECRET = "9d85c43b1482497dbbce61f6e4aa173a433796eeae2ca8c5f6129f2dc4de46d9"
-GOG_AUTH_URL = "https://auth.gog.com/token"
-GOG_LOGIN_URL = "https://auth.gog.com/auth"
-GOG_REDIRECT_URI = "https://embed.gog.com/on_login_success?origin=client"
-GOG_EMBED_URL = "https://embed.gog.com"
-GOG_API_URL = "https://api.gog.com"
+GOG_CLIENT_ID = settings.gog_client_id
+GOG_CLIENT_SECRET = settings.gog_client_secret
+GOG_AUTH_URL = settings.gog_auth_url
+GOG_LOGIN_URL = settings.gog_login_url
+GOG_REDIRECT_URI = settings.gog_redirect_uri
+GOG_EMBED_URL = settings.gog_embed_url
+GOG_API_URL = settings.gog_api_url
 GOG_DEFAULT_CACHE = Path.home() / ".config" / "heroic_gogdl" / "auth.json"
-AMAZON_ENTITLEMENTS_URL = "https://gaming.amazon.com/api/distribution/entitlements"
-AMAZON_TOKEN_URL = "https://api.amazon.com/auth/token"
-EA_GRAPHQL_URL = "https://service-aggregation-layer.juno.ea.com/graphql"
-EA_OWNED_GAMES_QUERY_HASH = "779f1cd1355699752e20c0b3877847f4e3010ef5de131c248e98f8eff84f0718"
-EA_PLAY_TIMES_QUERY_HASH = "3f09b35e06b75c74d8ec3e520a598ebb5e2992b1e1268b6dd3b8ed99b9fafb29"
+AMAZON_ENTITLEMENTS_URL = settings.amazon_entitlements_url
+AMAZON_TOKEN_URL = settings.amazon_token_url
+EA_GRAPHQL_URL = settings.ea_graphql_url
+EA_OWNED_GAMES_QUERY_HASH = settings.ea_owned_games_query_hash
+EA_PLAY_TIMES_QUERY_HASH = settings.ea_play_times_query_hash
 LOGGER = logging.getLogger(__name__)
 
 def platform_value(platform: Platform | str) -> str:
@@ -948,7 +948,7 @@ def _resolved_gog_title(
     return None
 
 
-UBISOFT_APP_ID = "f68a4bb5-608a-4ff2-8123-be8ef797e0a6"
+UBISOFT_APP_ID = settings.ubisoft_app_id
 
 
 class UbisoftProvider:
@@ -1544,9 +1544,14 @@ class MetaProvider:
         games: list[ImportedGame] = []
         seen: set[str] = set()
         with httpx.Client(timeout=40) as client:
-            for document_id in ("9431935310238631", "29383114651302983", "29143116735333849"):
+            document_ids = [
+                document_id.strip()
+                for document_id in settings.meta_graphql_document_ids.split(",")
+                if document_id.strip()
+            ]
+            for document_id in document_ids:
                 response = client.post(
-                    "https://graph.oculus.com/graphql?locale=en_US",
+                    settings.meta_graphql_url,
                     data={"access_token": access_token, "doc_id": document_id},
                 )
                 response.raise_for_status()

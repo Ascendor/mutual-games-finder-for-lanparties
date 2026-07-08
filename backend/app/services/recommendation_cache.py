@@ -9,6 +9,7 @@ from threading import RLock
 from sqlalchemy import event, insert, select, update
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Account, Game, ManualOwnership, Ownership, Participant, PlatformGameMapping, RecommendationCacheRevision
 from app.schemas import RecommendationRead
@@ -91,7 +92,10 @@ class RecommendationCache:
         return f'"recommendations-{revision}-{digest}"'
 
 
-recommendation_cache = RecommendationCache()
+recommendation_cache = RecommendationCache(
+    ttl_seconds=settings.recommendation_cache_entry_ttl_seconds,
+    max_entries=settings.recommendation_cache_max_entries,
+)
 
 
 def synchronize_recommendation_cache(db: Session) -> int:

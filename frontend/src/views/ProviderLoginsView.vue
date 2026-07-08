@@ -165,6 +165,7 @@ import { api } from '../api'
 import ManualOwnershipPicker from '../components/ManualOwnershipPicker.vue'
 import ProviderConnectDialog from '../components/ProviderConnectDialog.vue'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
+import { loginPlatforms, platformIcon, platformTitle } from '../platforms'
 import { stateFromRun, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
 import { useLanStore } from '../store'
 import type { Account, Participant, Platform, ProviderAuthStatus } from '../types'
@@ -182,18 +183,6 @@ const props = withDefaults(defineProps<{
   adminMode: false
 })
 
-const loginPlatforms: Platform[] = [
-  'steam',
-  'epic',
-  'gog',
-  'ubisoft',
-  'xbox',
-  'ea',
-  'amazon',
-  'battle_net',
-  'humble',
-  'meta'
-]
 const router = useRouter()
 const store = useLanStore()
 const statuses = ref<ProviderAuthStatus[]>([])
@@ -395,37 +384,6 @@ function readableError(value: unknown) {
   }
 }
 
-function platformTitle(platform: Platform) {
-  const titles: Record<string, string> = {
-    steam: 'Steam',
-    epic: 'Epic Games',
-    gog: 'GOG',
-    ubisoft: 'Ubisoft Connect',
-    xbox: 'Xbox Live',
-    ea: 'EA App',
-    amazon: 'Amazon Games',
-    battle_net: 'Battle.net',
-    humble: 'Humble',
-    meta: 'Meta / Oculus'
-  }
-  return titles[platform] || platform
-}
-
-function platformIcon(platform: Platform) {
-  const icons: Record<string, string> = {
-    steam: 'mdi-steam',
-    epic: 'mdi-gamepad-variant-outline',
-    gog: 'mdi-gamepad-square-outline',
-    ubisoft: 'mdi-alpha-u-circle-outline',
-    xbox: 'mdi-microsoft-xbox',
-    ea: 'mdi-alpha-e-circle-outline',
-    amazon: 'mdi-amazon',
-    battle_net: 'mdi-battle-net',
-    humble: 'mdi-alpha-h-circle-outline',
-    meta: 'mdi-virtual-reality'
-  }
-  return icons[platform] || 'mdi-gamepad-variant-outline'
-}
 </script>
 
 <style scoped>

@@ -1,13 +1,27 @@
 import { ref } from 'vue'
 
-const ADMIN_PASSWORD = 'QC4lF93bYgwTHRT4xRynsAIz3San1lDW'
-const STORAGE_KEY = 'lan-admin-unlocked'
+import { api } from './api'
+
+const STORAGE_KEY = 'lan-admin-unlocked-v2'
 const storage = typeof window === 'undefined' ? null : window.sessionStorage
 
 export const adminUnlocked = ref(storage?.getItem(STORAGE_KEY) === 'true')
 
-export function tryUnlockAdmin(password: string) {
-  if (password !== ADMIN_PASSWORD) return false
+export async function tryUnlockAdmin(password: string) {
+  let result: { unlocked: boolean }
+  try {
+    result = await api.adminUnlock(password)
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err)
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed.detail === 'invalid admin password') return false
+    } catch {
+      // Keep the original error for non-API failures.
+    }
+    throw err
+  }
+  if (!result.unlocked) return false
   storage?.setItem(STORAGE_KEY, 'true')
   adminUnlocked.value = true
   return true

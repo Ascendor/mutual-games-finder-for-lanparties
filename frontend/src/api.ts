@@ -24,6 +24,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  adminUnlock: (password: string) =>
+    request<{ unlocked: boolean }>('/admin/unlock', {
+      method: 'POST',
+      body: JSON.stringify({ password })
+    }),
   participants: () => request<Participant[]>('/participants'),
   createParticipant: (payload: Partial<Participant>) =>
     request<Participant>('/participants', { method: 'POST', body: JSON.stringify(payload) }),

@@ -29,11 +29,14 @@ Default Basic Auth:
 - Benutzer: `lanparty`
 - Passwort: `QC4lF93bYgwTHRT4xRynsAIz3San1lDW`
 
+Das In-App-Adminpasswort ist im lokalen Compose-Setup ebenfalls auf `QC4lF93bYgwTHRT4xRynsAIz3San1lDW` gesetzt. Basic Auth schuetzt den Zugriff auf die gesamte Anwendung; das Adminpasswort entsperrt nur die Administrationsbereiche innerhalb der Anwendung.
+
 Die Werte koennen in `.env` angepasst werden:
 
 ```env
 BASIC_AUTH_USER=lanparty
 BASIC_AUTH_PASSWORD=QC4lF93bYgwTHRT4xRynsAIz3San1lDW
+ADMIN_PASSWORD=QC4lF93bYgwTHRT4xRynsAIz3San1lDW
 ```
 
 Backend und Frontend werden im Docker-Compose-Betrieb nicht mehr direkt veroeffentlicht. Der Zugriff laeuft ueber den Gateway, damit TLS und Basic Auth nicht umgangen werden.
