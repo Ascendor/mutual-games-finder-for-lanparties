@@ -309,7 +309,7 @@
                 color="primary"
                 prepend-icon="mdi-open-in-new"
               >
-                {{ target.platform === 'ea' ? 'EA-Login öffnen' : `${platformTitle(target.platform)} öffnen` }}
+                {{ providerOpenButtonLabel }}
               </v-btn>
               <v-btn
                 v-if="target.platform === 'ea'"
@@ -506,7 +506,22 @@ let steamPopupTimer: ReturnType<typeof setInterval> | undefined
 
 const progress = computed(() => stage.value * 25)
 const browserGuide = computed(() => browserGuides[browserFamily.value])
+const providerOpenButtonLabel = computed(() => {
+  if (props.target?.platform === 'ea') return 'EA-Login öffnen'
+  if (props.target?.platform === 'battle_net') return 'Battle.net-Bibliotheksseite öffnen'
+  return `${platformTitle(props.target?.platform || '')} öffnen`
+})
 const sessionGuideSteps = computed(() => {
+  if (props.target?.platform === 'battle_net') {
+    return [
+      'Nutze unten den Button „Battle.net-Bibliotheksseite öffnen“. Öffne Battle.net bitte nicht manuell in einem anderen Tab.',
+      'Melde dich an, falls Battle.net dich dazu auffordert. Danach solltest du auf der technischen Seite „games-and-subs“ landen.',
+      browserGuide.value.steps[1],
+      'Lade die Seite neu, damit die Anfrage „games-and-subs“ in der Netzwerkliste erscheint.',
+      'Klicke die erfolgreiche Anfrage „games-and-subs“ mit Status 200 mit der rechten Maustaste an und kopiere sie als cURL.',
+      'Füge die komplette kopierte Anfrage unten ein.'
+    ]
+  }
   if (props.target?.platform !== 'ea') return browserGuide.value.steps
   return [
     'Öffne den EA-Login und melde dich vollständig an.',
@@ -520,7 +535,7 @@ const sessionGuideSteps = computed(() => {
 })
 const browserRequestHint = computed(() => {
   if (props.target?.platform === 'battle_net') {
-    return 'Am einfachsten ist die Anfrage „games-and-subs“ mit Status 200.'
+    return 'Wichtig: Starte über den Button in diesem Dialog. Gesucht ist danach die Anfrage „games-and-subs“ mit Status 200.'
   }
   if (props.target?.platform === 'humble') {
     return 'Filtere nach „user/order“ und kopiere diese Anfrage mit Status 200. Falls sie fehlt, öffne deine Humble-Bibliothek und lade sie neu.'

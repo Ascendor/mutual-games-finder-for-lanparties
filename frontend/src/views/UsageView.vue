@@ -34,13 +34,35 @@
         <v-col v-for="metric in metrics" :key="metric.label" cols="6" md="3">
           <v-card variant="flat" class="metric-card">
             <div class="text-h4 font-weight-bold">{{ metric.value }}</div>
-            <div class="text-body-2 text-medium-emphasis">{{ metric.label }}</div>
+            <div class="metric-label text-body-2 text-medium-emphasis">
+              <span>{{ metric.label }}</span>
+              <v-icon
+                v-if="metric.tooltip"
+                icon="mdi-help-circle-outline"
+                size="16"
+                class="help-icon"
+              >
+                <v-tooltip activator="parent" location="top" max-width="320">
+                  {{ metric.tooltip }}
+                </v-tooltip>
+              </v-icon>
+            </div>
           </v-card>
         </v-col>
       </v-row>
 
       <section class="usage-section">
-        <h2 class="text-h6 mb-3">Aktivität nach Tag</h2>
+        <div class="section-heading mb-1">
+          <h2 class="text-h6">Aktivität nach Datum</h2>
+          <v-icon icon="mdi-help-circle-outline" size="18" class="help-icon">
+            <v-tooltip activator="parent" location="top" max-width="360">
+              Gezählt werden alle App-Ereignisse pro Kalendertag im ausgewählten Zeitraum.
+            </v-tooltip>
+          </v-icon>
+        </div>
+        <p class="text-body-2 text-medium-emphasis mb-3">
+          Jede Zeile fasst die App-Nutzung dieses Kalendertags zusammen.
+        </p>
         <v-data-table
           class="compact-table"
           density="compact"
@@ -56,7 +78,14 @@
       <v-row>
         <v-col cols="12" lg="6">
           <section class="usage-section">
-            <h2 class="text-h6 mb-3">Meistgesuchte Spiele</h2>
+            <div class="section-heading mb-3">
+              <h2 class="text-h6">Meistgesuchte Spiele</h2>
+              <v-icon icon="mdi-help-circle-outline" size="18" class="help-icon">
+                <v-tooltip activator="parent" location="top" max-width="360">
+                  Suchen aus "Ich will Spiel X spielen": Wer besitzt dieses Spiel und könnte mitspielen?
+                </v-tooltip>
+              </v-icon>
+            </div>
             <v-data-table
               class="compact-table"
               density="compact"
@@ -69,7 +98,14 @@
         </v-col>
         <v-col cols="12" lg="6">
           <section class="usage-section">
-            <h2 class="text-h6 mb-3">Häufig als Mitspieler:in ausgewählt</h2>
+            <div class="section-heading mb-3">
+              <h2 class="text-h6">Häufig als Mitspieler:in ausgewählt</h2>
+              <v-icon icon="mdi-help-circle-outline" size="18" class="help-icon">
+                <v-tooltip activator="parent" location="top" max-width="360">
+                  Suchen aus "Ich will mit X, Y, Z spielen": Welche gemeinsamen Spiele passen zu dieser Gruppe?
+                </v-tooltip>
+              </v-icon>
+            </div>
             <v-data-table
               class="compact-table"
               density="compact"
@@ -132,8 +168,8 @@
           <template v-else-if="detail">
             <div class="detail-counts mb-5">
               <div><strong>{{ detail.total_events }}</strong><span>Aktionen gesamt</span></div>
-              <div><strong>{{ eventCount('find_players_search') }}</strong><span>Mitspielersuchen</span></div>
-              <div><strong>{{ eventCount('group_games_search') }}</strong><span>Gruppensuchen</span></div>
+              <div><strong>{{ eventCount('find_players_search') }}</strong><span>Wer-spielt-mit-Suchen</span></div>
+              <div><strong>{{ eventCount('group_games_search') }}</strong><span>Was-können-wir-spielen-Suchen</span></div>
               <div><strong>{{ eventCount('page_view') }}</strong><span>Seitenaufrufe</span></div>
             </div>
 
@@ -245,18 +281,26 @@ const periodOptions = [
 ]
 
 const metrics = computed(() => [
-  { label: 'Aktive Teilnehmer:innen', value: summary.value?.active_users || 0 },
-  { label: 'Mitspielersuchen', value: summary.value?.find_players_searches || 0 },
-  { label: 'Gruppensuchen', value: summary.value?.group_games_searches || 0 },
-  { label: 'Seitenaufrufe', value: summary.value?.page_views || 0 }
+  { label: 'Aktive Teilnehmer:innen', value: summary.value?.active_users || 0, tooltip: '' },
+  {
+    label: 'Wer spielt mit?',
+    value: summary.value?.find_players_searches || 0,
+    tooltip: 'Suchen aus "Ich will Spiel X spielen": Die App zeigt, wer dieses konkrete Spiel besitzt oder spielen kann.'
+  },
+  {
+    label: 'Was können wir spielen?',
+    value: summary.value?.group_games_searches || 0,
+    tooltip: 'Suchen aus "Ich will mit X, Y, Z spielen": Die App sucht gemeinsame Spiele für eine ausgewählte Gruppe.'
+  },
+  { label: 'Seitenaufrufe', value: summary.value?.page_views || 0, tooltip: '' }
 ])
 
 const dailyHeaders = [
-  { title: 'Tag', key: 'date' },
+  { title: 'Datum', key: 'date' },
   { title: 'Gesamt', key: 'total_events' },
-  { title: 'Seiten', key: 'page_views' },
-  { title: 'Mitspieler', key: 'find_players_searches' },
-  { title: 'Gruppen', key: 'group_games_searches' }
+  { title: 'Seitenaufrufe', key: 'page_views' },
+  { title: 'Wer spielt mit?', key: 'find_players_searches' },
+  { title: 'Was können wir spielen?', key: 'group_games_searches' }
 ]
 const gameHeaders = [
   { title: 'Spiel', key: 'title' },
@@ -271,9 +315,9 @@ const selectedPlayerHeaders = [
 const participantHeaders = [
   { title: 'Teilnehmer:in', key: 'nickname' },
   { title: 'Gesamt', key: 'total_events' },
-  { title: 'Seiten', key: 'page_views' },
-  { title: 'Mitspieler', key: 'find_players_searches' },
-  { title: 'Gruppen', key: 'group_games_searches' },
+  { title: 'Seitenaufrufe', key: 'page_views' },
+  { title: 'Wer spielt mit?', key: 'find_players_searches' },
+  { title: 'Was können wir spielen?', key: 'group_games_searches' },
   { title: 'Zuletzt aktiv', key: 'last_active_at' },
   { title: '', key: 'actions', sortable: false }
 ]
@@ -413,7 +457,12 @@ function eventDescription(event: UsageEvent) {
 }
 
 function formatDay(value: string) {
-  return new Intl.DateTimeFormat('de-DE', { weekday: 'short', dateStyle: 'medium' })
+  return new Intl.DateTimeFormat('de-DE', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
     .format(new Date(`${value}T12:00:00`))
 }
 
@@ -472,6 +521,23 @@ function readableError(value: unknown) {
   min-height: 104px;
   padding: 16px;
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.metric-label,
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-label {
+  min-height: 22px;
+}
+
+.help-icon {
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  cursor: help;
+  flex: 0 0 auto;
 }
 
 .usage-section {
