@@ -8,7 +8,7 @@ export function trackUsage(
 ) {
   const participantId = currentParticipantId.value
   if (!participantId) return
-  void fetch('/api/analytics/events', {
+  void fetch('/api/app-log/entries', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -18,6 +18,6 @@ export function trackUsage(
     }),
     keepalive: true
   }).catch(() => {
-    // Analytics must never interrupt the user's actual task.
+    // App logging must never interrupt the user's actual task.
   })
 }

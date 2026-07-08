@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from app.schemas import (
     ManualOwnershipRead,
     OwnershipCreate,
     OwnershipRead,
+    PersonalGamePageRead,
 )
 from app.services.normalization import normalize_title
 
@@ -30,6 +31,95 @@ def create_ownership(payload: OwnershipCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(ownership)
     return ownership
+
+
+@router.get("/participants/{participant_id}/games", response_model=PersonalGamePageRead)
+def participant_games(
+    participant_id: int,
+    search: str = "",
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=200),
+    sort_by: str = Query(default="title"),
+    sort_desc: bool = False,
+    db: Session = Depends(get_db),
+):
+    if not db.get(Participant, participant_id):
+        raise HTTPException(404, "participant not found")
+
+    ownership_totals = (
+        select(
+            Ownership.game_id.label("game_id"),
+            func.coalesce(func.sum(Ownership.playtime_minutes), 0).label("total_playtime_minutes"),
+            func.min(Ownership.platform).label("first_platform"),
+        )
+        .where(Ownership.participant_id == participant_id)
+        .group_by(Ownership.game_id)
+        .subquery()
+    )
+    filters = [Game.is_game == True]  # noqa: E712
+    normalized_search = normalize_title(search)
+    if normalized_search:
+        filters.append(Game.normalized_title.contains(normalized_search))
+
+    total = db.scalar(
+        select(func.count())
+        .select_from(Game)
+        .join(ownership_totals, ownership_totals.c.game_id == Game.id)
+        .where(*filters)
+    ) or 0
+
+    order_expression = {
+        "title": func.lower(Game.title),
+        "platform": func.lower(ownership_totals.c.first_platform),
+        "playtime_minutes": ownership_totals.c.total_playtime_minutes,
+    }.get(sort_by, func.lower(Game.title))
+    if sort_desc:
+        order_expression = order_expression.desc()
+
+    rows = db.execute(
+        select(Game, ownership_totals.c.total_playtime_minutes)
+        .join(ownership_totals, ownership_totals.c.game_id == Game.id)
+        .where(*filters)
+        .order_by(order_expression, func.lower(Game.title), Game.id)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    ).all()
+    games = [game for game, _total_playtime in rows]
+    game_ids = [game.id for game in games]
+
+    ownerships_by_game: dict[int, list[dict]] = {game_id: [] for game_id in game_ids}
+    if game_ids:
+        for ownership, account in db.execute(
+            select(Ownership, Account)
+            .outerjoin(Account, Account.id == Ownership.account_id)
+            .where(
+                Ownership.participant_id == participant_id,
+                Ownership.game_id.in_(game_ids),
+            )
+            .order_by(Ownership.platform, Ownership.id)
+        ):
+            ownerships_by_game[ownership.game_id].append(
+                {
+                    "platform": ownership.platform,
+                    "playtime_minutes": ownership.playtime_minutes,
+                    "account_id": account.account_id if account else None,
+                    "account_display_name": account.display_name if account else None,
+                }
+            )
+
+    return {
+        "items": [
+            {
+                "game": game,
+                "platforms": ownerships_by_game.get(game.id, []),
+                "total_playtime_minutes": int(total_playtime or 0),
+            }
+            for game, total_playtime in rows
+        ],
+        "total": int(total),
+        "page": page,
+        "per_page": per_page,
+    }
 
 
 @router.get("/manual/options", response_model=list[ManualOwnershipGameOptionRead])

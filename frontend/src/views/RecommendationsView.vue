@@ -92,7 +92,7 @@ import RecommendationTable from '../components/RecommendationTable.vue'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { useLanStore } from '../store'
 import type { Participant, Recommendation } from '../types'
-import { trackUsage } from '../usageAnalytics'
+import { trackUsage } from '../appLog'
 
 const store = useLanStore()
 const route = useRoute()

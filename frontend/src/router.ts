@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { adminUnlocked } from './adminAccess'
 import { currentParticipantId } from './playerIdentity'
-import { trackUsage } from './usageAnalytics'
+import { trackUsage } from './appLog'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -13,14 +13,15 @@ export const router = createRouter({
     { path: '/participants', redirect: '/admin/participants' },
     { path: '/accounts', redirect: '/logins' },
     { path: '/logins', component: () => import('./views/ProviderLoginsView.vue') },
+    { path: '/my-games', component: () => import('./views/PersonalGamesView.vue') },
     { path: '/games', redirect: '/admin/games' },
     { path: '/recommendations', component: () => import('./views/RecommendationsView.vue') },
     { path: '/find-players', component: () => import('./views/FindPlayersView.vue') },
     { path: '/sync', redirect: '/admin/sync' },
     { path: '/admin', component: () => import('./views/AdminView.vue') },
     {
-      path: '/admin/analytics',
-      component: () => import('./views/AnalyticsView.vue'),
+      path: '/admin/nutzung',
+      component: () => import('./views/UsageView.vue'),
       meta: { requiresAdmin: true }
     },
     {

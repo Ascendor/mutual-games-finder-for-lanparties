@@ -28,7 +28,7 @@
               <p class="text-medium-emphasis">
                 Suchen, Seitenaufrufe und Nutzung pro Teilnehmer für das LAN-Wochenende auswerten.
               </p>
-              <v-btn to="/admin/analytics" color="primary" variant="tonal" prepend-icon="mdi-chart-box-outline">
+              <v-btn to="/admin/nutzung" color="primary" variant="tonal" prepend-icon="mdi-chart-box-outline">
                 Analyse öffnen
               </v-btn>
             </v-card-text>
@@ -144,7 +144,7 @@ function unlock() {
   }
   password.value = ''
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-  if (['/admin/analytics', '/admin/logins', '/admin/participants', '/admin/games', '/admin/sync'].includes(redirect)) {
+  if (['/admin/nutzung', '/admin/logins', '/admin/participants', '/admin/games', '/admin/sync'].includes(redirect)) {
     void router.replace(redirect)
     return
   }

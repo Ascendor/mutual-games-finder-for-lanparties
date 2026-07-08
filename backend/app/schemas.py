@@ -176,6 +176,26 @@ class OwnershipRead(OwnershipCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PersonalGamePlatformRead(BaseModel):
+    platform: Platform
+    playtime_minutes: int = 0
+    account_id: str | None = None
+    account_display_name: str | None = None
+
+
+class PersonalGameRead(BaseModel):
+    game: GameRead
+    platforms: list[PersonalGamePlatformRead] = Field(default_factory=list)
+    total_playtime_minutes: int = 0
+
+
+class PersonalGamePageRead(BaseModel):
+    items: list[PersonalGameRead]
+    total: int
+    page: int
+    per_page: int
+
+
 class ManualOwnershipCreate(BaseModel):
     participant_id: int
     game_id: int

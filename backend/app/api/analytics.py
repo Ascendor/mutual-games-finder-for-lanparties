@@ -26,14 +26,14 @@ from app.services.analytics_service import (
 router = APIRouter()
 
 
-@router.post("/events", response_model=UsageEventRead, status_code=201)
+@router.post("/entries", response_model=UsageEventRead, status_code=201)
 def create_event(payload: UsageEventCreate, db: Session = Depends(get_db)):
     maybe_purge_expired_usage_events(db)
     participant = db.get(Participant, payload.participant_id) if payload.participant_id else None
     if payload.participant_id and participant is None:
         raise HTTPException(404, "participant not found")
     if len(json.dumps(payload.details, ensure_ascii=False)) > 8192:
-        raise HTTPException(413, "analytics event details are too large")
+        raise HTTPException(413, "entry details are too large")
     event = UsageEvent(
         participant_id=participant.id if participant else None,
         participant_name=participant.nickname if participant else "",
@@ -109,7 +109,7 @@ def analytics_participant(
         raise HTTPException(status, str(exc)) from exc
 
 
-@router.delete("/participants/{participant_id}/events", status_code=204)
+@router.delete("/participants/{participant_id}/entries", status_code=204)
 def delete_participant_events(
     participant_id: int,
     db: Session = Depends(get_db),

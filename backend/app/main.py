@@ -30,7 +30,7 @@ app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(provider_auth.router, prefix="/api/provider-auth", tags=["provider-auth"])
 app.include_router(recommendations.router, prefix="/api/recommendations", tags=["recommendations"])
 app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(analytics.router, prefix="/api/app-log", tags=["app-log"])
 app.include_router(privacy.router, prefix="/api/privacy", tags=["privacy"])
 
 

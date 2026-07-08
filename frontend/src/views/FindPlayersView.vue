@@ -49,7 +49,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { useRoute } from 'vue-router'
-import { trackUsage } from '../usageAnalytics'
+import { trackUsage } from '../appLog'
 import type { GameOption, GameOwner, Platform } from '../types'
 
 const route = useRoute()

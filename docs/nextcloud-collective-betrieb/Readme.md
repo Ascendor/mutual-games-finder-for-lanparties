@@ -8,7 +8,7 @@ Collectives hochladen. `Readme.md` wird als Startseite verwendet.
 
 Zuletzt praktisch geprueft:
 
-- Release: `v1.1.0`
+- Release: `v1.2.0`
 - Datum: 3. Juli 2026
 - Apache terminiert TLS und Basic Auth.
 - Frontend lauscht auf `127.0.0.1:18080`.

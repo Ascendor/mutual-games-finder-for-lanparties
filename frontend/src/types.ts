@@ -105,6 +105,26 @@ export interface Ownership {
   last_seen: string
 }
 
+export interface PersonalGamePlatform {
+  platform: Platform
+  playtime_minutes: number
+  account_id?: string | null
+  account_display_name?: string | null
+}
+
+export interface PersonalGame {
+  game: Game
+  platforms: PersonalGamePlatform[]
+  total_playtime_minutes: number
+}
+
+export interface PersonalGamePage {
+  items: PersonalGame[]
+  total: number
+  page: number
+  per_page: number
+}
+
 
 export interface GameOwner {
   participant: Participant

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
+import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -72,6 +72,23 @@ export const api = {
   createOwnership: (payload: Partial<Ownership>) =>
     request<Ownership>('/ownerships', { method: 'POST', body: JSON.stringify(payload) }),
   deleteOwnership: (id: number) => request<void>(`/ownerships/${id}`, { method: 'DELETE' }),
+  personalGames: (params: {
+    participantId: number
+    page: number
+    perPage: number
+    search?: string
+    sortBy?: string
+    sortDesc?: boolean
+  }) => {
+    const query = new URLSearchParams({
+      page: String(params.page),
+      per_page: String(params.perPage),
+      sort_by: params.sortBy || 'title',
+      sort_desc: String(Boolean(params.sortDesc))
+    })
+    if (params.search?.trim()) query.set('search', params.search.trim())
+    return request<PersonalGamePage>(`/ownerships/participants/${params.participantId}/games?${query}`)
+  },
   manualOwnershipOptions: (participantId: number, search: string, limit = 25) => {
     const params = new URLSearchParams({
       participant_id: String(participantId),
@@ -173,30 +190,30 @@ export const api = {
   completeProviderLogin: (accountId: number, payload: { code?: string; email?: string; password?: string; two_factor_code?: string }) =>
     request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/complete`, { method: 'POST', body: JSON.stringify(payload) }),
   logoutProvider: (accountId: number) => request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/logout`, { method: 'POST' }),
-  analyticsConfiguration: () =>
-    request<AnalyticsConfiguration>('/analytics/configuration'),
-  updateAnalyticsConfiguration: (payload: AnalyticsConfiguration) =>
-    request<AnalyticsConfiguration>('/analytics/configuration', {
+  usageConfiguration: () =>
+    request<AnalyticsConfiguration>('/app-log/configuration'),
+  updateUsageConfiguration: (payload: AnalyticsConfiguration) =>
+    request<AnalyticsConfiguration>('/app-log/configuration', {
       method: 'PUT',
       body: JSON.stringify(payload)
     }),
-  analyticsSummary: (period: AnalyticsPeriod, dateFrom: string, dateTo: string) => {
+  usageSummary: (period: AnalyticsPeriod, dateFrom: string, dateTo: string) => {
     const params = new URLSearchParams({ period })
     if (period === 'custom') {
       params.set('date_from', dateFrom)
       params.set('date_to', dateTo)
     }
-    return request<AnalyticsSummary>(`/analytics/summary?${params}`)
+    return request<AnalyticsSummary>(`/app-log/summary?${params}`)
   },
-  analyticsParticipant: (participantId: number, period: AnalyticsPeriod, dateFrom: string, dateTo: string) => {
+  usageParticipant: (participantId: number, period: AnalyticsPeriod, dateFrom: string, dateTo: string) => {
     const params = new URLSearchParams({ period })
     if (period === 'custom') {
       params.set('date_from', dateFrom)
       params.set('date_to', dateTo)
     }
-    return request<AnalyticsParticipantDetail>(`/analytics/participants/${participantId}?${params}`)
+    return request<AnalyticsParticipantDetail>(`/app-log/participants/${participantId}?${params}`)
   },
-  deleteParticipantAnalytics: (participantId: number) =>
-    request<void>(`/analytics/participants/${participantId}/events`, { method: 'DELETE' }),
+  deleteParticipantUsage: (participantId: number) =>
+    request<void>(`/app-log/participants/${participantId}/entries`, { method: 'DELETE' }),
   privacyInfo: () => request<PrivacyInfo>('/privacy')
 }

@@ -1,6 +1,6 @@
 <template>
-  <div class="page analytics-page">
-    <div class="analytics-header mb-5">
+  <div class="page usage-page">
+    <div class="usage-header mb-5">
       <div>
         <h1 class="text-h4">Nutzungsanalyse</h1>
         <p class="text-medium-emphasis mb-0">Lokale Auswertung der tatsächlichen App-Nutzung.</p>
@@ -39,7 +39,7 @@
         </v-col>
       </v-row>
 
-      <section class="analytics-section">
+      <section class="usage-section">
         <h2 class="text-h6 mb-3">Aktivität nach Tag</h2>
         <v-data-table
           class="compact-table"
@@ -55,7 +55,7 @@
 
       <v-row>
         <v-col cols="12" lg="6">
-          <section class="analytics-section">
+          <section class="usage-section">
             <h2 class="text-h6 mb-3">Meistgesuchte Spiele</h2>
             <v-data-table
               class="compact-table"
@@ -68,7 +68,7 @@
           </section>
         </v-col>
         <v-col cols="12" lg="6">
-          <section class="analytics-section">
+          <section class="usage-section">
             <h2 class="text-h6 mb-3">Häufig als Mitspieler:in ausgewählt</h2>
             <v-data-table
               class="compact-table"
@@ -82,7 +82,7 @@
         </v-col>
       </v-row>
 
-      <section class="analytics-section">
+      <section class="usage-section">
         <h2 class="text-h6 mb-3">Nutzung nach Teilnehmer:in</h2>
         <v-data-table
           class="compact-table"
@@ -287,8 +287,8 @@ onMounted(initialize)
 
 async function initialize() {
   try {
-    configuration.value = await api.analyticsConfiguration()
-    const saved = window.localStorage.getItem('lan-analytics-period') as AnalyticsPeriod | null
+    configuration.value = await api.usageConfiguration()
+    const saved = window.localStorage.getItem('lan-usage-period') as AnalyticsPeriod | null
     period.value = saved || (configuration.value.party_start_at ? 'party' : 'custom')
     if (!configuration.value.party_start_at && ['party', 'before_party'].includes(period.value)) {
       period.value = 'custom'
@@ -300,7 +300,7 @@ async function initialize() {
 }
 
 function changePeriod(value: AnalyticsPeriod) {
-  window.localStorage.setItem('lan-analytics-period', value)
+  window.localStorage.setItem('lan-usage-period', value)
   void load()
 }
 
@@ -308,7 +308,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    summary.value = await api.analyticsSummary(period.value, dateFrom.value, dateTo.value)
+    summary.value = await api.usageSummary(period.value, dateFrom.value, dateTo.value)
   } catch (err) {
     error.value = readableError(err)
   } finally {
@@ -321,7 +321,7 @@ async function openParticipant(participantId: number) {
   detailLoading.value = true
   detail.value = null
   try {
-    detail.value = await api.analyticsParticipant(
+    detail.value = await api.usageParticipant(
       participantId,
       period.value,
       dateFrom.value,
@@ -340,7 +340,7 @@ async function deleteDetailEvents() {
   if (!window.confirm(`Alle Nutzungsereignisse von ${detail.value.nickname} wirklich löschen?`)) return
   detailDeleting.value = true
   try {
-    await api.deleteParticipantAnalytics(detail.value.participant_id)
+    await api.deleteParticipantUsage(detail.value.participant_id)
     detailOpen.value = false
     detail.value = null
     await load()
@@ -369,13 +369,13 @@ async function saveConfiguration() {
       configurationError.value = 'Das Partyende muss nach dem Partybeginn liegen.'
       return
     }
-    configuration.value = await api.updateAnalyticsConfiguration({
+    configuration.value = await api.updateUsageConfiguration({
       party_start_at: partyStart.toISOString(),
       party_end_at: partyEnd?.toISOString() || null
     })
     configurationOpen.value = false
     period.value = 'party'
-    window.localStorage.setItem('lan-analytics-period', period.value)
+    window.localStorage.setItem('lan-usage-period', period.value)
     await load()
   } catch (err) {
     configurationError.value = readableError(err)
@@ -454,7 +454,7 @@ function readableError(value: unknown) {
 </script>
 
 <style scoped>
-.analytics-header {
+.usage-header {
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -474,7 +474,7 @@ function readableError(value: unknown) {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
-.analytics-section {
+.usage-section {
   margin-bottom: 28px;
 }
 
@@ -502,7 +502,7 @@ function readableError(value: unknown) {
 }
 
 @media (max-width: 760px) {
-  .analytics-header {
+  .usage-header {
     align-items: stretch;
     flex-direction: column;
   }

@@ -81,13 +81,24 @@
 
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
-          <v-card-title>Einstellungen</v-card-title>
+          <v-card-title class="settings-title">
+            <span>Einstellungen</span>
+            <v-btn
+              variant="text"
+              color="primary"
+              size="small"
+              prepend-icon="mdi-logout"
+              @click="logout"
+            >
+              Abmelden
+            </v-btn>
+          </v-card-title>
           <v-card-text class="action-content text-center">
             <span class="text-body-1">Eingeloggt als <strong>{{ currentParticipant?.nickname }}</strong></span>
           </v-card-text>
           <v-card-actions class="settings-actions">
-            <v-btn variant="text" color="primary" prepend-icon="mdi-logout" @click="logout">Abmelden</v-btn>
-            <v-btn to="/logins" color="primary" prepend-icon="mdi-key-chain-variant">Meine Accounts</v-btn>
+            <v-btn to="/my-games" color="primary" variant="text" prepend-icon="mdi-format-list-bulleted">Meine Spiele</v-btn>
+            <v-btn to="/logins" color="primary" variant="text" prepend-icon="mdi-key-chain-variant">Meine Accounts</v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
@@ -148,7 +159,7 @@ async function logout() {
 
 <style scoped>
 .home-page {
-  max-width: 1180px;
+  max-width: 1320px;
 }
 
 .action-card {
@@ -167,10 +178,22 @@ async function logout() {
   justify-content: center;
 }
 
-.settings-actions {
+.settings-title {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-actions {
+  justify-content: center;
+  flex-wrap: nowrap;
   gap: 8px;
+}
+
+.settings-actions :deep(.v-btn) {
+  min-width: 0;
+  padding-inline: 10px;
 }
 
 .inline-action {
@@ -188,6 +211,10 @@ async function logout() {
 @media (max-width: 620px) {
   .inline-action {
     grid-template-columns: 1fr;
+  }
+
+  .settings-actions {
+    flex-wrap: wrap;
   }
 }
 </style>

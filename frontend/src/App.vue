@@ -18,7 +18,7 @@
           </template>
           <v-list-item to="/admin" prepend-icon="mdi-shield-key-outline" title="Adminbereich" />
           <template v-if="adminUnlocked">
-            <v-list-item to="/admin/analytics" prepend-icon="mdi-chart-box-outline" title="Nutzungsanalyse" />
+            <v-list-item to="/admin/nutzung" prepend-icon="mdi-chart-box-outline" title="Nutzungsanalyse" />
             <v-list-item to="/admin/logins" prepend-icon="mdi-key-chain-variant" title="Accounts & Logins" />
             <v-list-item to="/admin/participants" prepend-icon="mdi-account-group-outline" title="Teilnehmer:innen" />
             <v-list-item to="/admin/games" prepend-icon="mdi-gamepad-variant-outline" title="Spiele" />
@@ -81,7 +81,8 @@ const mainItems = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard-outline', to: '/dashboard' },
   { title: 'Was können wir spielen?', icon: 'mdi-star-outline', to: '/recommendations' },
   { title: 'Mitspieler:in finden', icon: 'mdi-account-search-outline', to: '/find-players' },
-  { title: 'Accounts & Logins', icon: 'mdi-key-chain-variant', to: '/logins' },
+  { title: 'Meine Spiele', icon: 'mdi-format-list-bulleted', to: '/my-games' },
+  { title: 'Meine Accounts & Logins', icon: 'mdi-key-chain-variant', to: '/logins' },
 ]
 
 watch(
