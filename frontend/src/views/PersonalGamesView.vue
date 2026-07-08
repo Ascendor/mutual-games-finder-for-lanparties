@@ -21,6 +21,16 @@
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
+    <v-card v-if="currentParticipant" variant="flat" class="manual-library-card mb-4">
+      <v-card-text>
+        <ManualOwnershipPicker
+          :participant="currentParticipant"
+          :accounts="currentAccounts"
+          @changed="loadPage"
+        />
+      </v-card-text>
+    </v-card>
+
     <div class="personal-games-filters mb-4">
       <v-text-field
         v-model="search"
@@ -76,9 +86,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
+import ManualOwnershipPicker from '../components/ManualOwnershipPicker.vue'
 import { clearParticipant, currentParticipantId, currentParticipantName } from '../playerIdentity'
 import { useLanStore } from '../store'
-import type { Game, PersonalGame, Platform } from '../types'
+import type { Account, Game, PersonalGame, Platform } from '../types'
 
 const router = useRouter()
 const store = useLanStore()
@@ -87,6 +98,7 @@ const total = ref(0)
 const loading = ref(false)
 const error = ref('')
 const search = ref('')
+const accounts = ref<Account[]>([])
 const page = ref(1)
 const itemsPerPage = ref(50)
 const sortBy = ref<{ key: string; order: 'asc' | 'desc' }[]>([
@@ -100,6 +112,9 @@ const currentParticipant = computed(() =>
 )
 const participantName = computed(() =>
   currentParticipant.value?.nickname || currentParticipantName.value || 'dich'
+)
+const currentAccounts = computed(() =>
+  accounts.value.filter((account) => account.participant_id === currentParticipantId.value)
 )
 
 const headers = [
@@ -126,6 +141,7 @@ onMounted(async () => {
     await router.replace({ path: '/player', query: { redirect: '/my-games' } })
     return
   }
+  await loadAccounts()
   await loadPage()
 })
 
@@ -160,6 +176,14 @@ async function loadPage() {
     error.value = readableError(err)
   } finally {
     if (request === pageRequest) loading.value = false
+  }
+}
+
+async function loadAccounts() {
+  try {
+    accounts.value = await api.accounts()
+  } catch (err) {
+    error.value = readableError(err)
   }
 }
 
@@ -216,6 +240,11 @@ function readableError(value: unknown) {
 
 .personal-games-filters {
   max-width: 440px;
+}
+
+.manual-library-card :deep(.manual-library) {
+  padding: 0;
+  border-top: 0;
 }
 
 .platform-list {

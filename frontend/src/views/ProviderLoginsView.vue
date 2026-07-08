@@ -84,6 +84,7 @@
             </div>
 
             <ManualOwnershipPicker
+              v-if="adminMode"
               :participant="group.participant"
               :accounts="accountsFor(group.participant.id)"
             />

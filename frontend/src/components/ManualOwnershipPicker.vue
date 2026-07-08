@@ -101,6 +101,9 @@ const props = defineProps<{
   participant: Participant
   accounts: Account[]
 }>()
+const emit = defineEmits<{
+  changed: []
+}>()
 
 const search = ref('')
 const results = ref<ManualOwnershipGameOption[]>([])
@@ -187,6 +190,7 @@ async function confirmAdd() {
     })
     message.value = `„${game.title}“ ist jetzt in deiner Bibliothek.`
     await loadResults()
+    emit('changed')
   } catch (err) {
     error.value = readableError(err)
   } finally {
@@ -206,6 +210,7 @@ async function removeManual(game: ManualOwnershipGameOption) {
     )
     message.value = `Der manuelle Eintrag für „${game.title}“ wurde entfernt.`
     await loadResults()
+    emit('changed')
   } catch (err) {
     error.value = readableError(err)
   } finally {
