@@ -21,14 +21,36 @@
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
-    <v-card v-if="currentParticipant" variant="flat" class="manual-library-card mb-4">
-      <v-card-text>
-        <ManualOwnershipPicker
-          :participant="currentParticipant"
-          :accounts="currentAccounts"
-          @changed="loadPage"
-        />
+    <v-card v-if="currentParticipant" variant="flat" class="library-actions-card mb-4">
+      <v-card-text class="library-actions">
+        <div>
+          <div class="text-subtitle-1 font-weight-bold">Bibliothek pflegen</div>
+          <p class="text-body-2 text-medium-emphasis mb-0">
+            Verbinde oder aktualisiere zuerst deine Spielekonten. Das ist der bevorzugte Weg, damit Plattformen,
+            Spielzeiten und spätere Synchronisationen sauber bleiben.
+          </p>
+        </div>
+        <v-btn to="/logins" color="primary" variant="tonal" prepend-icon="mdi-key-chain-variant">
+          Meine Accounts & Logins
+        </v-btn>
       </v-card-text>
+
+      <v-divider />
+
+      <v-expansion-panels variant="accordion" class="manual-library-expansion">
+        <v-expansion-panel elevation="0">
+          <v-expansion-panel-title>
+            Fehlendes Spiel manuell ergänzen
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <ManualOwnershipPicker
+              :participant="currentParticipant"
+              :accounts="currentAccounts"
+              @changed="loadPage"
+            />
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
     </v-card>
 
     <div class="personal-games-filters mb-4">
@@ -337,7 +359,27 @@ function readableError(value: unknown) {
   gap: 12px;
 }
 
-.manual-library-card :deep(.manual-library) {
+.library-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.library-actions > div {
+  min-width: 0;
+}
+
+.manual-library-expansion {
+  border-radius: 0;
+}
+
+.manual-library-expansion :deep(.v-expansion-panel-title) {
+  min-height: 44px;
+  font-size: 0.95rem;
+}
+
+.manual-library-expansion :deep(.manual-library) {
   padding: 0;
   border-top: 0;
 }
@@ -369,6 +411,11 @@ function readableError(value: unknown) {
 @media (max-width: 680px) {
   .personal-games-filters {
     grid-template-columns: 1fr;
+  }
+
+  .library-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>
