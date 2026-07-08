@@ -194,6 +194,8 @@ class PersonalGamePageRead(BaseModel):
     total: int
     page: int
     per_page: int
+    platforms: list[Platform] = Field(default_factory=list)
+    genres: list[str] = Field(default_factory=list)
 
 
 class ManualOwnershipCreate(BaseModel):

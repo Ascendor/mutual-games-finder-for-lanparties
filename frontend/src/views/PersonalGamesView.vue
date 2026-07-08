@@ -40,6 +40,58 @@
         clearable
         hide-details
       />
+      <v-autocomplete
+        v-model="selectedPlatforms"
+        :items="platformOptions"
+        item-title="title"
+        item-value="value"
+        label="Plattformen"
+        prepend-inner-icon="mdi-controller-classic-outline"
+        density="compact"
+        multiple
+        chips
+        closable-chips
+        clearable
+        hide-details
+      />
+      <v-autocomplete
+        v-model="selectedGenres"
+        :items="genreOptions"
+        label="Genres"
+        prepend-inner-icon="mdi-tag-multiple-outline"
+        density="compact"
+        multiple
+        chips
+        closable-chips
+        clearable
+        hide-details
+      />
+      <v-select
+        v-model="selectedModes"
+        :items="modeOptions"
+        item-title="title"
+        item-value="value"
+        label="Multiplayermodi"
+        prepend-inner-icon="mdi-controller-classic-outline"
+        density="compact"
+        multiple
+        chips
+        closable-chips
+        clearable
+        hide-details
+      />
+      <v-text-field
+        v-model.number="playerCount"
+        label="Spielbar mit"
+        prepend-inner-icon="mdi-account-multiple-outline"
+        suffix="Spieler:innen"
+        type="number"
+        min="1"
+        max="128"
+        density="compact"
+        clearable
+        hide-details
+      />
     </div>
 
     <v-data-table-server
@@ -66,12 +118,22 @@
       <template #item.platform="{ item }">
         <div class="platform-list">
           <div v-for="entry in item.platforms" :key="`${item.game.id}:${entry.platform}`" class="platform-entry">
-            <v-chip size="small" color="primary" variant="tonal">
+            <v-chip
+              size="small"
+              color="primary"
+              :variant="selectedPlatforms.includes(entry.platform) ? 'flat' : 'tonal'"
+              class="platform-chip"
+              role="button"
+              tabindex="0"
+              @click="filterByPlatform(entry.platform)"
+              @keydown.enter.prevent="filterByPlatform(entry.platform)"
+              @keydown.space.prevent="filterByPlatform(entry.platform)"
+            >
               {{ platformTitle(entry.platform) }}
+              <v-tooltip activator="parent" location="bottom">
+                Nach {{ platformTitle(entry.platform) }} filtern
+              </v-tooltip>
             </v-chip>
-            <span v-if="entry.account_display_name" class="text-caption text-medium-emphasis">
-              {{ entry.account_display_name }}
-            </span>
           </div>
         </div>
       </template>
@@ -98,6 +160,12 @@ const total = ref(0)
 const loading = ref(false)
 const error = ref('')
 const search = ref('')
+const selectedPlatforms = ref<Platform[]>([])
+const selectedGenres = ref<string[]>([])
+const selectedModes = ref<string[]>([])
+const playerCount = ref<number | null>(null)
+const availablePlatforms = ref<Platform[]>([])
+const availableGenres = ref<string[]>([])
 const accounts = ref<Account[]>([])
 const page = ref(1)
 const itemsPerPage = ref(50)
@@ -116,6 +184,17 @@ const participantName = computed(() =>
 const currentAccounts = computed(() =>
   accounts.value.filter((account) => account.participant_id === currentParticipantId.value)
 )
+const platformOptions = computed(() =>
+  availablePlatforms.value.map((platform) => ({
+    value: platform,
+    title: platformTitle(platform)
+  }))
+)
+const genreOptions = computed(() => availableGenres.value)
+const normalizedPlayerCount = computed(() => {
+  const value = Number(playerCount.value)
+  return Number.isInteger(value) && value >= 1 && value <= 128 ? value : null
+})
 
 const headers = [
   { title: 'Spiel', key: 'title' },
@@ -123,16 +202,20 @@ const headers = [
   { title: 'Spielzeit', key: 'playtime_minutes' }
 ]
 
-watch(search, () => {
-  window.clearTimeout(filterTimer)
-  filterTimer = window.setTimeout(() => {
-    if (page.value === 1) {
-      void loadPage()
-    } else {
-      page.value = 1
-    }
-  }, 250)
-})
+watch(
+  [search, selectedPlatforms, selectedGenres, selectedModes, playerCount],
+  () => {
+    window.clearTimeout(filterTimer)
+    filterTimer = window.setTimeout(() => {
+      if (page.value === 1) {
+        void loadPage()
+      } else {
+        page.value = 1
+      }
+    }, 250)
+  },
+  { deep: true }
+)
 
 onMounted(async () => {
   if (!store.participants.length) await store.refreshParticipants()
@@ -162,12 +245,18 @@ async function loadPage() {
       page: page.value,
       perPage: itemsPerPage.value,
       search: search.value,
+      platforms: selectedPlatforms.value,
+      genres: selectedGenres.value,
+      modes: selectedModes.value,
+      playerCount: normalizedPlayerCount.value,
       sortBy: sort?.key,
       sortDesc: sort?.order === 'desc'
     })
     if (request !== pageRequest) return
     games.value = result.items
     total.value = result.total
+    availablePlatforms.value = result.platforms
+    availableGenres.value = result.genres
     if (page.value > 1 && !result.items.length && result.total) {
       page.value = Math.ceil(result.total / itemsPerPage.value)
     }
@@ -185,6 +274,12 @@ async function loadAccounts() {
   } catch (err) {
     error.value = readableError(err)
   }
+}
+
+function filterByPlatform(platform: Platform) {
+  selectedPlatforms.value = selectedPlatforms.value.length === 1 && selectedPlatforms.value[0] === platform
+    ? []
+    : [platform]
 }
 
 function gameMeta(game: Game) {
@@ -205,22 +300,43 @@ function formatPlaytime(minutes: number) {
 }
 
 function platformTitle(platform: Platform) {
-  const titles: Record<string, string> = {
+const titles: Record<string, string> = {
     steam: 'Steam',
     epic: 'Epic Games',
     gog: 'GOG',
     ubisoft: 'Ubisoft Connect',
     xbox: 'Xbox Live',
+    ea: 'EA App',
     amazon: 'Amazon Games',
     battle_net: 'Battle.net',
+    bethesda: 'Bethesda',
+    gamejolt: 'Game Jolt',
     humble: 'Humble',
     humble_key: 'Humble Key',
     meta: 'Meta / Oculus',
+    itch: 'itch.io',
+    legacy: 'Legacy Games',
+    riot: 'Riot Games',
     rockstar: 'Rockstar',
     local: 'Lokal'
   }
   return titles[platform] || platform
 }
+
+const modeOptions = [
+  { title: 'Singleplayer', value: 'singleplayer' },
+  { title: 'Multiplayer', value: 'multiplayer' },
+  { title: 'LAN', value: 'lan' },
+  { title: 'Coop', value: 'coop' },
+  { title: 'Local Coop', value: 'local_coop' },
+  { title: 'Online Coop', value: 'online_coop' },
+  { title: 'Campaign Coop', value: 'campaign_coop' },
+  { title: 'PvP / Versus', value: 'versus' },
+  { title: 'Hotseat', value: 'hotseat' },
+  { title: 'Split / Shared Screen', value: 'split_screen' },
+  { title: 'Shared Screen', value: 'shared_screen' },
+  { title: 'Kostenlos', value: 'free' }
+]
 
 function readableError(value: unknown) {
   const raw = value instanceof Error ? value.message : String(value)
@@ -239,7 +355,9 @@ function readableError(value: unknown) {
 }
 
 .personal-games-filters {
-  max-width: 440px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  gap: 12px;
 }
 
 .manual-library-card :deep(.manual-library) {
@@ -259,5 +377,21 @@ function readableError(value: unknown) {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.platform-chip {
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .personal-games-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .personal-games-filters {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

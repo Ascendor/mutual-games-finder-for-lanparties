@@ -123,6 +123,8 @@ export interface PersonalGamePage {
   total: number
   page: number
   per_page: number
+  platforms: Platform[]
+  genres: string[]
 }
 
 

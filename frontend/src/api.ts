@@ -77,6 +77,10 @@ export const api = {
     page: number
     perPage: number
     search?: string
+    platforms?: Platform[]
+    genres?: string[]
+    modes?: string[]
+    playerCount?: number | null
     sortBy?: string
     sortDesc?: boolean
   }) => {
@@ -87,6 +91,10 @@ export const api = {
       sort_desc: String(Boolean(params.sortDesc))
     })
     if (params.search?.trim()) query.set('search', params.search.trim())
+    params.platforms?.forEach((platform) => query.append('platforms', platform))
+    params.genres?.forEach((genre) => query.append('genres', genre))
+    params.modes?.forEach((mode) => query.append('modes', mode))
+    if (params.playerCount) query.set('player_count', String(params.playerCount))
     return request<PersonalGamePage>(`/ownerships/participants/${params.participantId}/games?${query}`)
   },
   manualOwnershipOptions: (participantId: number, search: string, limit = 25) => {

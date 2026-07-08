@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import distinct, func, select
+from sqlalchemy import String, cast, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -15,8 +16,21 @@ from app.schemas import (
     PersonalGamePageRead,
 )
 from app.services.normalization import normalize_title
+from app.services.genre_utils import sanitize_genres
 
 router = APIRouter()
+
+PERSONAL_GAME_MODE_FIELDS = {
+    "singleplayer": Game.singleplayer,
+    "multiplayer": Game.multiplayer,
+    "lan": Game.lan,
+    "local_coop": Game.local_coop,
+    "online_coop": Game.online_coop,
+    "campaign_coop": Game.campaign_coop,
+    "versus": Game.versus,
+    "hotseat": Game.hotseat,
+    "shared_screen": Game.shared_screen,
+}
 
 
 @router.get("", response_model=list[OwnershipRead])
@@ -37,15 +51,30 @@ def create_ownership(payload: OwnershipCreate, db: Session = Depends(get_db)):
 def participant_games(
     participant_id: int,
     search: str = "",
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=50, ge=1, le=200),
-    sort_by: str = Query(default="title"),
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=200)] = 50,
+    sort_by: str = "title",
     sort_desc: bool = False,
     db: Session = Depends(get_db),
+    platforms: Annotated[list[str] | None, Query()] = None,
+    genres: Annotated[list[str] | None, Query()] = None,
+    modes: Annotated[list[str] | None, Query()] = None,
+    player_count: Annotated[int | None, Query(ge=1, le=128)] = None,
 ):
     if not db.get(Participant, participant_id):
         raise HTTPException(404, "participant not found")
 
+    selected_platforms = [platform for platform in platforms or [] if platform.strip()]
+    ownership_filters = [Ownership.participant_id == participant_id]
+    if selected_platforms:
+        ownership_filters.append(Ownership.platform.in_(selected_platforms))
+
+    matching_game_ids = (
+        select(Ownership.game_id)
+        .where(*ownership_filters)
+        .group_by(Ownership.game_id)
+        .subquery()
+    )
     ownership_totals = (
         select(
             Ownership.game_id.label("game_id"),
@@ -53,6 +82,7 @@ def participant_games(
             func.min(Ownership.platform).label("first_platform"),
         )
         .where(Ownership.participant_id == participant_id)
+        .where(Ownership.game_id.in_(select(matching_game_ids.c.game_id)))
         .group_by(Ownership.game_id)
         .subquery()
     )
@@ -60,6 +90,62 @@ def participant_games(
     normalized_search = normalize_title(search)
     if normalized_search:
         filters.append(Game.normalized_title.contains(normalized_search))
+    selected_genres = [genre for genre in genres or [] if genre.strip()]
+    if selected_genres:
+        filters.append(
+            or_(
+                *(
+                    cast(Game.genres, String).ilike(f'%"{genre}"%')
+                    for genre in selected_genres
+                )
+            )
+        )
+    for mode in [mode for mode in modes or [] if mode.strip()]:
+        if mode == "coop":
+            filters.append(
+                (Game.local_coop == True)  # noqa: E712
+                | (Game.online_coop == True)  # noqa: E712
+                | (Game.campaign_coop == True)  # noqa: E712
+            )
+        elif mode == "split_screen":
+            filters.append(
+                (Game.split_screen == True) | (Game.shared_screen == True)  # noqa: E712
+            )
+        elif mode == "free":
+            filters.append(Game.is_free == True)  # noqa: E712
+        elif mode in PERSONAL_GAME_MODE_FIELDS:
+            filters.append(PERSONAL_GAME_MODE_FIELDS[mode] == True)  # noqa: E712
+    if player_count is not None:
+        filters.extend(
+            [
+                Game.player_count_known == True,  # noqa: E712
+                Game.min_players <= player_count,
+                Game.max_players >= player_count,
+            ]
+        )
+
+    available_platforms = db.scalars(
+        select(Ownership.platform)
+        .join(Game, Game.id == Ownership.game_id)
+        .where(
+            Ownership.participant_id == participant_id,
+            Game.is_game == True,  # noqa: E712
+        )
+        .distinct()
+    ).all()
+    available_platforms = sorted(available_platforms, key=lambda platform: str(platform).lower())
+    available_genres = sanitize_genres(
+        genre
+        for values in db.scalars(
+            select(Game.genres)
+            .join(Ownership, Ownership.game_id == Game.id)
+            .where(
+                Ownership.participant_id == participant_id,
+                Game.is_game == True,  # noqa: E712
+            )
+        )
+        for genre in (values or [])
+    )
 
     total = db.scalar(
         select(func.count())
@@ -119,6 +205,8 @@ def participant_games(
         "total": int(total),
         "page": page,
         "per_page": per_page,
+        "platforms": available_platforms,
+        "genres": available_genres,
     }
 
 
