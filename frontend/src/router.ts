@@ -9,7 +9,7 @@ export const router = createRouter({
     { path: '/player', component: () => import('./views/PlayerGateView.vue') },
     { path: '/legal', component: () => import('./views/LegalView.vue') },
     { path: '/', component: () => import('./views/HomeView.vue') },
-    { path: '/dashboard', component: () => import('./views/DashboardView.vue') },
+    { path: '/dashboard', redirect: '/admin/dashboard' },
     { path: '/participants', redirect: '/admin/participants' },
     { path: '/accounts', redirect: '/logins' },
     { path: '/logins', component: () => import('./views/ProviderLoginsView.vue') },
@@ -19,6 +19,11 @@ export const router = createRouter({
     { path: '/find-players', component: () => import('./views/FindPlayersView.vue') },
     { path: '/sync', redirect: '/admin/sync' },
     { path: '/admin', component: () => import('./views/AdminView.vue') },
+    {
+      path: '/admin/dashboard',
+      component: () => import('./views/DashboardView.vue'),
+      meta: { requiresAdmin: true }
+    },
     {
       path: '/admin/nutzung',
       component: () => import('./views/UsageView.vue'),

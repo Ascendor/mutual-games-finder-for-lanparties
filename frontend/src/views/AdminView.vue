@@ -23,6 +23,20 @@
       <v-row>
         <v-col cols="12">
           <v-card variant="flat">
+            <v-card-title>Orga-Dashboard</v-card-title>
+            <v-card-text>
+              <p class="text-medium-emphasis">
+                Suchtrends, Datenqualität der anwesenden Gruppe und Sync-Probleme auf einen Blick.
+              </p>
+              <v-btn to="/admin/dashboard" color="primary" variant="tonal" prepend-icon="mdi-view-dashboard-outline">
+                Dashboard öffnen
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12">
+          <v-card variant="flat">
             <v-card-title>Nutzungsanalyse</v-card-title>
             <v-card-text>
               <p class="text-medium-emphasis">
@@ -153,7 +167,7 @@ async function unlock() {
   }
   password.value = ''
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-  if (['/admin/nutzung', '/admin/logins', '/admin/participants', '/admin/games', '/admin/sync'].includes(redirect)) {
+  if (['/admin/dashboard', '/admin/nutzung', '/admin/logins', '/admin/participants', '/admin/games', '/admin/sync'].includes(redirect)) {
     void router.replace(redirect)
     return
   }
