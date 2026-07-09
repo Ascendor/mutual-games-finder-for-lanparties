@@ -96,6 +96,78 @@ def test_upsert_ownership_does_not_replace_known_playtime_with_zero(db):
     assert participant.ownerships[0].playtime_minutes == 240
 
 
+def test_playnite_fallback_playtime_does_not_replace_direct_provider_time(db):
+    participant = Participant(nickname="Priority")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.steam, account_id="76561198000000000")
+    db.add(account)
+    db.flush()
+    game = resolve_game(db, Platform.steam, ImportedGame(platform_game_id="620", title="Portal 2"))
+
+    upsert_ownership(db, account, game, ImportedGame(platform_game_id="620", title="Portal 2", playtime_minutes=240))
+    upsert_ownership(
+        db,
+        account,
+        game,
+        ImportedGame(platform_game_id="620", title="Portal 2", playtime_minutes=999),
+        playtime_priority="fallback",
+    )
+    db.flush()
+
+    assert participant.ownerships[0].playtime_minutes == 240
+
+
+def test_direct_provider_playtime_replaces_playnite_fallback_time(db):
+    participant = Participant(nickname="Priority")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.steam, account_id="76561198000000000")
+    db.add(account)
+    db.flush()
+    game = resolve_game(db, Platform.steam, ImportedGame(platform_game_id="620", title="Portal 2"))
+
+    upsert_ownership(
+        db,
+        account,
+        game,
+        ImportedGame(platform_game_id="620", title="Portal 2", playtime_minutes=90),
+        playtime_priority="fallback",
+    )
+    upsert_ownership(db, account, game, ImportedGame(platform_game_id="620", title="Portal 2", playtime_minutes=240))
+    db.flush()
+
+    assert participant.ownerships[0].playtime_minutes == 240
+
+
+def test_playnite_owned_account_can_update_playnite_playtime(db):
+    participant = Participant(nickname="Fallback")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.rockstar, account_id="playnite:1:rockstar")
+    db.add(account)
+    db.flush()
+    game = resolve_game(db, Platform.rockstar, ImportedGame(platform_game_id="rdr2", title="Red Dead Redemption 2"))
+
+    upsert_ownership(
+        db,
+        account,
+        game,
+        ImportedGame(platform_game_id="rdr2", title="Red Dead Redemption 2", playtime_minutes=120),
+        playtime_priority="fallback",
+    )
+    upsert_ownership(
+        db,
+        account,
+        game,
+        ImportedGame(platform_game_id="rdr2", title="Red Dead Redemption 2", playtime_minutes=180),
+        playtime_priority="fallback",
+    )
+    db.flush()
+
+    assert participant.ownerships[0].playtime_minutes == 180
+
+
 def test_upsert_ownership_treats_legacy_null_playtime_as_zero(db):
     participant = Participant(nickname="Legacy")
     db.add(participant)

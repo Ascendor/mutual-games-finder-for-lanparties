@@ -85,7 +85,7 @@ def _import_playnite_entries(
         if created:
             result.created_accounts += 1
         game = resolve_game(db, platform.value, imported)
-        upsert_ownership(db, account, game, imported)
+        upsert_ownership(db, account, game, imported, playtime_priority="fallback")
         result.imported_games += 1
         result.updated_ownerships += 1
         result.game_ids.add(game.id)

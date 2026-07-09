@@ -226,7 +226,14 @@ def _pending_ownership(
     return None
 
 
-def upsert_ownership(db: Session, account: Account, game: Game, imported: ImportedGame) -> Ownership:
+def upsert_ownership(
+    db: Session,
+    account: Account,
+    game: Game,
+    imported: ImportedGame,
+    *,
+    playtime_priority: str = "authoritative",
+) -> Ownership:
     ownership_platform = imported.ownership_platform or account.platform
     ownership = _pending_ownership(db, account, game, ownership_platform)
     if ownership is None:
@@ -251,7 +258,13 @@ def upsert_ownership(db: Session, account: Account, game: Game, imported: Import
         # enriches a previously account-less manual confirmation.
         ownership.account_id = account.id
     current_playtime = ownership.playtime_minutes or 0
-    if imported.playtime_minutes > 0 or current_playtime <= 0:
+    playnite_owned_account = account.account_id.startswith("playnite:")
+    may_replace_playtime = (
+        playtime_priority == "authoritative"
+        or current_playtime <= 0
+        or playnite_owned_account
+    )
+    if may_replace_playtime and (imported.playtime_minutes > 0 or current_playtime <= 0):
         ownership.playtime_minutes = imported.playtime_minutes
     ownership.owned_since = imported.owned_since or ownership.owned_since
     ownership.last_seen = datetime.utcnow()
