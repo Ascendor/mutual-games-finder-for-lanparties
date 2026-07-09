@@ -105,7 +105,14 @@ def _sort_key(item: RecommendationRead, mode: RecommendationMode) -> tuple:
     if mode == "group_size":
         return (item.owner_count, item.total_playtime_minutes, game.max_players, game.title.casefold())
     if mode == "new":
-        return (item.owner_count, -item.median_playtime_minutes, -item.average_playtime_minutes, game.max_players, game.title.casefold())
+        return (
+            -item.median_playtime_minutes,
+            -item.average_playtime_minutes,
+            item.owner_count,
+            item.coverage_percent,
+            game.max_players,
+            game.title.casefold(),
+        )
     return (item.owner_count, item.median_playtime_minutes, item.total_playtime_minutes, game.title.casefold())
 
 

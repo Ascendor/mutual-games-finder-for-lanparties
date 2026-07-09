@@ -43,7 +43,7 @@
       </v-col>
       <v-col cols="12" lg="6">
         <h2 class="text-h6 mb-2">Neu für die Gruppe</h2>
-        <RecommendationTable :items="store.newForGroup" :loading="store.loading" :limit="8" />
+        <RecommendationTable :items="store.newForGroup" :loading="store.loading" :limit="8" default-sort="new" />
       </v-col>
       <v-col cols="12">
         <h2 class="text-h6 mb-2">Gemeinsame Spiele der Anwesenden</h2>

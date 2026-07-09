@@ -79,7 +79,7 @@
       <v-window-item value="coop"><RecommendationTable :items="coop" :loading="loading" /></v-window-item>
       <v-window-item value="lan"><RecommendationTable :items="lan" :loading="loading" /></v-window-item>
       <v-window-item value="popular"><RecommendationTable :items="popular" :loading="loading || store.loading" /></v-window-item>
-      <v-window-item value="new"><RecommendationTable :items="newForGroup" :loading="loading" /></v-window-item>
+      <v-window-item value="new"><RecommendationTable :items="newForGroup" :loading="loading" default-sort="new" /></v-window-item>
     </v-window>
   </div>
 </template>

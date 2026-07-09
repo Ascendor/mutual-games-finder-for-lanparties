@@ -418,13 +418,25 @@ def test_new_for_group_prefers_broadly_owned_low_playtime_games(db):
     ada = Participant(nickname="Ada", present=True)
     linus = Participant(nickname="Linus", present=True)
     grace = Participant(nickname="Grace", present=True)
-    fresh = Game(title="Fresh Coop", normalized_title=normalize_title("Fresh Coop"), multiplayer=True, min_players=1, max_players=4)
+    fresh_broad = Game(title="Fresh Broad", normalized_title=normalize_title("Fresh Broad"), multiplayer=True, min_players=1, max_players=4)
+    fresh_narrow = Game(title="Fresh Narrow", normalized_title=normalize_title("Fresh Narrow"), multiplayer=True, min_players=1, max_players=4)
+    fresh_high_average = Game(title="Fresh High Average", normalized_title=normalize_title("Fresh High Average"), multiplayer=True, min_players=1, max_players=4)
     exhausted = Game(title="Exhausted Classic", normalized_title=normalize_title("Exhausted Classic"), multiplayer=True, min_players=1, max_players=4)
-    db.add_all([ada, linus, grace, fresh, exhausted])
+    db.add_all([ada, linus, grace, fresh_broad, fresh_narrow, fresh_high_average, exhausted])
     db.flush()
     for participant in (ada, linus, grace):
-        add_owned(db, participant, fresh, 5)
+        add_owned(db, participant, fresh_broad, 0)
         add_owned(db, participant, exhausted, 5000)
+    add_owned(db, ada, fresh_narrow, 0)
+    add_owned(db, linus, fresh_narrow, 0)
+    add_owned(db, ada, fresh_high_average, 0)
+    add_owned(db, linus, fresh_high_average, 0)
+    add_owned(db, grace, fresh_high_average, 600)
     db.commit()
 
-    assert [item.game.title for item in find_new_for_group_games(db)][:2] == ["Fresh Coop", "Exhausted Classic"]
+    assert [item.game.title for item in find_new_for_group_games(db)][:4] == [
+        "Fresh Broad",
+        "Fresh Narrow",
+        "Fresh High Average",
+        "Exhausted Classic",
+    ]

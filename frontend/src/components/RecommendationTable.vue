@@ -27,9 +27,9 @@
         {{ item.unknown_display }}
       </div>
     </template>
-    <template #item.total_hours="{ item }">{{ item.total_hours }} h</template>
-    <template #item.median_hours="{ item }">{{ item.median_hours }} h</template>
-    <template #item.average_hours="{ item }">{{ item.average_hours }} h</template>
+    <template #item.total_minutes="{ item }">{{ item.total_hours }} h</template>
+    <template #item.median_minutes="{ item }">{{ item.median_hours }} h</template>
+    <template #item.average_minutes="{ item }">{{ item.average_hours }} h</template>
     <template #item.features="{ item }">
       <v-chip v-if="item.lan" size="small" color="primary" class="mr-1">LAN</v-chip>
       <v-chip v-if="item.coop" size="small" color="secondary" class="mr-1">Coop</v-chip>
@@ -54,19 +54,18 @@ const props = withDefaults(defineProps<{
   limit?: number
   showAvailability?: boolean
   freeGamesAsOwned?: boolean
+  preserveOrder?: boolean
+  defaultSort?: 'owner' | 'availability' | 'new' | 'none'
 }>(), {
   loading: false,
   limit: 0,
   showAvailability: false,
-  freeGamesAsOwned: true
+  freeGamesAsOwned: true,
+  preserveOrder: false,
+  defaultSort: 'owner'
 })
 const filters = ref(createGameFilterState())
-const sortBy = ref<{ key: string; order: 'asc' | 'desc' }[]>([
-  {
-    key: props.showAvailability ? 'availability_rank' : 'owner_count',
-    order: 'desc'
-  }
-])
+const sortBy = ref<{ key: string; order: 'asc' | 'desc' }[]>(initialSortBy())
 const games = computed(() => props.items.map((item) => item.game))
 const filteredItems = computed(() => {
   const filtered = props.items.filter((item) => matchesGameFilters(item.game, filters.value))
@@ -78,9 +77,9 @@ const headers = computed(() => [
   props.showAvailability
     ? { title: 'Verfügbarkeit', key: 'availability_rank' }
     : { title: 'Besitzer', key: 'owner_count' },
-  { title: 'Gesamt', key: 'total_hours' },
-  { title: 'Median', key: 'median_hours' },
-  { title: 'Durchschnitt', key: 'average_hours' },
+  { title: 'Gesamt', key: 'total_minutes' },
+  { title: 'Median', key: 'median_minutes' },
+  { title: 'Durchschnitt', key: 'average_minutes' },
   { title: 'Features', key: 'features' },
   { title: 'Plattformen', key: 'platforms' }
 ])
@@ -110,6 +109,9 @@ const rows = computed(() =>
         ? `${rec.owner_count} von ${rec.selected_player_count} haben es in der Bibliothek`
         : '',
       unknown_display: unknownPlayerLabel(rec),
+      total_minutes: rec.total_playtime_minutes,
+      median_minutes: rec.median_playtime_minutes,
+      average_minutes: rec.average_playtime_minutes,
       total_hours: hours(rec.total_playtime_minutes),
       median_hours: hours(rec.median_playtime_minutes),
       average_hours: hours(rec.average_playtime_minutes),
@@ -123,6 +125,22 @@ const rows = computed(() =>
     }
   })
 )
+
+function initialSortBy() {
+  if (props.preserveOrder || props.defaultSort === 'none') return []
+  if (props.defaultSort === 'new') {
+    return [
+      { key: 'median_minutes', order: 'asc' as const },
+      { key: 'average_minutes', order: 'asc' as const },
+      { key: 'owner_count', order: 'desc' as const },
+      { key: 'coverage_percent', order: 'desc' as const }
+    ]
+  }
+  if (props.defaultSort === 'availability' || props.showAvailability) {
+    return [{ key: 'availability_rank', order: 'desc' as const }]
+  }
+  return [{ key: 'owner_count', order: 'desc' as const }]
+}
 
 const hours = (minutes: number) => Math.round(minutes / 60)
 
