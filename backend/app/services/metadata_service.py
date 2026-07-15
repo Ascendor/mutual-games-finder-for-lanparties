@@ -21,6 +21,7 @@ from app.models import Game, Platform, SyncRun
 from app.services.game_classification import classify_game
 from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
+from app.services.steam_metadata_service import SteamMetadataResult, enrich_steam_game_metadata
 
 METADATA_SYNC_LOCK = Lock()
 IGDB_TOKEN_LOCK = Lock()
@@ -110,7 +111,7 @@ def create_metadata_sync_run(
 def close_interrupted_metadata_runs(db: Session) -> None:
     runs = db.scalars(
         select(SyncRun).where(
-            SyncRun.kind.in_(("metadata", "game_metadata")),
+            SyncRun.kind.in_(("metadata", "metadata_repair", "game_metadata")),
             SyncRun.finished_at.is_(None),
         )
     ).all()
@@ -124,12 +125,52 @@ def close_interrupted_metadata_runs(db: Session) -> None:
     db.commit()
 
 
-def run_metadata_sync(run_id: int, game_ids: set[int] | None = None) -> None:
+def run_metadata_sync(
+    run_id: int,
+    game_ids: set[int] | None = None,
+    *,
+    include_steam: bool = False,
+) -> None:
     db = SessionLocal()
     try:
         run = db.get(SyncRun, run_id)
         if not run:
             return
+        if game_ids is not None and not game_ids and not include_steam:
+            run.success = True
+            run.finished_at = datetime.utcnow()
+            run.stage = "completed"
+            run.progress_current = 0
+            run.progress_total = 0
+            run.imported_games = 0
+            run.message = "Keine Spiele mit unbekannten oder verdaechtigen Metadaten gefunden"
+            db.commit()
+            return
+
+        steam_result: SteamMetadataResult | None = None
+        if include_steam:
+            run.stage = "steam_metadata"
+            run.message = "Steam Store-Metadaten werden geladen"
+            db.commit()
+
+            def update_steam_progress(current: int, total: int, updated: int, failed: int) -> None:
+                progress_run = db.get(SyncRun, run_id)
+                if progress_run:
+                    progress_run.stage = "steam_metadata"
+                    progress_run.imported_games = updated
+                    progress_run.progress_current = current
+                    progress_run.progress_total = total
+                    progress_run.message = (
+                        f"Steam: {current} von {total} geprueft, "
+                        f"{updated} aktualisiert, {failed} Fehler"
+                    )
+                    db.commit()
+
+            steam_result = enrich_steam_game_metadata(
+                db,
+                progress_callback=update_steam_progress,
+                acquire_lock=True,
+            )
         run.stage = "metadata"
         run.message = "IGDB-Verbindung wird geprüft"
         if game_ids is not None:
@@ -167,9 +208,17 @@ def run_metadata_sync(run_id: int, game_ids: set[int] | None = None) -> None:
         run.stage = "completed"
         run.progress_current = result.scanned_games
         run.progress_total = result.scanned_games
-        run.imported_games = result.updated_games
+        run.imported_games = result.updated_games + (steam_result.updated_games if steam_result else 0)
+        steam_summary = ""
+        if steam_result:
+            steam_summary = (
+                f"Steam: {steam_result.updated_games} von {steam_result.scanned_games} aktualisiert"
+                + (f", {steam_result.failed_games} Warnungen" if steam_result.failed_games else "")
+                + "; "
+            )
         run.message = (
-            f"{result.updated_games} von {result.scanned_games} Spielen aktualisiert"
+            steam_summary
+            + f"IGDB/RAWG: {result.updated_games} von {result.scanned_games} Spielen aktualisiert"
             + (
                 f", {result.excluded_games} Nicht-Spiele ausgeblendet"
                 if result.excluded_games
@@ -199,6 +248,29 @@ def run_metadata_sync(run_id: int, game_ids: set[int] | None = None) -> None:
     finally:
         db.close()
         METADATA_SYNC_LOCK.release()
+
+
+def metadata_repair_game_ids(db: Session) -> set[int]:
+    games = db.scalars(select(Game).order_by(Game.title)).all()
+    return {game.id for game in games if _has_unknown_or_suspicious_metadata(game)}
+
+
+def _has_unknown_or_suspicious_metadata(game: Game) -> bool:
+    if sanitize_genres(game.genres or []) != (game.genres or []):
+        return True
+    if game.metadata_updated_at is None or not game.metadata_source:
+        return True
+    if not game.is_game and not game.non_game_reason:
+        return True
+    if game.is_game and not (game.singleplayer or game.multiplayer):
+        return True
+    if not game.multiplayer_metadata_known or not game.player_count_known:
+        return True
+    if game.min_players < 1 or game.max_players < game.min_players:
+        return True
+    if game.multiplayer and game.max_players <= 1:
+        return True
+    return False
 
 
 def _igdb_access_token() -> str:

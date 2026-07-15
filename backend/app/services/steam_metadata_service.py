@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from datetime import datetime
 from threading import Lock
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.session import SessionLocal
 from app.core.config import settings
+from app.db.session import SessionLocal
 from app.models import Game, Ownership, Platform, PlatformGameMapping, SyncRun
 from app.services.game_classification import classify_game
 from app.services.import_providers import ImportedGame, _steam_metadata_from_details
@@ -25,14 +26,22 @@ STEAM_REQUEST_INTERVAL = 0.2
 STEAM_LAST_REQUEST = 0.0
 
 
+@dataclass
+class SteamMetadataResult:
+    scanned_games: int = 0
+    updated_games: int = 0
+    failed_games: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
 def create_steam_metadata_run(db: Session) -> SyncRun:
     if not STEAM_METADATA_LOCK.acquire(blocking=False):
-        raise RuntimeError("Ein vollständiger Steam-Metadatenabgleich läuft bereits")
+        raise RuntimeError("Ein vollstaendiger Steam-Metadatenabgleich laeuft bereits")
     try:
         run = SyncRun(
             kind="steam_metadata",
             stage="queued",
-            message="Vollständiger Steam-Metadatenabgleich wartet auf Start",
+            message="Vollstaendiger Steam-Metadatenabgleich wartet auf Start",
         )
         db.add(run)
         db.commit()
@@ -61,7 +70,7 @@ def close_interrupted_steam_metadata_runs(db: Session) -> None:
     db.commit()
 
 
-def _steam_games(db: Session) -> list[tuple[int, int, str]]:
+def _steam_games(db: Session, game_ids: set[int] | None = None) -> list[tuple[int, int, str]]:
     rows = db.execute(
         select(
             PlatformGameMapping.game_id,
@@ -72,6 +81,7 @@ def _steam_games(db: Session) -> list[tuple[int, int, str]]:
         .join(Game, Game.id == PlatformGameMapping.game_id)
         .outerjoin(Ownership, Ownership.game_id == Game.id)
         .where(PlatformGameMapping.platform == Platform.steam)
+        .where(PlatformGameMapping.game_id.in_(game_ids) if game_ids is not None else True)
         .group_by(
             PlatformGameMapping.game_id,
             PlatformGameMapping.platform_game_id,
@@ -188,21 +198,25 @@ def _apply_steam_metadata(game: Game, app_id: int, metadata: dict[str, Any]) -> 
     game.metadata_sources = sources
 
 
-def run_steam_metadata_sync(run_id: int) -> None:
-    db = SessionLocal()
+def enrich_steam_game_metadata(
+    db: Session,
+    progress_callback: Callable[[int, int, int, int], None] | None = None,
+    game_ids: set[int] | None = None,
+    *,
+    acquire_lock: bool = False,
+) -> SteamMetadataResult:
+    lock_acquired = False
+    if acquire_lock:
+        if not STEAM_METADATA_LOCK.acquire(blocking=False):
+            raise RuntimeError("Ein vollstaendiger Steam-Metadatenabgleich laeuft bereits")
+        lock_acquired = True
     try:
-        run = db.get(SyncRun, run_id)
-        if not run:
-            return
-        games = _steam_games(db)
-        run.stage = "steam_metadata"
-        run.progress_total = len(games)
-        run.message = f"{len(games)} Steam-Spiele warten auf Store-Metadaten"
-        db.commit()
-
+        games = _steam_games(db, game_ids)
         updated = 0
         failed = 0
         errors: list[str] = []
+        if progress_callback:
+            progress_callback(0, len(games), updated, failed)
         with httpx.Client(
             timeout=httpx.Timeout(20.0, connect=5.0),
             headers={"User-Agent": "Mozilla/5.0 (LAN Party Game Finder)"},
@@ -238,29 +252,56 @@ def run_steam_metadata_sync(run_id: int) -> None:
                         if len(errors) < 5:
                             errors.append(f"{title} ({app_id}): {error or 'unbekannter Fehler'}")
 
-                    run = db.get(SyncRun, run_id)
-                    if not run:
-                        return
-                    run.progress_current = current
-                    run.imported_games = updated
-                    run.message = (
-                        f"{current} von {len(games)} geprüft, "
-                        f"{updated} aktualisiert, {failed} Fehler"
-                    )
+                    if progress_callback:
+                        progress_callback(current, len(games), updated, failed)
                     if current % STEAM_METADATA_COMMIT_INTERVAL == 0:
                         db.commit()
+        db.commit()
+        return SteamMetadataResult(
+            scanned_games=len(games),
+            updated_games=updated,
+            failed_games=failed,
+            errors=errors,
+        )
+    finally:
+        if lock_acquired:
+            STEAM_METADATA_LOCK.release()
 
+
+def run_steam_metadata_sync(run_id: int) -> None:
+    db = SessionLocal()
+    try:
+        run = db.get(SyncRun, run_id)
+        if not run:
+            return
+
+        def update_progress(current: int, total: int, updated: int, failed: int) -> None:
+            progress_run = db.get(SyncRun, run_id)
+            if not progress_run:
+                return
+            progress_run.stage = "steam_metadata"
+            progress_run.progress_current = current
+            progress_run.progress_total = total
+            progress_run.imported_games = updated
+            progress_run.message = (
+                f"{current} von {total} geprueft, "
+                f"{updated} aktualisiert, {failed} Fehler"
+            )
+            db.commit()
+
+        result = enrich_steam_game_metadata(db, progress_callback=update_progress)
         run = db.get(SyncRun, run_id)
         if not run:
             return
         run.success = True
         run.stage = "completed"
         run.finished_at = datetime.utcnow()
-        run.progress_current = len(games)
-        run.imported_games = updated
+        run.progress_current = result.scanned_games
+        run.progress_total = result.scanned_games
+        run.imported_games = result.updated_games
         run.message = (
-            f"{updated} von {len(games)} Steam-Spielen aktualisiert"
-            + (f", {failed} Warnungen. " + " | ".join(errors) if failed else "")
+            f"{result.updated_games} von {result.scanned_games} Steam-Spielen aktualisiert"
+            + (f", {result.failed_games} Warnungen. " + " | ".join(result.errors) if result.failed_games else "")
         )
         db.commit()
     except Exception as exc:
@@ -270,7 +311,7 @@ def run_steam_metadata_sync(run_id: int) -> None:
             run.success = False
             run.stage = "failed"
             run.finished_at = datetime.utcnow()
-            run.message = f"Vollständiger Steam-Metadatenabgleich fehlgeschlagen: {exc}"
+            run.message = f"Vollstaendiger Steam-Metadatenabgleich fehlgeschlagen: {exc}"
             db.commit()
     finally:
         db.close()

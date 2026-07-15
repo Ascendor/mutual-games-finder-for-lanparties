@@ -7,16 +7,6 @@
       </div>
       <div class="d-flex ga-2 flex-wrap">
         <v-btn
-          color="secondary"
-          variant="tonal"
-          prepend-icon="mdi-steam"
-          :loading="steamSyncRunning"
-          :disabled="Boolean(activeRun)"
-          @click="startSteamSync"
-        >
-          Steam-Metadaten vollständig laden
-        </v-btn>
-        <v-btn
           icon="mdi-refresh"
           variant="text"
           :loading="loading"
@@ -244,7 +234,6 @@ const headers = [
   { title: '', key: 'actions', sortable: false }
 ]
 
-const steamSyncRunning = computed(() => activeRun.value?.kind === 'steam_metadata')
 const runProgress = computed(() => {
   if (!activeRun.value?.progress_total) return 0
   return Math.round(activeRun.value.progress_current / activeRun.value.progress_total * 100)
@@ -319,17 +308,6 @@ async function create() {
     })
     message.value = 'Spiel wurde angelegt.'
     await loadPage()
-  } catch (err) {
-    error.value = readableError(err)
-  }
-}
-
-async function startSteamSync() {
-  error.value = ''
-  message.value = ''
-  try {
-    activeRun.value = await api.syncAllSteamMetadata()
-    scheduleRunPoll()
   } catch (err) {
     error.value = readableError(err)
   }

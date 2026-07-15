@@ -84,8 +84,7 @@
             <v-card-title>Spiele</v-card-title>
             <v-card-text>
               <p class="text-medium-emphasis">
-                Die paginierte Spieleverwaltung enthält Suche, Filter, Metadatenpflege und den vollständigen
-                Steam-Store-Metadatenabgleich.
+                Die paginierte Spieleverwaltung enthält Suche, Filter und Metadatenpflege für einzelne Spiele.
               </p>
               <v-btn to="/admin/games" color="primary" variant="tonal" prepend-icon="mdi-gamepad-variant-outline">
                 Spiele verwalten

@@ -5,11 +5,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import Game, SyncRun
 from app.schemas import SyncRunRead
-from app.services.metadata_service import create_metadata_sync_run, run_metadata_sync
-from app.services.steam_metadata_service import (
-    create_steam_metadata_run,
-    run_steam_metadata_sync,
-)
+from app.services.metadata_service import create_metadata_sync_run, metadata_repair_game_ids, run_metadata_sync
 from app.services.sync_service import sync_account
 
 router = APIRouter()
@@ -36,23 +32,33 @@ def sync_single_account(account_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, str(exc)) from exc
 
 
-def _start_metadata_sync(background_tasks: BackgroundTasks, db: Session) -> SyncRun:
-    try:
-        run = create_metadata_sync_run(db)
-    except RuntimeError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    background_tasks.add_task(run_metadata_sync, run.id)
-    return run
-
-
 @router.post("/metadata", response_model=SyncRunRead, status_code=202)
 def metadata_all(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    return _start_metadata_sync(background_tasks, db)
+    try:
+        run = create_metadata_sync_run(
+            db,
+            message="Alle Metadaten warten auf Aktualisierung",
+        )
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    background_tasks.add_task(run_metadata_sync, run.id, include_steam=True)
+    return run
 
 
 @router.post("/metadata/repair", response_model=SyncRunRead, status_code=202)
 def repair_metadata(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    return _start_metadata_sync(background_tasks, db)
+    game_ids = metadata_repair_game_ids(db)
+    try:
+        run = create_metadata_sync_run(
+            db,
+            kind="metadata_repair",
+            message=f"{len(game_ids)} Spiele mit unbekannten oder verdaechtigen Metadaten warten auf Pruefung",
+            progress_total=len(game_ids),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    background_tasks.add_task(run_metadata_sync, run.id, game_ids, include_steam=False)
+    return run
 
 
 @router.post("/games/{game_id}/metadata", response_model=SyncRunRead, status_code=202)
@@ -76,15 +82,3 @@ def metadata_single_game(
     background_tasks.add_task(run_metadata_sync, run.id, {game.id})
     return run
 
-
-@router.post("/steam/metadata", response_model=SyncRunRead, status_code=202)
-def metadata_all_steam_games(
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    try:
-        run = create_steam_metadata_run(db)
-    except RuntimeError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    background_tasks.add_task(run_steam_metadata_sync, run.id)
-    return run

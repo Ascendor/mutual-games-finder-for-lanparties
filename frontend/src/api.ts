@@ -134,8 +134,6 @@ export const api = {
   repairMetadata: () => request<SyncRun>('/sync/metadata/repair', { method: 'POST' }),
   syncGameMetadata: (gameId: number) =>
     request<SyncRun>(`/sync/games/${gameId}/metadata`, { method: 'POST' }),
-  syncAllSteamMetadata: () =>
-    request<SyncRun>('/sync/steam/metadata', { method: 'POST' }),
   syncRuns: () => request<SyncRun[]>('/sync/runs'),
   syncRun: (runId: number) => request<SyncRun>(`/sync/runs/${runId}`),
   importPlaynite: (participantId: number, file: File, onUploadProgress?: (percent: number) => void) => {

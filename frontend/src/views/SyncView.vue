@@ -2,7 +2,29 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 class="text-h4">Synchronisation</h1>
-      <div class="d-flex ga-2 flex-wrap"><v-btn color="secondary" variant="tonal" prepend-icon="mdi-database-sync-outline" :loading="metadataLoading" :disabled="metadataRunning" @click="syncMetadata">Metadaten aktualisieren</v-btn><v-btn color="secondary" variant="tonal" prepend-icon="mdi-wrench-outline" :loading="repairLoading" :disabled="metadataRunning" @click="repairMetadata">Metadaten reparieren</v-btn><v-btn to="/accounts" color="primary" variant="tonal" prepend-icon="mdi-account-key">Accounts</v-btn></div>
+      <div class="d-flex ga-2 flex-wrap">
+        <v-btn
+          color="secondary"
+          variant="tonal"
+          prepend-icon="mdi-database-sync-outline"
+          :loading="metadataLoading"
+          :disabled="metadataRunning"
+          @click="syncMetadata"
+        >
+          Alle Metadaten aktualisieren
+        </v-btn>
+        <v-btn
+          color="secondary"
+          variant="tonal"
+          prepend-icon="mdi-wrench-outline"
+          :loading="repairLoading"
+          :disabled="metadataRunning"
+          @click="repairMetadata"
+        >
+          Unbekannte Metadaten prüfen
+        </v-btn>
+        <v-btn to="/accounts" color="primary" variant="tonal" prepend-icon="mdi-account-key">Accounts</v-btn>
+      </div>
     </div>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
@@ -100,7 +122,7 @@ async function syncMetadata() {
   metadataMessage.value = ''
   try {
     const result = await api.syncMetadata()
-    metadataMessage.value = `Metadatensynchronisation #${result.id} wurde gestartet.`
+    metadataMessage.value = `Alle-Metadaten-Lauf #${result.id} wurde gestartet.`
     await refreshRuns()
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
@@ -115,7 +137,7 @@ async function repairMetadata() {
   metadataMessage.value = ''
   try {
     const result = await api.repairMetadata()
-    metadataMessage.value = `Metadatenprüfung #${result.id} wurde gestartet.`
+    metadataMessage.value = `Prüfung unbekannter Metadaten #${result.id} wurde gestartet.`
     await refreshRuns()
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
@@ -141,6 +163,7 @@ function participantLabel(id?: number | null) {
 
 function syncRunLabel(run: { kind: string; account_id?: number | null; participant_id?: number | null }) {
   if (run.kind === 'metadata') return 'Alle Metadaten'
+  if (run.kind === 'metadata_repair') return 'Unbekannte/verdächtige Metadaten'
   if (run.kind === 'game_metadata') return 'Metadaten eines Spiels'
   if (run.kind === 'steam_metadata') return 'Steam-Metadaten vollständig'
   if (run.kind === 'playnite') return `Playnite: ${participantLabel(run.participant_id)}`
@@ -148,7 +171,7 @@ function syncRunLabel(run: { kind: string; account_id?: number | null; participa
 }
 
 function isMetadataRun(kind: string) {
-  return ['metadata', 'game_metadata', 'steam_metadata'].includes(kind)
+  return ['metadata', 'metadata_repair', 'game_metadata', 'steam_metadata'].includes(kind)
 }
 
 function platformLabel(platform: string) {

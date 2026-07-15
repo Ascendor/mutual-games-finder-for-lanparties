@@ -95,7 +95,7 @@ IGDB_CLIENT_SECRET=...
 RAWG_API_KEY=...
 ```
 
-Die IGDB-Zugangsdaten stammen aus einer Twitch-Developer-Anwendung. Anschliessend werden alle bestehenden Spiele ueber `Synchronisation` -> `Metadaten aktualisieren` neu bewertet.
+Die IGDB-Zugangsdaten stammen aus einer Twitch-Developer-Anwendung. Anschliessend werden alle bestehenden Spiele ueber `Synchronisation` -> `Alle Metadaten aktualisieren` neu bewertet. Dieser Lauf laedt zuerst Steam-Store-Basisdaten fuer Steam-Spiele und ergaenzt danach Spielmodi, Spielerzahlen, Koop, LAN und weitere Felder ueber IGDB mit RAWG-Fallback.
 
 Einen RAWG-Schluessel gibt es unter `https://rawg.io/apidocs`. HTTP 401 oder 403 kann auch bei ausgeschoepftem Monatskontingent auftreten. IGDB laeuft dann weiter und RAWG wird fuer diesen Metadatenlauf nach einem einzigen Vorabcheck uebersprungen. Nach dem Kontingent-Reset kann der Metadatenlauf ohne Datenverlust erneut gestartet werden.
 

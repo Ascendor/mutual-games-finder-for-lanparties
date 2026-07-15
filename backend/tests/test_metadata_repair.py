@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.models import Game, Platform, PlatformGameMapping
 from app.services import metadata_service
 from app.services.metadata_service import MetadataRecord
@@ -252,3 +254,54 @@ def test_metadata_sync_soft_excludes_software_from_existing_genres(db, monkeypat
     assert game.is_game is False
     assert "utilities" in (game.non_game_reason or "")
     assert game.metadata_sources["is_game"] == "classification"
+
+
+def test_metadata_repair_game_ids_selects_only_unknown_or_suspicious_games(db):
+    good = Game(
+        title="Portal 2",
+        normalized_title=normalize_title("Portal 2"),
+        metadata_source="igdb",
+        metadata_updated_at=datetime.utcnow(),
+        singleplayer=True,
+        multiplayer=True,
+        multiplayer_metadata_known=True,
+        player_count_known=True,
+        min_players=1,
+        max_players=2,
+    )
+    unknown = Game(
+        title="Unknown Multiplayer",
+        normalized_title=normalize_title("Unknown Multiplayer"),
+    )
+    suspicious = Game(
+        title="Multiplayer With Bad Player Count",
+        normalized_title=normalize_title("Multiplayer With Bad Player Count"),
+        metadata_source="igdb",
+        metadata_updated_at=datetime.utcnow(),
+        multiplayer=True,
+        multiplayer_metadata_known=True,
+        player_count_known=True,
+        min_players=1,
+        max_players=1,
+    )
+    bad_genres = Game(
+        title="Serialized Genre Fragment",
+        normalized_title=normalize_title("Serialized Genre Fragment"),
+        metadata_source="igdb",
+        metadata_updated_at=datetime.utcnow(),
+        singleplayer=True,
+        multiplayer_metadata_known=True,
+        player_count_known=True,
+        min_players=1,
+        max_players=1,
+        genres=["{'Field': 41", "Action"],
+    )
+    db.add_all([good, unknown, suspicious, bad_genres])
+    db.commit()
+
+    repair_ids = metadata_service.metadata_repair_game_ids(db)
+
+    assert good.id not in repair_ids
+    assert unknown.id in repair_ids
+    assert suspicious.id in repair_ids
+    assert bad_genres.id in repair_ids
