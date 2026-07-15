@@ -70,6 +70,8 @@ def _import_playnite_entries(
 ) -> PlayniteImportResult:
     result = PlayniteImportResult(platforms=[])
     seen_platforms: set[str] = set()
+    merged_entries: dict[tuple[str, str], ImportedGame] = {}
+    merged_platforms: dict[tuple[str, str], Platform] = {}
     total_entries = len(entries)
     if progress_callback:
         progress_callback("importing", 0, total_entries, 0)
@@ -81,22 +83,51 @@ def _import_playnite_entries(
             if progress_callback and (index % 10 == 0 or index == total_entries):
                 progress_callback("importing", index, total_entries, result.imported_games)
             continue
+        result.imported_games += 1
+        key = _playnite_import_key(platform, imported)
+        existing_import = merged_entries.get(key)
+        if existing_import is None:
+            merged_entries[key] = imported
+            merged_platforms[key] = platform
+        else:
+            _merge_playnite_import(existing_import, imported)
+        seen_platforms.add(platform.value)
+        if progress_callback and (index % 10 == 0 or index == total_entries):
+            progress_callback("importing", index, total_entries, result.imported_games)
+
+    for key, imported in merged_entries.items():
+        platform = merged_platforms[key]
         account, created = _account_for_import(db, participant_id, platform)
         if created:
             result.created_accounts += 1
         game = resolve_game(db, platform.value, imported)
         upsert_ownership(db, account, game, imported, playtime_priority="fallback")
-        result.imported_games += 1
         result.updated_ownerships += 1
         result.game_ids.add(game.id)
-        seen_platforms.add(platform.value)
-        if progress_callback and (index % 10 == 0 or index == total_entries):
-            progress_callback("importing", index, total_entries, result.imported_games)
 
     result.platforms = sorted(seen_platforms)
     result.message = f"{result.imported_games} Spiele aus Playnite importiert"
     db.commit()
     return result
+
+
+def _playnite_import_key(platform: Platform, imported: ImportedGame) -> tuple[str, str]:
+    external_id = imported.platform_game_id.strip() if imported.platform_game_id else ""
+    return (platform.value, external_id or f"title:{imported.normalized_title}")
+
+
+def _merge_playnite_import(target: ImportedGame, incoming: ImportedGame) -> None:
+    target.playtime_minutes = max(target.playtime_minutes, incoming.playtime_minutes)
+    if incoming.owned_since and (target.owned_since is None or incoming.owned_since < target.owned_since):
+        target.owned_since = incoming.owned_since
+    if incoming.description and not target.description:
+        target.description = incoming.description
+    if incoming.cover_url and not target.cover_url:
+        target.cover_url = incoming.cover_url
+    if incoming.release_date and target.release_date is None:
+        target.release_date = incoming.release_date
+    if incoming.genres:
+        target.genres = sorted({*target.genres, *incoming.genres}, key=str.casefold)
 
 
 def create_playnite_import_run(db: Session, participant_id: int, filename: str) -> SyncRun:
