@@ -16,7 +16,7 @@
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
     <v-alert v-if="message" type="success" variant="tonal" class="mb-4">{{ message }}</v-alert>
     <v-alert type="info" variant="tonal" :icon="false" class="playnite-guide mb-5">
-      <div class="font-weight-bold mb-1">Playnite-Import empfohlen</div>
+      <div class="font-weight-bold mb-1">Bibliothek aus Playnite oder GOG Galaxy importieren</div>
       <p class="mb-2">
         Playnite ist eine lokale Spielebibliothek, die Spiele aus vielen Launchern und von lokal installierten Quellen
         zusammenführt. Wenn du Playnite bereits eingerichtet hast, ist ein Playnite-Backup hier der bevorzugte und
@@ -30,6 +30,12 @@
         Öffne in Playnite das Hauptmenü, wähle <strong>Bibliothek → Bibliothek sichern</strong> und erstelle ein
         ZIP-Backup. Diese ZIP-Datei kannst du unten direkt im Feld <strong>Playnite-Backup</strong> auswählen und
         importieren.
+      </p>
+      <p class="mb-2">
+        Wenn du stattdessen GOG Galaxy 2.0 mit verbundenen Integrationen nutzt, kannst du als Alternative die lokale
+        Datei <strong>C:\ProgramData\GOG.com\Galaxy\storage\galaxy-2.0.db</strong> oder ein ZIP mit dieser Datei
+        importieren. Schließe GOG Galaxy vorher oder zippe den ganzen Ordner <strong>storage</strong>, damit aktuelle
+        WAL-Daten mit enthalten sind. Gespeicherte Login-Daten aus Plugin-Caches werden nicht übernommen.
       </p>
       <p class="mb-0">
         Alternativ kannst du die unten aufgeführten Plattformen einzeln verbinden und deren Bibliotheken direkt
@@ -79,6 +85,38 @@
                 />
                 <div class="text-caption text-medium-emphasis mt-1">
                   {{ playniteProgress[group.participant.id].message }}
+                </div>
+              </div>
+            </div>
+
+            <div class="playnite-import mb-3">
+              <v-file-input
+                v-model="galaxyFiles[group.participant.id]"
+                accept=".db,.sqlite,.sqlite3,application/zip,.zip"
+                label="GOG Galaxy Datenbank"
+                prepend-icon="mdi-database-import-outline"
+                density="compact"
+                hide-details="auto"
+              />
+              <v-btn
+                color="primary"
+                variant="tonal"
+                prepend-icon="mdi-import"
+                :loading="busy === `galaxy:${group.participant.id}`"
+                :disabled="!selectedGalaxyFile(group.participant.id) || busy === `galaxy:${group.participant.id}`"
+                @click="importGogGalaxy(group.participant)"
+              >
+                Galaxy importieren
+              </v-btn>
+              <div v-if="galaxyProgress[group.participant.id]" class="playnite-progress">
+                <v-progress-linear
+                  :model-value="galaxyProgress[group.participant.id].percent"
+                  :indeterminate="galaxyProgress[group.participant.id].indeterminate"
+                  :color="galaxyProgress[group.participant.id].phase === 'failed' ? 'error' : 'primary'"
+                  height="8"
+                />
+                <div class="text-caption text-medium-emphasis mt-1">
+                  {{ galaxyProgress[group.participant.id].message }}
                 </div>
               </div>
             </div>
@@ -166,7 +204,7 @@ import ManualOwnershipPicker from '../components/ManualOwnershipPicker.vue'
 import ProviderConnectDialog from '../components/ProviderConnectDialog.vue'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { loginPlatforms, platformIcon, platformTitle } from '../platforms'
-import { stateFromRun, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
+import { stateFromRun, waitForGogGalaxyImport, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
 import { useLanStore } from '../store'
 import type { Account, Participant, Platform, ProviderAuthStatus } from '../types'
 
@@ -192,6 +230,8 @@ const error = ref('')
 const message = ref('')
 const playniteFiles = reactive<Record<number, File | File[] | null>>({})
 const playniteProgress = reactive<Record<number, PlayniteProgressState>>({})
+const galaxyFiles = reactive<Record<number, File | File[] | null>>({})
+const galaxyProgress = reactive<Record<number, PlayniteProgressState>>({})
 const wizardOpen = ref(false)
 const wizardTarget = ref<ProviderSlot | null>(null)
 const adminMode = computed(() => props.adminMode)
@@ -261,6 +301,7 @@ function isConnected(slot: ProviderSlot) {
 function statusLabel(slot: ProviderSlot) {
   if (isConnected(slot)) return 'Verbunden'
   if (slot.account?.account_id.startsWith('playnite:')) return 'Nur Playnite'
+  if (slot.account?.account_id.startsWith('gog-galaxy:')) return 'Nur GOG Galaxy'
   if (slot.account && statusFor(slot.account.id)?.needs_2fa) return '2FA ausstehend'
   if (slot.account?.last_error) return 'Fehler'
   return 'Nicht verbunden'
@@ -269,7 +310,11 @@ function statusLabel(slot: ProviderSlot) {
 function statusColor(slot: ProviderSlot) {
   if (isConnected(slot)) return 'success'
   if (slot.account?.last_error) return 'error'
-  if (slot.account?.account_id.startsWith('playnite:') || statusFor(slot.account?.id || 0)?.needs_2fa) return 'warning'
+  if (
+    slot.account?.account_id.startsWith('playnite:')
+    || slot.account?.account_id.startsWith('gog-galaxy:')
+    || statusFor(slot.account?.id || 0)?.needs_2fa
+  ) return 'warning'
   return 'default'
 }
 
@@ -294,6 +339,11 @@ function accountsFor(participantId: number) {
 
 function selectedPlayniteFile(participantId: number) {
   const value = playniteFiles[participantId]
+  return Array.isArray(value) ? value[0] : value
+}
+
+function selectedGalaxyFile(participantId: number) {
+  const value = galaxyFiles[participantId]
   return Array.isArray(value) ? value[0] : value
 }
 
@@ -331,6 +381,50 @@ async function importPlaynite(participant: Participant) {
   } catch (err) {
     error.value = readableError(err)
     playniteProgress[participant.id] = {
+      phase: 'failed',
+      percent: 100,
+      indeterminate: false,
+      message: error.value
+    }
+  } finally {
+    busy.value = null
+  }
+}
+
+async function importGogGalaxy(participant: Participant) {
+  const file = selectedGalaxyFile(participant.id)
+  if (!file) return
+  busy.value = `galaxy:${participant.id}`
+  error.value = ''
+  message.value = ''
+  galaxyProgress[participant.id] = {
+    phase: 'upload',
+    percent: 0,
+    indeterminate: false,
+    message: 'GOG-Galaxy-Datenbank wird hochgeladen: 0 %'
+  }
+  try {
+    const job = await api.importGogGalaxy(participant.id, file, (percent) => {
+      galaxyProgress[participant.id] = {
+        phase: 'upload',
+        percent,
+        indeterminate: false,
+        message: percent < 100
+          ? `GOG-Galaxy-Datenbank wird hochgeladen: ${percent} %`
+          : 'Upload abgeschlossen. Der Server bereitet den Import vor.'
+      }
+    })
+    galaxyProgress[participant.id] = stateFromRun(job)
+    const result = await waitForGogGalaxyImport(job.id, (run) => {
+      galaxyProgress[participant.id] = stateFromRun(run)
+    })
+    if (!result.success) throw new Error(result.message)
+    message.value = `${participant.nickname}: ${result.message}`
+    galaxyFiles[participant.id] = null
+    await load()
+  } catch (err) {
+    error.value = readableError(err)
+    galaxyProgress[participant.id] = {
       phase: 'failed',
       percent: 100,
       indeterminate: false,

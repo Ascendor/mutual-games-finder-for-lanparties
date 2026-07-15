@@ -81,7 +81,7 @@ const rows = computed(() =>
         ? `${run.progress_current}/${run.progress_total}`
         : 'Läuft'
       : run.success ? 'OK' : 'Fehler',
-    imported_games: run.kind === 'playnite'
+    imported_games: ['playnite', 'gog_galaxy'].includes(run.kind)
       && !run.finished_at
       && ['queued', 'reading'].includes(run.stage)
       ? '–'
@@ -167,6 +167,7 @@ function syncRunLabel(run: { kind: string; account_id?: number | null; participa
   if (run.kind === 'game_metadata') return 'Metadaten eines Spiels'
   if (run.kind === 'steam_metadata') return 'Steam-Metadaten vollständig'
   if (run.kind === 'playnite') return `Playnite: ${participantLabel(run.participant_id)}`
+  if (run.kind === 'gog_galaxy') return `GOG Galaxy: ${participantLabel(run.participant_id)}`
   return accountLabel(run.account_id)
 }
 
@@ -194,6 +195,7 @@ function meaningfulAccountName(platform: string, displayName: string) {
   if (normalized === platform.replace(/_/g, ' ').toLocaleLowerCase('de-DE')) return ''
   if (normalized === platformLabel(platform).toLocaleLowerCase('de-DE')) return ''
   if (normalized.startsWith('playnite ')) return ''
+  if (normalized.endsWith(' (gog galaxy)')) return ''
   if (normalized.endsWith(' (teilnehmer)')) return ''
   return value
 }

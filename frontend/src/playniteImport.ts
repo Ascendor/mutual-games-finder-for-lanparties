@@ -32,3 +32,15 @@ export async function waitForPlayniteImport(
     await new Promise((resolve) => window.setTimeout(resolve, 1000))
   }
 }
+
+export async function waitForGogGalaxyImport(
+  runId: number,
+  onProgress: (run: SyncRun) => void
+): Promise<SyncRun> {
+  while (true) {
+    const run = await api.gogGalaxyImportStatus(runId)
+    onProgress(run)
+    if (run.finished_at) return run
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+  }
+}

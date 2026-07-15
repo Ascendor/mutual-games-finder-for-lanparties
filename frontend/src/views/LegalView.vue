@@ -49,7 +49,7 @@
         <li>Nickname, optionaler Realname, Anwesenheit und freiwillige Notizen</li>
         <li>Plattform, Account-ID und Anzeigename verbundener Spielekonten</li>
         <li>Spielebibliotheken, Besitzzuordnungen und Spielzeiten</li>
-        <li>Playnite-Importe und manuell bestätigte Besitzzuordnungen</li>
+        <li>Playnite- und GOG-Galaxy-Importe sowie manuell bestätigte Besitzzuordnungen</li>
         <li>lokal gespeicherte Spielmetadaten und Synchronisationsprotokolle</li>
         <li>
           Nutzungsereignisse mit Teilnehmer, Zeitpunkt, aufgerufener
@@ -101,7 +101,7 @@
       <h2>Datenquellen</h2>
       <p>
         Angaben werden direkt durch Teilnehmer eingegeben, aus freiwillig
-        hochgeladenen Playnite-Backups übernommen oder nach einer bewusst
+        hochgeladenen Playnite-Backups oder GOG-Galaxy-Datenbanken übernommen oder nach einer bewusst
         eingerichteten Verbindung von der jeweiligen Spieleplattform
         abgerufen. Spielmetadaten stammen außerdem von Steam, IGDB/Twitch und
         gegebenenfalls RAWG.

@@ -256,3 +256,25 @@ def test_playnite_upload_rejects_oversized_file_and_removes_temp_file(client, tm
 
     assert response.status_code == 413
     assert list(tmp_path.iterdir()) == []
+
+
+def test_gog_galaxy_upload_streams_to_disk_and_removes_temp_file(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "playnite_upload_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "playnite_upload_max_bytes", 16 * 1024 * 1024)
+    monkeypatch.setattr(
+        imports_api,
+        "run_gog_galaxy_import",
+        lambda _run_id, path: Path(path).unlink(missing_ok=True),
+    )
+    participant = client.post("/api/participants", json={"nickname": "Galaxy", "present": True}).json()
+
+    response = client.post(
+        "/api/imports/gog-galaxy",
+        data={"participant_id": str(participant["id"])},
+        files={"file": ("galaxy-2.0.db", b"SQLite format 3\x00", "application/octet-stream")},
+    )
+
+    assert response.status_code == 202
+    assert response.json()["kind"] == "gog_galaxy"
+    assert response.json()["stage"] == "queued"
+    assert list(tmp_path.iterdir()) == []

@@ -179,6 +179,49 @@ export const api = {
     })
   },
   playniteImportStatus: (runId: number) => request<SyncRun>(`/imports/playnite/${runId}`),
+  importGogGalaxy: (participantId: number, file: File, onUploadProgress?: (percent: number) => void) => {
+    const form = new FormData()
+    form.append('participant_id', String(participantId))
+    form.append('file', file)
+    pendingRequests.value += 1
+    return new Promise<SyncRun>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      let completed = false
+      const finish = () => {
+        if (completed) return
+        completed = true
+        pendingRequests.value -= 1
+      }
+      xhr.open('POST', `${base}/imports/gog-galaxy`)
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          onUploadProgress?.(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+        }
+      }
+      xhr.onload = () => {
+        finish()
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new Error(xhr.responseText))
+          return
+        }
+        try {
+          resolve(JSON.parse(xhr.responseText) as SyncRun)
+        } catch {
+          reject(new Error('Der Server hat keine gueltige Importantwort geliefert.'))
+        }
+      }
+      xhr.onerror = () => {
+        finish()
+        reject(new Error('Der Upload wurde durch ein Netzwerkproblem unterbrochen.'))
+      }
+      xhr.onabort = () => {
+        finish()
+        reject(new Error('Der Upload wurde abgebrochen.'))
+      }
+      xhr.send(form)
+    })
+  },
+  gogGalaxyImportStatus: (runId: number) => request<SyncRun>(`/imports/gog-galaxy/${runId}`),
   providerAuthStatus: () => request<ProviderAuthStatus[]>('/provider-auth/status'),
   resolveSteamProfile: (profile: string) =>
     request<SteamProfile>('/provider-auth/steam/resolve', {

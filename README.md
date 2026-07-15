@@ -85,6 +85,12 @@ Auf der Seite `Accounts und Logins` kann pro Teilnehmer ein Playnite-JSON-Export
 
 Direkte Provider-Syncs bleiben die bevorzugte Quelle fuer aktuelle Metadaten. Der Playnite-Import setzt deshalb nur vorsichtige Metadaten und ueberschreibt keine vertrauenswuerdigen Feature-Daten.
 
+## GOG-Galaxy-Import
+
+Als zweiter Komfort-Fallback kann auf `Accounts und Logins` eine lokale GOG-Galaxy-2.0-Bibliothek importiert werden. Erwartet wird entweder `C:\ProgramData\GOG.com\Galaxy\storage\galaxy-2.0.db` oder ein ZIP mit dieser Datei; wenn im ZIP auch `galaxy-2.0.db-wal` und `galaxy-2.0.db-shm` enthalten sind, werden diese mitgelesen. Am robustesten ist es, GOG Galaxy vorher zu schliessen oder den ganzen Ordner `storage` zu zippen.
+
+Der Import liest nur die zentrale Galaxy-Bibliothek mit Plattform, Plattform-ID, Titel und Spielzeit. Plugin-Caches und gespeicherte Credentials werden nicht uebernommen. Erkannte PC-Plattformen werden auf die vorhandenen Plattformen gemappt, z.B. `origin` -> `ea`, `uplay` -> `ubisoft`, `battlenet` -> `battle_net` und `xboxone` -> `xbox`; bekannte Konsolenplattformen werden ignoriert.
+
 ## Spielmetadaten
 
 IGDB ist die primaere Quelle fuer Spielmodi, Spielerzahlen, Koop, LAN, Splitscreen, Genres und Basisdaten. RAWG wird nur verwendet, wenn IGDB kein passendes Spiel oder unvollstaendige Angaben liefert. Lege dafuer folgende Werte in `.env` ab:
@@ -108,7 +114,7 @@ Diese Plattformen koennen unter **Accounts & Logins** fuer jeden Teilnehmer getr
 - Meta/Oculus verwendet ebenfalls eine kopierte Browser-Anfrage. Aus ihr wird ausschliesslich das fuer die Oculus-GraphQL-Bibliothek erforderliche `oc_ac_at`-Token gespeichert.
 - EA verwendet eine kopierte Anfrage an `service-aggregation-layer.juno.ea.com/graphql`. Gespeichert wird ausschliesslich der Bearer-Token; Bibliothek und Spielzeiten werden anschliessend direkt von EA geladen.
 
-Die Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen der Anbieter ausfallen oder eine erneute Anmeldung verlangen. Zugangspasswoerter werden dabei nicht an die Anwendung uebermittelt. Playnite-Backups bleiben fuer alle Plattformen als Fallback verfuegbar.
+Die Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen der Anbieter ausfallen oder eine erneute Anmeldung verlangen. Zugangspasswoerter werden dabei nicht an die Anwendung uebermittelt. Playnite-Backups und GOG-Galaxy-Datenbankimporte bleiben fuer alle Plattformen als Fallback verfuegbar.
 
 ## Entwicklung ohne Docker
 

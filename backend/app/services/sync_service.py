@@ -258,11 +258,11 @@ def upsert_ownership(
         # enriches a previously account-less manual confirmation.
         ownership.account_id = account.id
     current_playtime = ownership.playtime_minutes or 0
-    playnite_owned_account = account.account_id.startswith("playnite:")
+    fallback_owned_account = account.account_id.startswith(("playnite:", "gog-galaxy:"))
     may_replace_playtime = (
         playtime_priority == "authoritative"
         or current_playtime <= 0
-        or playnite_owned_account
+        or fallback_owned_account
     )
     if may_replace_playtime and (imported.playtime_minutes > 0 or current_playtime <= 0):
         ownership.playtime_minutes = imported.playtime_minutes
