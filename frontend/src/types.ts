@@ -127,6 +127,13 @@ export interface PersonalGamePage {
   genres: string[]
 }
 
+export interface RecentAcquisition {
+  participant: Participant
+  game: Game
+  owned_since: string
+  platforms: Platform[]
+}
+
 
 export interface GameOwner {
   participant: Participant

@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import distinct, func, or_, select
+from sqlalchemy import and_, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -14,6 +14,7 @@ from app.schemas import (
     OwnershipCreate,
     OwnershipRead,
     PersonalGamePageRead,
+    RecentAcquisitionRead,
 )
 from app.services.normalization import normalize_title
 from app.services.genre_utils import sanitize_genres
@@ -45,6 +46,61 @@ def create_ownership(payload: OwnershipCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(ownership)
     return ownership
+
+
+@router.get("/recent-acquisitions", response_model=list[RecentAcquisitionRead])
+def recent_acquisitions(
+    days: Annotated[int, Query(ge=1, le=3650)] = 90,
+    limit: Annotated[int, Query(ge=1, le=250)] = 100,
+    db: Session = Depends(get_db),
+):
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    first_owned = (
+        select(
+            Ownership.participant_id.label("participant_id"),
+            Ownership.game_id.label("game_id"),
+            func.min(Ownership.owned_since).label("owned_since"),
+        )
+        .join(Game, Game.id == Ownership.game_id)
+        .where(
+            Ownership.owned_since.is_not(None),
+            Game.is_game == True,  # noqa: E712
+        )
+        .group_by(Ownership.participant_id, Ownership.game_id)
+        .subquery()
+    )
+
+    rows = db.execute(
+        select(Participant, Game, first_owned.c.owned_since)
+        .join(first_owned, first_owned.c.participant_id == Participant.id)
+        .join(Game, Game.id == first_owned.c.game_id)
+        .where(first_owned.c.owned_since >= cutoff)
+        .order_by(first_owned.c.owned_since.desc(), func.lower(Participant.nickname), func.lower(Game.title))
+        .limit(limit)
+    ).all()
+    pairs = [(participant.id, game.id) for participant, game, _owned_since in rows]
+    platforms_by_pair: dict[tuple[int, int], set] = {pair: set() for pair in pairs}
+    if pairs:
+        ownership_filters = [
+            and_(Ownership.participant_id == participant_id, Ownership.game_id == game_id)
+            for participant_id, game_id in pairs
+        ]
+        for participant_id, game_id, platform in db.execute(
+            select(Ownership.participant_id, Ownership.game_id, Ownership.platform)
+            .where(or_(*ownership_filters))
+            .order_by(Ownership.platform)
+        ):
+            platforms_by_pair[(participant_id, game_id)].add(platform)
+
+    return [
+        {
+            "participant": participant,
+            "game": game,
+            "owned_since": owned_since,
+            "platforms": sorted(platforms_by_pair.get((participant.id, game.id), set()), key=str),
+        }
+        for participant, game, owned_since in rows
+    ]
 
 
 @router.get("/participants/{participant_id}/games", response_model=PersonalGamePageRead)

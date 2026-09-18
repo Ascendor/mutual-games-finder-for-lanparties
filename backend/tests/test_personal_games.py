@@ -1,4 +1,6 @@
-from app.api.ownerships import participant_games
+from datetime import datetime, timedelta
+
+from app.api.ownerships import participant_games, recent_acquisitions
 from app.models import Account, Game, Ownership, Participant, Platform
 
 
@@ -123,3 +125,67 @@ def test_participant_games_groups_platforms_and_searches(db):
     four_player_games = participant_games(participant.id, db=db, player_count=4)
     assert four_player_games["total"] == 1
     assert four_player_games["items"][0]["game"].title == "Half-Life"
+
+
+def test_recent_acquisitions_use_first_owned_since_and_ignore_import_date(db):
+    now = datetime.utcnow()
+    lob = Participant(nickname="PlayerOne")
+    reactionman = Participant(nickname="PlayerTwo")
+    old_game = Game(title="Old Game", normalized_title="old game", multiplayer=True)
+    new_game = Game(title="Fresh Game", normalized_title="fresh game", multiplayer=True)
+    import_only = Game(title="Just Imported", normalized_title="just imported", multiplayer=True)
+    tool = Game(title="Video Tool", normalized_title="video tool", is_game=False)
+    db.add_all([lob, reactionman, old_game, new_game, import_only, tool])
+    db.flush()
+    steam = Account(participant_id=lob.id, platform=Platform.steam, account_id="steam", display_name="Steam")
+    gog = Account(participant_id=lob.id, platform=Platform.gog, account_id="gog", display_name="GOG")
+    db.add_all([steam, gog])
+    db.flush()
+    db.add_all(
+        [
+            Ownership(
+                participant_id=lob.id,
+                account_id=steam.id,
+                game_id=old_game.id,
+                platform=Platform.steam,
+                owned_since=now - timedelta(days=500),
+                last_seen=now,
+            ),
+            Ownership(
+                participant_id=lob.id,
+                account_id=gog.id,
+                game_id=old_game.id,
+                platform=Platform.gog,
+                owned_since=now - timedelta(days=5),
+                last_seen=now,
+            ),
+            Ownership(
+                participant_id=reactionman.id,
+                game_id=new_game.id,
+                platform=Platform.steam,
+                owned_since=now - timedelta(days=2),
+                last_seen=now,
+            ),
+            Ownership(
+                participant_id=lob.id,
+                game_id=import_only.id,
+                platform=Platform.steam,
+                owned_since=None,
+                last_seen=now,
+            ),
+            Ownership(
+                participant_id=lob.id,
+                game_id=tool.id,
+                platform=Platform.steam,
+                owned_since=now - timedelta(days=1),
+                last_seen=now,
+            ),
+        ]
+    )
+    db.commit()
+
+    result = recent_acquisitions(days=30, db=db)
+
+    assert [item["game"].title for item in result] == ["Fresh Game"]
+    assert result[0]["participant"].nickname == "PlayerTwo"
+    assert result[0]["platforms"] == [Platform.steam]

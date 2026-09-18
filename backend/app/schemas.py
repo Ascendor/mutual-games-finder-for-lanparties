@@ -198,6 +198,13 @@ class PersonalGamePageRead(BaseModel):
     genres: list[str] = Field(default_factory=list)
 
 
+class RecentAcquisitionRead(BaseModel):
+    participant: ParticipantRead
+    game: GameRead
+    owned_since: datetime
+    platforms: list[Platform] = Field(default_factory=list)
+
+
 class ManualOwnershipCreate(BaseModel):
     participant_id: int
     game_id: int

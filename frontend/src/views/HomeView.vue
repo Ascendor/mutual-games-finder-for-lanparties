@@ -1,17 +1,19 @@
 <template>
-  <div class="page home-page">
-    <div class="mb-6">
+  <div class="page home-page home-page-container d-flex flex-column pa-4">
+    <div class="mb-6 title-section">
       <h1 class="text-h3">ref'ju:geeks play together - Der Spielefinder</h1>
     </div>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
 
-    <v-row>
+     <v-spacer class="flex-grow-1" />
+     <div class="cards-wrapper w-100">
+    <v-row class="flex-grow-0">
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
-          <v-card-title>Mitspieler:innen finden</v-card-title>
+          <v-card-title><strong>Mitspieler:innen finden</strong></v-card-title>
           <v-card-text class="action-content">
-            <div class="inline-action">
+            <div class="inline-action text-body-1">
               <span>Ich will</span>
               <v-autocomplete
                 v-model="gameName"
@@ -38,9 +40,9 @@
 
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
-          <v-card-title>Gemeinsames Spiel finden</v-card-title>
+          <v-card-title><strong>Gemeinsames Spiel finden</strong></v-card-title>
           <v-card-text class="action-content">
-            <div class="inline-action">
+            <div class="inline-action text-body-1">
               <span>Ich will mit</span>
               <v-autocomplete
                 v-model="selectedPlayers"
@@ -82,7 +84,7 @@
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
           <v-card-title class="settings-title">
-            <span>Einstellungen</span>
+            <span><strong>Einstellungen</strong></span>
             <v-btn
               variant="text"
               color="primary"
@@ -103,21 +105,85 @@
         </v-card>
       </v-col>
     </v-row>
+</div>
+
+ <v-spacer class="flex-grow-1" />
+
+ <!-- NEU: Ein flexibler Container, der den restlichen Platz füllt -->
+      <section class="recent-acquisitions mt-auto">
+        <div class="recent-acquisitions__header">
+          <div>
+            <h2 class="text-subtitle-1 mb-1">Neu in euren Bibliotheken</h2>
+            <p class="text-caption text-medium-emphasis mb-0">
+              Erwerbsdaten aus den verbundenen Bibliotheken, nicht bloß neue Imports.
+            </p>
+          </div>
+          <v-select
+            v-model="acquisitionDays"
+            :items="acquisitionDayOptions"
+            density="compact"
+            hide-details
+            variant="plain"
+            class="period-select"
+            @update:model-value="() => loadRecentAcquisitions()"
+          />
+        </div>
+
+        <v-data-table
+          class="recent-acquisitions__table"
+          :headers="acquisitionHeaders"
+          :items="recentAcquisitions"
+          :items-per-page="6"
+          :loading="loadingAcquisitions"
+          density="compact"
+        >
+          <template #item.participant="{ item }">
+            {{ item.participant.nickname }}
+          </template>
+          <template #item.game="{ item }">
+            <em>{{ item.game.title }}</em>
+          </template>
+          <template #item.owned_since="{ item }">
+            {{ formatDate(item.owned_since) }}
+          </template>
+          <template #no-data>
+            <div class="pa-4 text-medium-emphasis">
+              Keine Spiele mit Erwerbsdatum im gewählten Zeitraum gefunden.
+            </div>
+          </template>
+        </v-data-table>
+      </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { api } from '../api'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
+import { platformTitle } from '../platforms'
 import { useLanStore } from '../store'
-import type { Participant } from '../types'
+import type { Participant, RecentAcquisition } from '../types'
 
 const router = useRouter()
 const store = useLanStore()
 const gameName = ref('')
 const selectedPlayers = ref<number[]>([])
 const error = ref('')
+const recentAcquisitions = ref<RecentAcquisition[]>([])
+const acquisitionDays = ref(90)
+const loadingAcquisitions = ref(false)
+const acquisitionDayOptions = [
+  { title: '7 Tage', value: 7 },
+  { title: '30 Tage', value: 30 },
+  { title: '90 Tage', value: 90 },
+  { title: '1 Jahr', value: 365 }
+]
+const acquisitionHeaders = [
+  { title: 'Spieler:in', key: 'participant' },
+  { title: 'Spiel', key: 'game' },
+  { title: 'Erworben', key: 'owned_since' },
+]
 const currentParticipant = computed(() =>
   store.participants.find((participant) => participant.id === currentParticipantId.value)
 )
@@ -127,6 +193,7 @@ const otherParticipants = computed(() =>
 
 onMounted(async () => {
   await store.refreshHome()
+  await loadRecentAcquisitions()
   if (!currentParticipant.value) {
     clearParticipant()
     await router.replace({ path: '/player', query: { redirect: '/' } })
@@ -155,11 +222,69 @@ async function logout() {
   clearParticipant()
   await router.replace('/player')
 }
+
+async function loadRecentAcquisitions() {
+  loadingAcquisitions.value = true
+  try {
+    recentAcquisitions.value = await api.recentAcquisitions(acquisitionDays.value, 100)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    loadingAcquisitions.value = false
+  }
+}
+
+function formatDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date)
+}
 </script>
 
 <style scoped>
 .home-page {
   max-width: 1320px;
+  min-height: 0; /* Verhindert Überlauf-Bugs */
+}
+
+.home-page-container {
+  /* Berechnet den mathematisch exakten, maximal verfügbaren Platz im Viewport */
+  height: calc(100vh - var(--v-layout-top, 0px) - var(--v-layout-bottom, 0px) - 32px);
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+/* NEU: Richtet die Karten im zugewiesenen Raum vertikal mittig aus */
+.cards-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Drückt die Sektion nach ganz unten, falls Platz auf dem Bildschirm ist */
+.recent-acquisitions {
+  width: 100%;
+}
+
+/* Auf kleinen Bildschirmen heben wir die starre Zentrierung und Höhe wieder auf */
+@media (max-width: 1264px) {
+  .home-page-container {
+    height: auto;
+    min-height: 100%;
+  }
+  
+  .cards-wrapper {
+    display: block; /* Normaler Block-Fluss untereinander */
+    margin-bottom: 32px;
+  }
+  
+  .recent-acquisitions {
+    margin-top: 16px;
+  }
 }
 
 .action-card {
@@ -208,6 +333,33 @@ async function logout() {
   pointer-events: none;
 }
 
+.recent-acquisitions {
+  border-top: 1px solid rgba(var(--v-border-color), 0.28);
+  padding-top: 18px;
+}
+
+.recent-acquisitions__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.recent-acquisitions__table {
+  background: transparent;
+}
+
+.period-select {
+  max-width: 120px;
+}
+
+.platform-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 @media (max-width: 620px) {
   .inline-action {
     grid-template-columns: 1fr;
@@ -215,6 +367,11 @@ async function logout() {
 
   .settings-actions {
     flex-wrap: wrap;
+  }
+
+  .recent-acquisitions__header {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>

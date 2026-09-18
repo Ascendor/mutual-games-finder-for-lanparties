@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
+import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, RecentAcquisition, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -77,6 +77,8 @@ export const api = {
   createOwnership: (payload: Partial<Ownership>) =>
     request<Ownership>('/ownerships', { method: 'POST', body: JSON.stringify(payload) }),
   deleteOwnership: (id: number) => request<void>(`/ownerships/${id}`, { method: 'DELETE' }),
+  recentAcquisitions: (days = 90, limit = 100) =>
+    request<RecentAcquisition[]>(`/ownerships/recent-acquisitions?days=${days}&limit=${limit}`),
   personalGames: (params: {
     participantId: number
     page: number
