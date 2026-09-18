@@ -108,15 +108,11 @@
 </div>
 
  <v-spacer class="flex-grow-1" />
-
- <!-- NEU: Ein flexibler Container, der den restlichen Platz füllt -->
+<!--
       <section class="recent-acquisitions mt-auto">
         <div class="recent-acquisitions__header">
           <div>
             <h2 class="text-subtitle-1 mb-1">Neu in euren Bibliotheken</h2>
-            <p class="text-caption text-medium-emphasis mb-0">
-              Erwerbsdaten aus den verbundenen Bibliotheken, nicht bloß neue Imports.
-            </p>
           </div>
           <v-select
             v-model="acquisitionDays"
@@ -153,6 +149,7 @@
           </template>
         </v-data-table>
       </section>
+    -->      
   </div>
 </template>
 
