@@ -1,12 +1,11 @@
-﻿import json
-import secrets
-import time
-from html import escape
+﻿import time
+from dataclasses import dataclass
+from secrets import token_urlsafe
 from threading import Lock
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -17,16 +16,30 @@ from app.schemas import AccountRead, SteamConnectionRead, SteamProfileRead
 from app.services import provider_auth
 from app.services.account_identity import apply_account_identity
 from app.services.steam_auth import (
-    build_steam_login_url,
     resolve_steam_profile,
     upsert_steam_account,
-    verify_steam_openid,
 )
+from app.services.steam_client_auth import complete_steam_qr_login, poll_steam_qr_login, start_steam_qr_login
+from app.services.steam_client_credentials import delete_steam_credentials
+from app.services.steam_openid import build_steam_openid_url, verify_steam_openid_response
 
 router = APIRouter()
 STEAM_LOGIN_TTL_SECONDS = 10 * 60
 _steam_login_lock = Lock()
-_pending_steam_logins: dict[str, tuple[int, float, str]] = {}
+_pending_steam_logins: dict[str, tuple[int, float]] = {}
+_steam_openid_lock = Lock()
+
+
+@dataclass(frozen=True)
+class PendingSteamOpenId:
+    participant_id: int
+    expires_at: float
+    origin: str
+    return_path: str
+    callback_url: str
+
+
+_pending_steam_openid: dict[str, PendingSteamOpenId] = {}
 
 
 class ProviderCodePayload(BaseModel):
@@ -46,7 +59,12 @@ class SteamConnectPayload(SteamProfilePayload):
 
 class SteamLoginStartPayload(BaseModel):
     participant_id: int
+
+
+class SteamOpenIdStartPayload(BaseModel):
+    participant_id: int
     origin: str
+    return_path: str = "/logins"
 
 
 def _get_account(db: Session, account_id: int) -> Account:
@@ -54,56 +72,6 @@ def _get_account(db: Session, account_id: int) -> Account:
     if not account:
         raise HTTPException(404, "account not found")
     return account
-
-
-def _allowed_origin(origin: str) -> str:
-    value = origin.rstrip("/")
-    parsed = urlparse(value)
-    configured = {item.rstrip("/") for item in settings.cors_origin_list}
-    if (
-        parsed.scheme not in {"http", "https"}
-        or not parsed.netloc
-        or parsed.username
-        or parsed.password
-        or parsed.path not in {"", "/"}
-        or parsed.query
-        or parsed.fragment
-        or value not in configured
-    ):
-        raise HTTPException(400, "Ungültige Rückkehradresse für die Steam-Anmeldung.")
-    return value
-
-
-def _steam_callback_html(payload: dict, target_origin: str) -> HTMLResponse:
-    event_json = json.dumps(payload, ensure_ascii=True).replace("<", "\\u003c")
-    origin_json = json.dumps(target_origin)
-    success = bool(payload.get("success"))
-    heading = "Steam ist verbunden" if success else "Steam-Verbindung fehlgeschlagen"
-    message = escape(str(payload.get("message") or ""))
-    body = f"""<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{heading}</title>
-  <style>
-    body {{ font: 16px system-ui, sans-serif; margin: 3rem auto; max-width: 34rem; padding: 0 1rem; }}
-    h1 {{ font-size: 1.5rem; }}
-  </style>
-</head>
-<body>
-  <h1>{heading}</h1>
-  <p>{message}</p>
-  <p>Dieses Fenster kann geschlossen werden.</p>
-  <script>
-    if (window.opener) {{
-      window.opener.postMessage({event_json}, {origin_json});
-      window.close();
-    }}
-  </script>
-</body>
-</html>"""
-    return HTMLResponse(body)
 
 
 @router.get("/status")
@@ -133,6 +101,7 @@ def connect_steam(payload: SteamConnectPayload, db: Session = Depends(get_db)):
                 "Setze die Spieldetails bei Steam auf Öffentlich und prüfe das Profil erneut."
             )
         account = upsert_steam_account(db, payload.participant_id, profile)
+        delete_steam_credentials(account.id)
         return {**profile.to_dict(), "account": account}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -144,86 +113,42 @@ def connect_steam(payload: SteamConnectPayload, db: Session = Depends(get_db)):
 def start_steam_login(payload: SteamLoginStartPayload, db: Session = Depends(get_db)):
     if not db.get(Participant, payload.participant_id):
         raise HTTPException(404, "participant not found")
-    origin = _allowed_origin(payload.origin)
-    now = time.monotonic()
-    state = secrets.token_urlsafe(24)
+    try:
+        result = start_steam_qr_login()
+    except Exception as exc:
+        raise HTTPException(502, f"Steam-Anmeldung konnte nicht gestartet werden: {exc}") from exc
+    state = str(result["state"])
+    expires_in = int(result.get("expires_in") or STEAM_LOGIN_TTL_SECONDS)
     with _steam_login_lock:
-        expired = [key for key, (_, expires_at, _) in _pending_steam_logins.items() if expires_at <= now]
+        now = time.monotonic()
+        expired = [key for key, (_, expires_at) in _pending_steam_logins.items() if expires_at <= now]
         for key in expired:
             _pending_steam_logins.pop(key, None)
-        _pending_steam_logins[state] = (
-            payload.participant_id,
-            now + STEAM_LOGIN_TTL_SECONDS,
-            origin,
-        )
-    return {
-        "login_url": build_steam_login_url(
-            f"{origin}/api/provider-auth/steam/callback?state={state}",
-            f"{origin}/",
-        ),
-        "state": state,
-        "expires_in": STEAM_LOGIN_TTL_SECONDS,
-    }
+        _pending_steam_logins[state] = (payload.participant_id, now + expires_in)
+    return result
 
 
-@router.get("/steam/callback", response_class=HTMLResponse)
-def steam_login_callback(request: Request, state: str, db: Session = Depends(get_db)):
+@router.get("/steam/poll/{state}")
+def poll_steam_login(state: str, db: Session = Depends(get_db)):
     with _steam_login_lock:
-        pending = _pending_steam_logins.pop(state, None)
+        pending = _pending_steam_logins.get(state)
     if not pending or pending[1] <= time.monotonic():
-        return _steam_callback_html(
-            {
-                "type": "steam-login-result",
-                "state": state,
-                "success": False,
-                "message": "Die Steam-Anmeldung ist abgelaufen. Starte sie bitte erneut.",
-            },
-            pending[2] if pending else "*",
-        )
-
-    participant_id, _, origin = pending
+        with _steam_login_lock:
+            _pending_steam_logins.pop(state, None)
+        raise HTTPException(404, "Die Steam-Anmeldung ist abgelaufen. Starte sie bitte erneut.")
     try:
-        steam_id = verify_steam_openid(dict(request.query_params))
-        profile = resolve_steam_profile(steam_id)
-        account = (
-            upsert_steam_account(db, participant_id, profile)
-            if profile.library_accessible
-            else None
-        )
-        message = (
-            f"{profile.display_name} wurde erkannt. Die Bibliothek enthält {profile.game_count} Spiele."
-            if account
-            else (
-                f"{profile.display_name} wurde erkannt, aber die Spielebibliothek ist nicht öffentlich. "
-                "Setze bei Steam unter Privatsphäre die Spieldetails auf Öffentlich."
-            )
-        )
-        account_payload = (
-            AccountRead.model_validate(account).model_dump(mode="json")
-            if account
-            else None
-        )
-        return _steam_callback_html(
-            {
-                "type": "steam-login-result",
-                "state": state,
-                "success": True,
-                "message": message,
-                "account": account_payload,
-                "profile": profile.to_dict(),
-            },
-            origin,
-        )
+        result = poll_steam_qr_login(state)
+        if result.get("status") == "complete":
+            result = complete_steam_qr_login(db, pending[0], result)
+            result["account"] = AccountRead.model_validate(result["account"]).model_dump(mode="json")
+            with _steam_login_lock:
+                _pending_steam_logins.pop(state, None)
+        elif result.get("status") == "failed":
+            with _steam_login_lock:
+                _pending_steam_logins.pop(state, None)
+        return result
     except Exception as exc:
-        return _steam_callback_html(
-            {
-                "type": "steam-login-result",
-                "state": state,
-                "success": False,
-                "message": str(exc),
-            },
-            origin,
-        )
+        raise HTTPException(502, f"Steam-Anmeldung konnte nicht abgeschlossen werden: {exc}") from exc
 
 
 @router.get("/accounts/{account_id}/status")
@@ -233,6 +158,101 @@ def account_auth_status(account_id: int, db: Session = Depends(get_db)):
         return provider_auth.account_status(account)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/steam/openid/start")
+def start_steam_openid_login(
+    payload: SteamOpenIdStartPayload,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not db.get(Participant, payload.participant_id):
+        raise HTTPException(404, "participant not found")
+    origin = _validated_frontend_origin(payload.origin, request)
+    return_path = payload.return_path if payload.return_path in {"/logins", "/admin/logins"} else "/logins"
+    state = token_urlsafe(32)
+    callback_url = f"{origin}/api/provider-auth/steam/openid/callback?{urlencode({'state': state})}"
+    pending = PendingSteamOpenId(
+        participant_id=payload.participant_id,
+        expires_at=time.monotonic() + STEAM_LOGIN_TTL_SECONDS,
+        origin=origin,
+        return_path=return_path,
+        callback_url=callback_url,
+    )
+    with _steam_openid_lock:
+        now = time.monotonic()
+        expired = [key for key, item in _pending_steam_openid.items() if item.expires_at <= now]
+        for key in expired:
+            _pending_steam_openid.pop(key, None)
+        _pending_steam_openid[state] = pending
+    return {
+        "login_url": build_steam_openid_url(callback_url, f"{origin}/"),
+        "expires_in": STEAM_LOGIN_TTL_SECONDS,
+    }
+
+
+@router.get("/steam/openid/callback")
+def complete_steam_openid_login(request: Request, state: str, db: Session = Depends(get_db)):
+    with _steam_openid_lock:
+        pending = _pending_steam_openid.pop(state, None)
+    if not pending or pending.expires_at <= time.monotonic():
+        raise HTTPException(400, "Die Steam-Anmeldung ist abgelaufen oder wurde bereits verwendet.")
+
+    params = dict(request.query_params)
+    try:
+        steam_id = verify_steam_openid_response(params, pending.callback_url)
+        profile = resolve_steam_profile(steam_id)
+        if not profile.library_accessible:
+            raise ValueError(
+                "Die Steam-Spielebibliothek ist nicht öffentlich. Setze die Spieldetails bei Steam auf Öffentlich."
+            )
+        account = upsert_steam_account(db, pending.participant_id, profile)
+        delete_steam_credentials(account.id)
+        return _steam_openid_redirect(
+            pending,
+            steam_openid="success",
+            account_id=str(account.id),
+        )
+    except ValueError as exc:
+        return _steam_openid_redirect(pending, steam_openid="error", steam_message=str(exc))
+    except Exception:
+        return _steam_openid_redirect(
+            pending,
+            steam_openid="error",
+            steam_message="Steam ist gerade nicht erreichbar. Bitte versuche die Anmeldung später erneut.",
+        )
+
+
+def _validated_frontend_origin(origin: str, request: Request) -> str:
+    parsed = urlparse(origin.strip())
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or parsed.path not in {"", "/"}
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise HTTPException(400, "Ungültige Rücksprungadresse für die Steam-Anmeldung.")
+    normalized = f"{parsed.scheme}://{parsed.netloc}"
+    forwarded_host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    ).split(",")[0].strip()
+    allowed_origins = {value.rstrip("/") for value in settings.cors_origin_list}
+    if parsed.netloc != forwarded_host and normalized not in allowed_origins:
+        raise HTTPException(400, "Die Rücksprungadresse gehört nicht zu dieser Anwendung.")
+    return normalized
+
+
+def _steam_openid_redirect(pending: PendingSteamOpenId, **query: str) -> RedirectResponse:
+    return RedirectResponse(
+        url=f"{pending.origin}{pending.return_path}?{urlencode(query)}",
+        status_code=303,
+    )
 
 
 @router.get("/accounts/{account_id}/start")

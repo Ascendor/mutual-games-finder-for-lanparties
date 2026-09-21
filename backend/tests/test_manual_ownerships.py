@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from app.api.accounts import delete_account
+from app.core.config import settings
 from app.api.ownerships import (
     create_manual_ownership,
     delete_manual_ownership,
@@ -142,3 +143,22 @@ def test_deleting_provider_account_keeps_manual_ownership(db):
     ownership = db.get(Ownership, ownership_id)
     assert ownership is not None
     assert ownership.account_id is None
+
+
+def test_deleting_account_removes_stored_provider_credentials(db, tmp_path, monkeypatch):
+    participant, _game = _library(db)
+    account = Account(
+        participant_id=participant.id,
+        platform=Platform.steam,
+        account_id="76561198000000002",
+    )
+    db.add(account)
+    db.commit()
+    monkeypatch.setattr(settings, "provider_auth_root", str(tmp_path))
+    credentials = tmp_path / "steam" / str(account.id) / "auth.json"
+    credentials.parent.mkdir(parents=True)
+    credentials.write_text('{"refresh_token":"secret"}', encoding="utf-8")
+
+    delete_account(account.id, db)
+
+    assert not credentials.parent.exists()

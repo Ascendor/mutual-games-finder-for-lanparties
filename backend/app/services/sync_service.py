@@ -233,6 +233,7 @@ def upsert_ownership(
     imported: ImportedGame,
     *,
     playtime_priority: str = "authoritative",
+    discovery_is_baseline: bool = False,
 ) -> Ownership:
     ownership_platform = imported.ownership_platform or account.platform
     ownership = _pending_ownership(db, account, game, ownership_platform)
@@ -245,11 +246,27 @@ def upsert_ownership(
             )
         )
     if ownership is None:
+        previous_first_seen = db.execute(
+            select(Ownership.first_seen_at, Ownership.first_seen_is_baseline)
+            .where(
+                Ownership.participant_id == account.participant_id,
+                Ownership.game_id == game.id,
+            )
+            .order_by(Ownership.first_seen_at.asc().nulls_last())
+            .limit(1)
+        ).first()
+        now = datetime.utcnow()
         ownership = Ownership(
             participant_id=account.participant_id,
             account_id=account.id,
             game_id=game.id,
             platform=ownership_platform,
+            first_seen_at=previous_first_seen[0] if previous_first_seen else now,
+            first_seen_is_baseline=(
+                previous_first_seen[1]
+                if previous_first_seen
+                else discovery_is_baseline
+            ),
         )
         db.add(ownership)
     elif ownership.account_id is None or imported.ownership_platform is not None:
@@ -266,7 +283,10 @@ def upsert_ownership(
     )
     if may_replace_playtime and (imported.playtime_minutes > 0 or current_playtime <= 0):
         ownership.playtime_minutes = imported.playtime_minutes
-    ownership.owned_since = imported.owned_since or ownership.owned_since
+    if imported.owned_since and imported.owned_since_source:
+        if ownership.owned_since_source is None or ownership.owned_since is None or imported.owned_since < ownership.owned_since:
+            ownership.owned_since = imported.owned_since
+            ownership.owned_since_source = imported.owned_since_source
     ownership.last_seen = datetime.utcnow()
     return ownership
 
@@ -311,6 +331,7 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
     db.flush()
     try:
         provider = PROVIDERS[account.platform]
+        initial_account_sync = account.last_successful_sync is None
         provider_result = provider.sync_account(account)
         if isinstance(provider_result, ImportBatch):
             imported_games = provider_result.games
@@ -325,7 +346,13 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
             mapping_platform = imported.mapping_platform or account.platform
             ownership_platform = imported.ownership_platform or account.platform
             game = resolve_game(db, mapping_platform, imported)
-            upsert_ownership(db, account, game, imported)
+            upsert_ownership(
+                db,
+                account,
+                game,
+                imported,
+                discovery_is_baseline=initial_account_sync,
+            )
             imported_game_ids_by_platform.setdefault(ownership_platform, set()).add(game.id)
         authoritative_platforms: set[Platform | str] = set()
         if authoritative_snapshot:

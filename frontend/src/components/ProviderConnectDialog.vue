@@ -41,81 +41,129 @@
 
         <template v-else-if="stage === 2">
           <template v-if="target.platform === 'steam'">
-            <h2 class="text-h6 mb-2">Mit Steam anmelden</h2>
-            <p class="text-body-2 text-medium-emphasis mb-4">
-              Du meldest dich direkt bei Steam an. Die App erhält nur deine bestätigte SteamID und niemals dein Passwort.
-            </p>
-            <v-btn
+            <h2 class="text-h6 mb-3">Wie möchtest du Steam verbinden?</h2>
+            <v-btn-toggle
+              v-model="steamConnectionMode"
+              mandatory
+              divided
               color="primary"
-              size="large"
-              prepend-icon="mdi-steam"
-              :loading="steamLoginPending"
-              :disabled="busy"
-              @click="startSteamLogin"
+              variant="outlined"
+              class="steam-mode-toggle mb-5"
             >
-              Mit Steam anmelden
-            </v-btn>
-            <v-alert v-if="steamLoginPending" type="info" variant="tonal" class="mt-4">
-              Schließe die Anmeldung im geöffneten Steam-Fenster ab. Danach werden deine Spiele hier automatisch geladen.
-            </v-alert>
+              <v-btn value="qr" prepend-icon="mdi-qrcode-scan">QR-Anmeldung</v-btn>
+              <v-btn value="openid" prepend-icon="mdi-open-in-new">Browser-Anmeldung</v-btn>
+              <v-btn value="community" prepend-icon="mdi-card-account-details-outline">Community-ID</v-btn>
+            </v-btn-toggle>
+            <p class="text-caption text-medium-emphasis mb-4">
+              Einzelheiten zur Speicherung findest du unter
+              <a href="/legal" target="_blank" rel="noopener noreferrer">Datenschutz &amp; Hinweise</a>.
+            </p>
 
-            <div v-if="steamResolvedProfile" class="steam-profile-preview mt-4">
-              <v-avatar size="48">
-                <v-img v-if="steamResolvedProfile.avatar_url" :src="steamResolvedProfile.avatar_url" alt="" />
-                <v-icon v-else icon="mdi-account-circle" />
-              </v-avatar>
-              <div>
-                <div class="font-weight-bold">{{ steamResolvedProfile.display_name }}</div>
-                <div class="text-caption text-medium-emphasis">
-                  <template v-if="steamResolvedProfile.library_accessible">
-                    {{ steamResolvedProfile.game_count }} Spiele sichtbar
-                  </template>
-                  <template v-else>Spielebibliothek ist nicht öffentlich</template>
-                </div>
-              </div>
-            </div>
-
-            <v-alert
-              v-if="steamResolvedProfile && !steamResolvedProfile.library_accessible"
-              type="warning"
-              variant="tonal"
-              class="mt-4"
-            >
-              Setze bei Steam unter Profil bearbeiten → Privatsphäre die Spieldetails auf „Öffentlich“ und prüfe danach erneut.
-              <div class="mt-2">
+            <template v-if="steamConnectionMode === 'qr'">
+              <v-alert type="info" variant="tonal" class="mb-4">
+                <div class="font-weight-bold mb-1">Komfortabel und vollständig</div>
+                Scanne den QR-Code mit der Steam-App und bestätige die Anmeldung. Dein Passwort wird nie an die App
+                übermittelt. Eine erneuerbare Steam-Anmeldung wird geschützt auf dem Server gespeichert, damit auch
+                private Bibliotheken, Lizenzdaten und spätere Synchronisationen funktionieren.
+              </v-alert>
+              <v-btn
+                v-if="!steamQrDataUrl"
+                color="primary"
+                size="large"
+                prepend-icon="mdi-steam"
+                :loading="steamLoginPending"
+                :disabled="busy"
+                @click="startSteamLogin"
+              >
+                Steam-QR-Code anzeigen
+              </v-btn>
+              <div v-else class="steam-qr-login">
+                <img :src="steamQrDataUrl" alt="QR-Code für die Steam-Anmeldung" class="steam-qr-code" />
+                <v-alert type="info" variant="tonal">
+                  <v-progress-circular v-if="steamLoginPending" indeterminate size="18" width="2" class="mr-2" />
+                  {{ steamStatusMessage }}
+                </v-alert>
                 <v-btn
-                  href="https://steamcommunity.com/my/edit/settings"
-                  target="_blank"
-                  size="small"
                   variant="text"
-                  prepend-icon="mdi-open-in-new"
+                  prepend-icon="mdi-refresh"
+                  :disabled="busy"
+                  @click="startSteamLogin"
                 >
-                  Steam-Privatsphäre öffnen
+                  Neuen QR-Code anfordern
                 </v-btn>
               </div>
-            </v-alert>
+            </template>
 
-            <v-divider class="my-5" />
-            <v-expansion-panels variant="accordion">
-              <v-expansion-panel title="Profil stattdessen manuell angeben">
-                <v-expansion-panel-text>
-                  <p class="text-body-2 text-medium-emphasis mb-3">
-                    Funktioniert die Anmeldung nicht, reichen auch dein Steam-Profilname, der Profillink oder eine SteamID64.
-                  </p>
-                  <v-text-field
-                    v-model="steamProfile"
-                    label="Steam-Profilname oder Link"
-                    prepend-inner-icon="mdi-account-search-outline"
-                    autocomplete="off"
-                    :disabled="busy"
-                    hint="Beispiel: nickname oder https://steamcommunity.com/id/nickname"
-                    persistent-hint
-                    @keyup.enter="submit"
-                  />
+            <template v-else-if="steamConnectionMode === 'openid'">
+              <v-alert type="info" variant="tonal" class="mb-4">
+                <div class="font-weight-bold mb-1">Ohne Steam-App und ohne gespeichertes Token</div>
+                Steam öffnet sich in diesem Browser. Benutzername, Passwort und Steam Guard gibst du ausschließlich
+                auf <strong>steamcommunity.com</strong> ein; sie werden nicht an diese Anwendung übermittelt.
+                Nach der Bestätigung erhält die Anwendung nur deine SteamID.
+              </v-alert>
+              <p class="text-body-2 mb-2"><strong>Dafür gelten folgende Einschränkungen:</strong></p>
+              <ul class="text-body-2 text-medium-emphasis mb-4 steam-limitations">
+                <li>Dein Steam-Profil und die „Spieldetails“ müssen öffentlich sein.</li>
+                <li>Lizenz- und Erwerbsdaten (z.B. Kaufzeitpunkt) fehlen.</li>
+                <li>Ungenutzte oder deinstallierte Gratisspiele können fehlen.</li>
+              </ul>
+              <v-btn
+                color="primary"
+                size="large"
+                prepend-icon="mdi-steam"
+                :loading="busy"
+                @click="startSteamOpenIdLogin"
+              >
+                Bei Steam anmelden
+              </v-btn>
+              <p class="text-caption text-medium-emphasis mt-3 mb-0">
+                Du kehrst danach automatisch hierher zurück und die Bibliothek wird synchronisiert.
+              </p>
+            </template>
 
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
+            <template v-else>
+              <v-alert type="info" variant="tonal" class="mb-4">
+                <div class="font-weight-bold mb-1">Manuell über das öffentliche Community-Profil</div>
+                Es wird kein Steam-Zugangs- oder Refresh-Token gespeichert. Spätere Synchronisationen laufen anhand
+                deiner SteamID über die offizielle Steam Web API und benötigen keine erneute Anmeldung.
+              </v-alert>
+              <p class="text-body-2 mb-2"><strong>Dafür gelten folgende Einschränkungen:</strong></p>
+              <ul class="text-body-2 text-medium-emphasis mb-4 steam-limitations">
+                <li>Dein Steam-Profil und die „Spieldetails“ müssen öffentlich sein.</li>
+                <li>Lizenz- und Erwerbsdaten (z.B. Kaufzeitpunkt) fehlen</li>
+                <li>Ungenutzte oder deinstallierte Gratisspiele können fehlen.</li>
+              </ul>
+              <v-text-field
+                v-model="steamProfile"
+                label="Steam-Community-ID, Profilname oder Profillink"
+                prepend-inner-icon="mdi-account-search-outline"
+                autocomplete="off"
+                :disabled="busy"
+                hint="Beispiel: nickname, SteamID64 oder https://steamcommunity.com/id/nickname"
+                persistent-hint
+                @keyup.enter="submit"
+              />
+
+              <div v-if="steamResolvedProfile" class="steam-profile-preview mt-4">
+                <v-avatar size="48">
+                  <v-img v-if="steamResolvedProfile.avatar_url" :src="steamResolvedProfile.avatar_url" alt="" />
+                  <v-icon v-else icon="mdi-account-circle" />
+                </v-avatar>
+                <div>
+                  <div class="font-weight-bold">{{ steamResolvedProfile.display_name }}</div>
+                  <div class="text-caption text-medium-emphasis">
+                    <template v-if="steamResolvedProfile.library_accessible">
+                      {{ steamResolvedProfile.game_count }} Spiele öffentlich sichtbar
+                    </template>
+                    <template v-else>Spielebibliothek ist nicht öffentlich</template>
+                  </div>
+                </div>
+              </div>
+              <v-alert v-if="steamResolvedProfile && !steamResolvedProfile.library_accessible" type="warning" variant="tonal" class="mt-4">
+                Öffne bei Steam „Profil bearbeiten → Privatsphäreeinstellungen“ und setze „Spieldetails“ auf
+                „Öffentlich“. Prüfe das Profil danach erneut.
+              </v-alert>
+            </template>
           </template>
 
           <template v-else-if="target.platform === 'epic'">
@@ -370,7 +418,7 @@
           Weiter
         </v-btn>
         <v-btn
-          v-else-if="stage === 2 && target.platform !== 'xbox'"
+          v-else-if="stage === 2 && target.platform !== 'xbox' && (target.platform !== 'steam' || steamConnectionMode === 'community')"
           color="primary"
           append-icon="mdi-arrow-right"
           :disabled="!canSubmit"
@@ -406,7 +454,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { platformIcon, platformTitle } from '../platforms'
 import type { Account, Participant, Platform, ProviderLoginStart, SteamProfile } from '../types'
@@ -418,6 +466,7 @@ interface ProviderTarget {
 }
 
 type BrowserFamily = 'firefox' | 'edge' | 'chromium' | 'safari' | 'other'
+type SteamConnectionMode = 'qr' | 'openid' | 'community'
 
 const browserOptions: Array<{ title: string; value: BrowserFamily }> = [
   { title: 'Firefox', value: 'firefox' },
@@ -490,10 +539,13 @@ const error = ref('')
 const account = ref<Account | undefined>()
 const loginStart = ref<ProviderLoginStart>()
 const code = ref('')
+const steamConnectionMode = ref<SteamConnectionMode>('qr')
 const steamProfile = ref('')
 const steamResolvedProfile = ref<SteamProfile>()
 const steamLoginPending = ref(false)
 const steamLoginState = ref('')
+const steamQrDataUrl = ref('')
+const steamStatusMessage = ref('QR-Code mit der Steam-App scannen und bestätigen.')
 const needs2fa = ref(false)
 const resultMessage = ref('')
 const ubisoft = reactive({ email: '', password: '', twoFactorCode: '' })
@@ -501,8 +553,7 @@ const xboxChecking = ref(false)
 const codeCopied = ref(false)
 const browserFamily = ref<BrowserFamily>(detectBrowser())
 let xboxPollTimer: ReturnType<typeof setTimeout> | undefined
-let steamPopup: Window | null = null
-let steamPopupTimer: ReturnType<typeof setInterval> | undefined
+let steamPollTimer: ReturnType<typeof setTimeout> | undefined
 
 const progress = computed(() => stage.value * 25)
 const browserGuide = computed(() => browserGuides[browserFamily.value])
@@ -550,7 +601,11 @@ const browserRequestHint = computed(() => {
 })
 const canSubmit = computed(() => {
   const platform = props.target?.platform
-  if (platform === 'steam') return Boolean(steamProfile.value.trim()) && !steamLoginPending.value
+  if (platform === 'steam') {
+    return steamConnectionMode.value === 'community'
+      && Boolean(steamProfile.value.trim())
+      && !steamLoginPending.value
+  }
   if (platform === 'ubisoft') {
     return needs2fa.value
       ? Boolean(ubisoft.twoFactorCode.trim())
@@ -562,7 +617,7 @@ const canSubmit = computed(() => {
 const steamActionLabel = computed(() => {
   if (!steamResolvedProfile.value) return 'Profil prüfen'
   if (!steamResolvedProfile.value.library_accessible) return 'Erneut prüfen'
-  return 'Verbinden und Spiele laden'
+  return 'Ohne Token verbinden und Spiele laden'
 })
 const isBrowserSessionPlatform = computed(() =>
   ['battle_net', 'humble', 'meta', 'ea'].includes(props.target?.platform || '')
@@ -570,7 +625,7 @@ const isBrowserSessionPlatform = computed(() =>
 const introTitle = computed(() => `${platformTitle(props.target?.platform || '')} verbinden`)
 const introText = computed(() => {
   const platform = props.target?.platform
-  if (platform === 'steam') return 'Du bestätigst dein Konto einmalig direkt bei Steam. SteamID, Profilname und Bibliothek werden danach automatisch übernommen.'
+  if (platform === 'steam') return 'Du entscheidest selbst: Die QR-Anmeldung liefert die vollständigsten Daten und speichert eine erneuerbare Anmeldung. Alternativ nutzt die App nur dein öffentliches Steam-Community-Profil und speichert kein Steam-Token.'
   if (platform === 'epic') return 'Die Anmeldung findet auf der offiziellen Epic-Seite statt. Danach gibst du die angezeigte Bestätigung hier zurück.'
   if (platform === 'gog') return 'Die Anmeldung findet auf der offiziellen GOG-Seite statt. Danach übernimmt die App den Bestätigungscode.'
   if (platform === 'ubisoft') return 'Du meldest dich direkt mit deinem Ubisoft-Konto an. Falls 2FA aktiv ist, führt der Assistent automatisch zum nächsten Schritt.'
@@ -584,7 +639,7 @@ const introText = computed(() => {
 })
 const introSteps = computed(() => {
   const platform = props.target?.platform
-  if (platform === 'steam') return ['Bei Steam bestätigen', 'Profil und Freigabe automatisch prüfen', 'Bibliothek automatisch laden']
+  if (platform === 'steam') return ['Verbindungsart und Datenumfang auswählen', 'Steam-Konto oder öffentliches Community-Profil verbinden', 'Bibliothek automatisch laden']
   if (platform === 'epic' || platform === 'gog') return ['Offizielle Loginseite öffnen', 'Bestätigung kopieren und einfügen', 'Bibliothek automatisch laden']
   if (platform === 'ubisoft') return ['E-Mail und Passwort eingeben', 'Falls nötig 2FA bestätigen', 'Bibliothek automatisch laden']
   if (platform === 'xbox') return ['Einmaligen Code anzeigen', 'Bei Microsoft bestätigen', 'Bibliothek automatisch laden']
@@ -605,12 +660,15 @@ watch(
     account.value = props.target.account
     loginStart.value = undefined
     code.value = ''
+    steamConnectionMode.value = 'qr'
     steamProfile.value = props.target.platform === 'steam' && props.target.account && !props.target.account.account_id.startsWith('playnite:')
       ? props.target.account.account_id
       : ''
     steamResolvedProfile.value = undefined
     steamLoginPending.value = false
     steamLoginState.value = ''
+    steamQrDataUrl.value = ''
+    steamStatusMessage.value = 'QR-Code mit der Steam-App scannen und bestätigen.'
     needs2fa.value = false
     resultMessage.value = ''
     xboxChecking.value = false
@@ -624,6 +682,16 @@ watch(steamProfile, (value) => {
   if (steamResolvedProfile.value?.steam_id !== value.trim()) {
     steamResolvedProfile.value = undefined
   }
+})
+
+watch(steamConnectionMode, (mode) => {
+  error.value = ''
+  steamResolvedProfile.value = undefined
+  if (mode === 'qr') return
+  clearSteamLogin()
+  steamLoginState.value = ''
+  steamQrDataUrl.value = ''
+  steamStatusMessage.value = 'QR-Code mit der Steam-App scannen und bestätigen.'
 })
 
 async function prepare() {
@@ -723,75 +791,82 @@ async function syncLibrary() {
 
 async function startSteamLogin() {
   if (!props.target) return
+  clearSteamLogin()
   error.value = ''
-  steamPopup = window.open('', 'steam-login', 'popup,width=760,height=720')
-  if (!steamPopup) {
-    error.value = 'Das Steam-Fenster wurde vom Browser blockiert. Erlaube Pop-ups für diese Seite und versuche es erneut.'
-    return
-  }
-
   busy.value = true
   try {
-    const result = await api.startSteamLogin(props.target.participant.id, window.location.origin)
+    const result = await api.startSteamLogin(props.target.participant.id)
     steamLoginState.value = result.state
+    steamQrDataUrl.value = result.qr_data_url
+    steamStatusMessage.value = 'QR-Code mit der Steam-App scannen und bestätigen.'
     steamLoginPending.value = true
-    steamPopup.location.href = result.login_url
-    steamPopupTimer = setInterval(() => {
-      if (steamPopup?.closed) {
-        clearInterval(steamPopupTimer)
-        steamPopupTimer = undefined
-        steamPopup = null
-        steamLoginPending.value = false
-      }
-    }, 500)
+    scheduleSteamPoll()
   } catch (err) {
-    steamPopup.close()
-    steamPopup = null
     error.value = readableError(err)
   } finally {
     busy.value = false
   }
 }
 
-async function handleSteamLoginMessage(event: MessageEvent) {
-  if (event.origin !== window.location.origin) return
-  const data = event.data as {
-    type?: string
-    state?: string
-    success?: boolean
-    message?: string
-    account?: Account
-    profile?: SteamProfile
-  }
-  if (data.type !== 'steam-login-result' || data.state !== steamLoginState.value) return
-
+async function startSteamOpenIdLogin() {
+  if (!props.target) return
   clearSteamLogin()
-  if (!data.success || !data.profile) {
-    error.value = data.message || 'Steam konnte nicht verbunden werden.'
-    return
+  error.value = ''
+  busy.value = true
+  try {
+    const returnPath = window.location.pathname.startsWith('/admin/') ? '/admin/logins' : '/logins'
+    const result = await api.startSteamOpenId(
+      props.target.participant.id,
+      window.location.origin,
+      returnPath
+    )
+    window.location.assign(result.login_url)
+  } catch (err) {
+    error.value = readableError(err)
+    busy.value = false
   }
+}
 
-  steamProfile.value = data.profile.steam_id
-  steamResolvedProfile.value = data.profile
-  if (!data.profile.library_accessible) {
-    error.value = ''
-    return
+function scheduleSteamPoll() {
+  if (steamPollTimer) clearTimeout(steamPollTimer)
+  steamPollTimer = setTimeout(() => void pollSteamLogin(), 1500)
+}
+
+async function pollSteamLogin() {
+  if (!steamLoginState.value || !props.modelValue) return
+  try {
+    const result = await api.pollSteamLogin(steamLoginState.value)
+    steamStatusMessage.value = result.message
+    if (result.status === 'failed') {
+      steamLoginPending.value = false
+      error.value = result.message
+      return
+    }
+    if (result.status !== 'complete') {
+      scheduleSteamPoll()
+      return
+    }
+    if (!result.account || !result.profile) {
+      throw new Error('Steam wurde bestätigt, aber der Account konnte nicht gespeichert werden.')
+    }
+    steamLoginPending.value = false
+    steamProfile.value = result.profile.steam_id
+    steamResolvedProfile.value = result.profile
+    account.value = result.account
+    resultMessage.value = result.message
+    stage.value = 4
+    emit('finished')
+  } catch (err) {
+    steamLoginPending.value = false
+    error.value = readableError(err)
   }
-  if (!data.account) {
-    error.value = 'Steam wurde bestätigt, aber der Account konnte nicht gespeichert werden.'
-    return
-  }
-  account.value = data.account
-  await syncLibrary()
 }
 
 function clearSteamLogin() {
-  if (steamPopupTimer) {
-    clearInterval(steamPopupTimer)
-    steamPopupTimer = undefined
+  if (steamPollTimer) {
+    clearTimeout(steamPollTimer)
+    steamPollTimer = undefined
   }
-  if (steamPopup && !steamPopup.closed) steamPopup.close()
-  steamPopup = null
   steamLoginPending.value = false
 }
 
@@ -891,11 +966,9 @@ function finish() {
   emit('update:modelValue', false)
 }
 
-onMounted(() => window.addEventListener('message', handleSteamLoginMessage))
 onBeforeUnmount(() => {
   clearXboxPoll()
   clearSteamLogin()
-  window.removeEventListener('message', handleSteamLoginMessage)
 })
 
 </script>
@@ -926,10 +999,42 @@ onBeforeUnmount(() => {
   max-width: 320px;
 }
 
+.steam-mode-toggle {
+  display: flex;
+  width: 100%;
+}
+
+.steam-mode-toggle :deep(.v-btn) {
+  flex: 1 1 0;
+  min-height: 48px;
+  height: auto;
+  white-space: normal;
+}
+
+.steam-limitations {
+  padding-left: 22px;
+}
+
+.steam-limitations li {
+  margin-bottom: 6px;
+}
+
 .steam-profile-preview {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.steam-qr-login {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+}
+
+.steam-qr-code {
+  width: min(300px, 100%);
+  aspect-ratio: 1;
+  display: block;
 }
 
 .xbox-code-row {
@@ -977,6 +1082,14 @@ onBeforeUnmount(() => {
   .wizard-content {
     min-height: 420px;
     padding: 18px;
+  }
+
+  .steam-mode-toggle {
+    flex-direction: column;
+  }
+
+  .steam-mode-toggle :deep(.v-btn) {
+    width: 100%;
   }
 }
 </style>

@@ -127,15 +127,16 @@ def test_participant_games_groups_platforms_and_searches(db):
     assert four_player_games["items"][0]["game"].title == "Half-Life"
 
 
-def test_recent_acquisitions_use_first_owned_since_and_ignore_import_date(db):
+def test_recent_acquisitions_prefer_store_dates_and_include_non_baseline_discoveries(db):
     now = datetime.utcnow()
     lob = Participant(nickname="PlayerOne")
     reactionman = Participant(nickname="PlayerTwo")
     old_game = Game(title="Old Game", normalized_title="old game", multiplayer=True)
     new_game = Game(title="Fresh Game", normalized_title="fresh game", multiplayer=True)
+    detected_game = Game(title="Newly Detected", normalized_title="newly detected", multiplayer=True)
     import_only = Game(title="Just Imported", normalized_title="just imported", multiplayer=True)
     tool = Game(title="Video Tool", normalized_title="video tool", is_game=False)
-    db.add_all([lob, reactionman, old_game, new_game, import_only, tool])
+    db.add_all([lob, reactionman, old_game, new_game, detected_game, import_only, tool])
     db.flush()
     steam = Account(participant_id=lob.id, platform=Platform.steam, account_id="steam", display_name="Steam")
     gog = Account(participant_id=lob.id, platform=Platform.gog, account_id="gog", display_name="GOG")
@@ -149,6 +150,7 @@ def test_recent_acquisitions_use_first_owned_since_and_ignore_import_date(db):
                 game_id=old_game.id,
                 platform=Platform.steam,
                 owned_since=now - timedelta(days=500),
+                owned_since_source="store_entitlement",
                 last_seen=now,
             ),
             Ownership(
@@ -157,6 +159,7 @@ def test_recent_acquisitions_use_first_owned_since_and_ignore_import_date(db):
                 game_id=old_game.id,
                 platform=Platform.gog,
                 owned_since=now - timedelta(days=5),
+                owned_since_source="store_entitlement",
                 last_seen=now,
             ),
             Ownership(
@@ -164,13 +167,25 @@ def test_recent_acquisitions_use_first_owned_since_and_ignore_import_date(db):
                 game_id=new_game.id,
                 platform=Platform.steam,
                 owned_since=now - timedelta(days=2),
+                owned_since_source="store_entitlement",
+                last_seen=now,
+            ),
+            Ownership(
+                participant_id=lob.id,
+                game_id=detected_game.id,
+                platform=Platform.steam,
+                first_seen_at=now - timedelta(days=1),
+                first_seen_is_baseline=False,
                 last_seen=now,
             ),
             Ownership(
                 participant_id=lob.id,
                 game_id=import_only.id,
                 platform=Platform.steam,
-                owned_since=None,
+                owned_since=now - timedelta(days=1),
+                owned_since_source=None,
+                first_seen_at=now - timedelta(days=1),
+                first_seen_is_baseline=True,
                 last_seen=now,
             ),
             Ownership(
@@ -178,6 +193,7 @@ def test_recent_acquisitions_use_first_owned_since_and_ignore_import_date(db):
                 game_id=tool.id,
                 platform=Platform.steam,
                 owned_since=now - timedelta(days=1),
+                owned_since_source="store_entitlement",
                 last_seen=now,
             ),
         ]
@@ -186,6 +202,8 @@ def test_recent_acquisitions_use_first_owned_since_and_ignore_import_date(db):
 
     result = recent_acquisitions(days=30, db=db)
 
-    assert [item["game"].title for item in result] == ["Fresh Game"]
-    assert result[0]["participant"].nickname == "PlayerTwo"
-    assert result[0]["platforms"] == [Platform.steam]
+    assert [item["game"].title for item in result] == ["Newly Detected", "Fresh Game"]
+    assert result[0]["date_kind"] == "first_seen"
+    assert result[1]["date_kind"] == "acquired"
+    assert result[1]["participant"].nickname == "PlayerTwo"
+    assert result[1]["platforms"] == [Platform.steam]

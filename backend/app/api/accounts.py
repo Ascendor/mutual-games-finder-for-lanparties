@@ -1,7 +1,11 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException
+import shutil
+from pathlib import Path
+
 from sqlalchemy import exists, select, update
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import Account, ManualOwnership, Ownership, Platform
 from app.schemas import AccountCreate, AccountRead, AccountUpdate
@@ -26,6 +30,14 @@ def _platform_value(platform: Platform | str) -> str:
 
 def _local_account_id(platform: Platform | str, participant_id: int, sequence: int) -> str:
     return f"local-{_platform_value(platform)}-{participant_id}-{sequence}"
+
+
+def _delete_provider_auth_data(account: Account) -> None:
+    root = Path(settings.provider_auth_root).resolve()
+    account_path = (root / _platform_value(account.platform) / str(account.id)).resolve()
+    if root not in account_path.parents:
+        return
+    shutil.rmtree(account_path, ignore_errors=True)
 
 
 def _repair_blank_provider_account_ids(db: Session) -> None:
@@ -119,4 +131,5 @@ def delete_account(account_id: int, db: Session = Depends(get_db)):
     )
     db.delete(account)
     db.commit()
+    _delete_provider_auth_data(account)
 

@@ -3,7 +3,9 @@ import sqlite3
 import zipfile
 from pathlib import Path
 
-from app.models import Account, Participant, Platform
+from sqlalchemy import select
+
+from app.models import Account, Participant, Platform, PlatformGameMapping
 from app.services.gog_galaxy_import import import_gog_galaxy_export_path
 from app.services.import_providers import ImportedGame
 from app.services.sync_service import resolve_game, upsert_ownership
@@ -87,7 +89,76 @@ def test_gog_galaxy_import_reads_database_from_zip(db, tmp_path):
     assert participant.ownerships[0].game.title == "MDK 2"
 
 
-def _write_galaxy_db(path: Path, rows: list[tuple[str, str, int]]) -> None:
+def test_gog_galaxy_import_adds_safe_related_platform_mappings(db, tmp_path):
+    participant = Participant(nickname="Mapper", present=True)
+    db.add(participant)
+    db.commit()
+    database = tmp_path / "galaxy-2.0.db"
+    _write_galaxy_db(
+        database,
+        [
+            (
+                "epic_Fowl",
+                "The Escapists 2",
+                15,
+                ["steam_641990", "gog_2137491407", "epic_Fowl", "psn_CUSA06244_00"],
+            )
+        ],
+    )
+
+    import_gog_galaxy_export_path(db, participant.id, database)
+    mapped = resolve_game(db, Platform.gog, ImportedGame(platform_game_id="2137491407", title="The Escapists 2"))
+
+    assert mapped.id == participant.ownerships[0].game_id
+    assert {
+        (mapping.platform, mapping.platform_game_id)
+        for mapping in db.scalars(select(PlatformGameMapping)).all()
+    } == {
+        (Platform.epic, "Fowl"),
+        (Platform.steam, "641990"),
+        (Platform.gog, "2137491407"),
+    }
+
+
+def test_gog_galaxy_related_mappings_never_rehome_existing_platform_mapping(db, tmp_path):
+    existing = resolve_game(db, Platform.steam, ImportedGame(platform_game_id="123", title="Already Mapped"))
+    participant = Participant(nickname="Conflict", present=True)
+    db.add(participant)
+    db.commit()
+    database = tmp_path / "galaxy-2.0.db"
+    _write_galaxy_db(database, [("gog_conflict", "Different Game", 0, ["steam_123", "gog_conflict"])])
+
+    import_gog_galaxy_export_path(db, participant.id, database)
+
+    steam_mapping = db.scalar(
+        select(PlatformGameMapping).where(
+            PlatformGameMapping.platform == Platform.steam,
+            PlatformGameMapping.platform_game_id == "123",
+        )
+    )
+    assert steam_mapping is not None
+    assert steam_mapping.game_id == existing.id
+
+
+def test_gog_galaxy_related_mappings_skip_ambiguous_new_steam_ids(db, tmp_path):
+    participant = Participant(nickname="Ambiguous", present=True)
+    db.add(participant)
+    db.commit()
+    database = tmp_path / "galaxy-2.0.db"
+    _write_galaxy_db(
+        database,
+        [("gog_ambiguous", "Ambiguous Steam Game", 0, ["steam_100", "steam_200", "gog_ambiguous"])],
+    )
+
+    import_gog_galaxy_export_path(db, participant.id, database)
+
+    steam_mappings = db.scalars(
+        select(PlatformGameMapping).where(PlatformGameMapping.platform == Platform.steam)
+    ).all()
+    assert steam_mappings == []
+
+
+def _write_galaxy_db(path: Path, rows: list[tuple]) -> None:
     with sqlite3.connect(path) as connection:
         connection.executescript(
             """
@@ -105,7 +176,10 @@ def _write_galaxy_db(path: Path, rows: list[tuple[str, str, int]]) -> None:
             """
         )
         connection.execute("INSERT INTO GamePieceTypes (id, type) VALUES (573, 'title')")
-        for index, (release_key, title, playtime) in enumerate(rows, start=1):
+        connection.execute("INSERT INTO GamePieceTypes (id, type) VALUES (376, 'allGameReleases')")
+        for index, row in enumerate(rows, start=1):
+            release_key, title, playtime = row[:3]
+            related_releases = row[3] if len(row) > 3 else []
             connection.execute(
                 "INSERT INTO LibraryReleases (id, userId, releaseKey) VALUES (?, ?, ?)",
                 (index, 1, release_key),
@@ -122,3 +196,8 @@ def _write_galaxy_db(path: Path, rows: list[tuple[str, str, int]]) -> None:
                 "INSERT INTO GamePieces (releaseKey, gamePieceTypeId, userId, value, languageId) VALUES (?, 573, ?, ?, NULL)",
                 (release_key, 1, json.dumps({"title": title})),
             )
+            if related_releases:
+                connection.execute(
+                    "INSERT INTO GamePieces (releaseKey, gamePieceTypeId, userId, value, languageId) VALUES (?, 376, ?, ?, NULL)",
+                    (release_key, 1, json.dumps({"releases": related_releases})),
+                )

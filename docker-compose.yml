@@ -37,11 +37,15 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      steam-helper:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lanparty}:${POSTGRES_PASSWORD:-lanparty}@database:5432/${POSTGRES_DB:-lanparty}
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,https://localhost:8443,https://127.0.0.1:8443
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-QC4lF93bYgwTHRT4xRynsAIz3San1lDW}
       STEAM_API_KEY: ${STEAM_API_KEY:-}
+      STEAM_HELPER_URL: http://steam-helper:3000
+      STEAM_HELPER_TIMEOUT_SECONDS: ${STEAM_HELPER_TIMEOUT_SECONDS:-15}
       IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
       IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
       RAWG_API_KEY: ${RAWG_API_KEY:-}
@@ -56,6 +60,7 @@ services:
       GOG_API_URL: ${GOG_API_URL:-https://api.gog.com}
       EPIC_LOGIN_URL: ${EPIC_LOGIN_URL:-https://legendary.gl/epiclogin}
       UBISOFT_APP_ID: ${UBISOFT_APP_ID:-f68a4bb5-608a-4ff2-8123-be8ef797e0a6}
+      UBISOFT_CLUB_GRAPHQL_URL: ${UBISOFT_CLUB_GRAPHQL_URL:-https://public-ubiservices.ubi.com/v1/profiles/me/uplay/graphql}
       AMAZON_DEVICE_TYPE: ${AMAZON_DEVICE_TYPE:-A2UMVHOX7UP4V7}
       AMAZON_LOGIN_URL: ${AMAZON_LOGIN_URL:-https://www.amazon.com/ap/signin}
       AMAZON_ENTITLEMENTS_URL: ${AMAZON_ENTITLEMENTS_URL:-https://gaming.amazon.com/api/distribution/entitlements}
@@ -63,6 +68,8 @@ services:
       EA_GRAPHQL_URL: ${EA_GRAPHQL_URL:-https://service-aggregation-layer.juno.ea.com/graphql}
       EA_OWNED_GAMES_QUERY_HASH: ${EA_OWNED_GAMES_QUERY_HASH:-779f1cd1355699752e20c0b3877847f4e3010ef5de131c248e98f8eff84f0718}
       EA_PLAY_TIMES_QUERY_HASH: ${EA_PLAY_TIMES_QUERY_HASH:-3f09b35e06b75c74d8ec3e520a598ebb5e2992b1e1268b6dd3b8ed99b9fafb29}
+      EA_IDENTITY_URL: ${EA_IDENTITY_URL:-https://gateway.ea.com/proxy/identity/pids/me}
+      EA_ORIGIN_API_BASE_URLS: ${EA_ORIGIN_API_BASE_URLS:-https://api1.origin.com,https://api2.origin.com,https://api3.origin.com,https://api4.origin.com}
       META_GRAPHQL_URL: ${META_GRAPHQL_URL:-https://graph.oculus.com/graphql?locale=en_US}
       META_GRAPHQL_DOCUMENT_IDS: ${META_GRAPHQL_DOCUMENT_IDS:-9431935310238631,29383114651302983,29143116735333849}
       GAMES_OPTIONS_CACHE_SECONDS: ${GAMES_OPTIONS_CACHE_SECONDS:-300}
@@ -102,6 +109,16 @@ services:
       dockerfile: frontend/Dockerfile
     depends_on:
       - backend
+
+  steam-helper:
+    build:
+      context: .
+      dockerfile: steam-helper/Dockerfile
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   gateway-certs:

@@ -57,8 +57,9 @@
           und Anzahl der berechneten Ergebnisse
         </li>
         <li>
-          erforderliche Provider-Tokens oder Sitzungsdaten im geschützten
-          Server-Speicher; Passwörter werden nicht gespeichert
+          je nach freiwillig gewählter Verbindungsart erforderliche
+          Provider-Tokens oder Sitzungsdaten im geschützten Server-Speicher;
+          Passwörter werden nicht gespeichert
         </li>
         <li>
           technische Webserver- und Fehlerprotokolle; dabei können
@@ -109,6 +110,40 @@
     </section>
 
     <section>
+      <h2>Wahlmöglichkeit bei Steam</h2>
+      <p>
+        Für Steam stehen drei Verbindungsarten zur Verfügung. Bei der
+        QR-Anmeldung wird nach der Bestätigung in der offiziellen Steam-App
+        ein erneuerbares Steam-Token im geschützten Server-Speicher abgelegt.
+        Das Steam-Passwort wird weder übermittelt noch gespeichert. Das Token
+        wird ausschließlich zur Abfrage der verbundenen Bibliothek und ihrer
+        Lizenzdaten verwendet, nie an den Browser ausgegeben und beim Wechsel
+        auf die tokenlose Verbindung oder beim Löschen des Accounts entfernt.
+      </p>
+      <p>
+        Wer kein Steam-Token speichern lassen möchte oder keine Steam-Mobile-App
+        verwendet, kann sich über die offizielle Steam-OpenID-Seite im Browser
+        anmelden. Benutzername, Passwort und Steam Guard werden dabei
+        ausschließlich an Steam übermittelt. Diese Anwendung erhält und
+        speichert nur die von Steam bestätigte SteamID und die anschließend
+        abgerufenen Bibliotheksdaten. Alternativ kann eine Steam-Community-ID,
+        ein Profilname oder ein Profillink manuell angegeben werden; dabei wird
+        die Kontrolle über das angegebene Profil nicht technisch bestätigt.
+      </p>
+      <p>
+        Beide tokenlosen Varianten verwenden die offizielle Steam Web API und
+        erfordern ein öffentliches Profil mit öffentlichen
+        Spieldetails. Öffentlich sichtbare Spielzeiten werden dabei
+        übernommen. Private Bibliotheken sowie Lizenz- beziehungsweise
+        Erwerbsdaten können auf diesem Weg nicht verarbeitet werden;
+        ungenutzte oder deinstallierte Gratisspiele können fehlen. Separat
+        ausgeblendete Spielzeiten sind auch mit der QR-Anmeldung nicht
+        abrufbar. Weitere Synchronisationen benötigen trotzdem keine erneute
+        Anmeldung.
+      </p>
+    </section>
+
+    <section>
       <h2>Empfänger und externe Dienste</h2>
       <p>
         Die gemeinsam gepflegten Teilnehmer-, Bibliotheks- und
@@ -129,6 +164,9 @@
       <div class="legal-links">
         <a href="https://steamcommunity.com/dev/apiterms" target="_blank" rel="noopener noreferrer">
           Steam Web API
+        </a>
+        <a href="https://partner.steamgames.com/doc/features/auth" target="_blank" rel="noopener noreferrer">
+          Steam OpenID
         </a>
         <a href="https://api-docs.igdb.com/" target="_blank" rel="noopener noreferrer">
           IGDB

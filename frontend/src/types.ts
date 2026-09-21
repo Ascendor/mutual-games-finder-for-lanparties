@@ -130,7 +130,8 @@ export interface PersonalGamePage {
 export interface RecentAcquisition {
   participant: Participant
   game: Game
-  owned_since: string
+  occurred_at: string
+  date_kind: 'acquired' | 'first_seen'
   platforms: Platform[]
 }
 
@@ -189,6 +190,7 @@ export interface ProviderAuthStatus {
   needs_2fa?: boolean
   pending?: boolean
   interval?: number
+  connection_mode?: 'qr' | 'community'
   message: string
 }
 
@@ -220,9 +222,24 @@ export interface SteamConnection extends SteamProfile {
 }
 
 export interface SteamLoginStart {
-  login_url: string
   state: string
+  qr_data_url: string
   expires_in: number
+}
+
+export interface SteamOpenIdStart {
+  login_url: string
+  expires_in: number
+}
+
+export interface SteamLoginStatus {
+  status: 'pending' | 'scanned' | 'processing' | 'complete' | 'failed'
+  authenticated?: boolean
+  message: string
+  account?: Account
+  profile?: SteamProfile
+  imported_games?: number
+  dated_games?: number
 }
 
 export type UsageEventType =

@@ -31,6 +31,44 @@ documented request structure, persisted-query identifiers, pagination
 behaviour, and playtime lookup. The implementation in this repository is a
 separate Python implementation.
 
+### FriendsOfGalaxy GOG Galaxy Integrations
+
+- Ubisoft/Uplay project: https://github.com/FriendsOfGalaxy/galaxy-integration-uplay
+- Ubisoft/Uplay reference revision: `61d24e4ed0f1b2378252142e5ee2c92cd309612b`
+- Copyright: Copyright (c) 2019 FriendsOfGalaxy
+- License: MIT
+- Local license copy: `LICENSES/FriendsOfGalaxy-Uplay-MIT.txt`
+
+The Ubisoft provider was informed by the Galaxy Uplay integration's direct
+Ubisoft Club GraphQL library request and PC-platform filtering. The
+implementation in this repository is a separate Python implementation.
+
+- Origin project: https://github.com/FriendsOfGalaxy/galaxy-integration-origin
+- Origin reference revision: `350b11a62fd46ae5124d1edb94c1d1d94fe66110`
+
+The EA provider's legacy Origin fallback was informed by the Origin
+integration's documented identity, entitlement, and offer-detail endpoints.
+No source code from that repository is incorporated in this project.
+
+### DoctorMcKay Steam Libraries
+
+- Projects: https://github.com/DoctorMcKay/node-steam-session and https://github.com/DoctorMcKay/node-steam-user
+- Packages: `steam-session` 1.9.4 and `steam-user` 5.3.0
+- License: MIT
+
+The helper also uses `qrcode` 1.5.4 (MIT) to render the challenge supplied by
+Steam as an image in the browser.
+
+The internal Steam helper uses these libraries for the user-approved QR login
+and the reading of Steam license data. A renewable login token is stored in the
+protected backend provider-auth volume for later synchronizations. It is never
+returned to the browser and is removed when the linked account is deleted.
+Users may instead authenticate through Steam's official OpenID 2.0 endpoint or
+manually connect a public Steam Community profile. These modes store no Steam
+login token and do not use this helper, but cannot read private libraries or
+Steam license acquisition dates. The OpenID flow sends passwords and Steam
+Guard data only to Steam and returns only the verified SteamID to this app.
+
 ### Legendary
 
 - Project: https://github.com/legendary-gl/legendary

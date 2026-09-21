@@ -31,6 +31,7 @@ from app.services.import_providers import (
     save_provider_auth_json,
     validate_ea_access_token,
 )
+from app.services.steam_client_credentials import load_steam_credentials
 
 EPIC_LOGIN_URL = settings.epic_login_url
 UBISOFT_APP_ID = settings.ubisoft_app_id
@@ -45,6 +46,7 @@ LOGIN_PLATFORMS = {
     Platform.humble,
     Platform.meta,
 }
+STATUS_PLATFORMS = LOGIN_PLATFORMS | {Platform.steam}
 AMAZON_DEVICE_TYPE = settings.amazon_device_type
 AMAZON_LOGIN_URL = settings.amazon_login_url
 
@@ -482,8 +484,27 @@ def generic_json_status(account: Account) -> dict[str, Any]:
 
 
 def account_status(account: Account) -> dict[str, Any]:
-    _supported_account(account)
     platform = _account_platform(account)
+    if platform == Platform.steam:
+        authenticated = load_steam_credentials(account.id) is not None
+        is_direct_connection = bool(re.fullmatch(r"\d{17}", account.account_id or ""))
+        connection_mode = "qr" if authenticated else "community" if is_direct_connection else None
+        return {
+            "account_id": account.id,
+            "participant_id": account.participant_id,
+            "platform": platform,
+            "authenticated": authenticated,
+            "needs_2fa": False,
+            "connection_mode": connection_mode,
+            "message": (
+                "Steam QR login is stored"
+                if authenticated
+                else "Steam Community ID without login token"
+                if is_direct_connection
+                else "Steam was imported without a direct connection"
+            ),
+        }
+    _supported_account(account)
     if platform == Platform.epic:
         return epic_status(account)
     if platform == Platform.gog:
@@ -496,7 +517,7 @@ def account_status(account: Account) -> dict[str, Any]:
 
 
 def status(db: Session) -> list[dict[str, Any]]:
-    accounts = db.scalars(select(Account).where(Account.platform.in_(LOGIN_PLATFORMS)).order_by(Account.platform, Account.display_name)).all()
+    accounts = db.scalars(select(Account).where(Account.platform.in_(STATUS_PLATFORMS)).order_by(Account.platform, Account.display_name)).all()
     return [account_status(account) for account in accounts]
 
 

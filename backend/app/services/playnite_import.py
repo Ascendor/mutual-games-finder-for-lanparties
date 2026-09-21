@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models import Account, Game, Participant, Platform, SyncRun
 from app.services.account_identity import is_placeholder_display_name
-from app.services.import_providers import ImportedGame, _as_int, _as_list, _parse_date, _parse_datetime
+from app.services.import_providers import ImportedGame, _as_int, _as_list, _parse_date
 from app.services.genre_utils import sanitize_genres
 from app.services.metadata_service import METADATA_SYNC_LOCK, enrich_all_game_metadata
 from app.services.normalization import normalize_title
@@ -101,7 +101,14 @@ def _import_playnite_entries(
         if created:
             result.created_accounts += 1
         game = resolve_game(db, platform.value, imported)
-        upsert_ownership(db, account, game, imported, playtime_priority="fallback")
+        upsert_ownership(
+            db,
+            account,
+            game,
+            imported,
+            playtime_priority="fallback",
+            discovery_is_baseline=True,
+        )
         result.updated_ownerships += 1
         result.game_ids.add(game.id)
 
@@ -118,8 +125,6 @@ def _playnite_import_key(platform: Platform, imported: ImportedGame) -> tuple[st
 
 def _merge_playnite_import(target: ImportedGame, incoming: ImportedGame) -> None:
     target.playtime_minutes = max(target.playtime_minutes, incoming.playtime_minutes)
-    if incoming.owned_since and (target.owned_since is None or incoming.owned_since < target.owned_since):
-        target.owned_since = incoming.owned_since
     if incoming.description and not target.description:
         target.description = incoming.description
     if incoming.cover_url and not target.cover_url:
@@ -701,7 +706,6 @@ def _imported_game_from_playnite_entry(entry: dict[str, Any]) -> tuple[ImportedG
     platform_game_id = _detect_platform_game_id(entry, platform, title)
     playtime_minutes = _playtime_minutes(entry)
     release_date = _parse_date(_first_deep(entry, "ReleaseDate", "releaseDate", "Released", "released"))
-    owned_since = _parse_datetime(_first_deep(entry, "Added", "added", "DateAdded", "dateAdded", "InstallDate", "installDate"))
     genres = _names_from_collection(_first_deep(entry, "Genres", "genres", "Genre", "genre"))
     cover_url = _first_deep(entry, "CoverImage", "coverImage", "Cover", "cover", "Icon", "icon")
 
@@ -710,7 +714,6 @@ def _imported_game_from_playnite_entry(entry: dict[str, Any]) -> tuple[ImportedG
             platform_game_id=platform_game_id,
             title=title,
             playtime_minutes=playtime_minutes,
-            owned_since=owned_since,
             cover_url=str(cover_url) if cover_url else None,
             release_date=release_date,
             genres=genres,

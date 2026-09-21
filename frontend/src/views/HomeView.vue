@@ -108,11 +108,13 @@
 </div>
 
  <v-spacer class="flex-grow-1" />
-<!--
       <section class="recent-acquisitions mt-auto">
         <div class="recent-acquisitions__header">
           <div>
             <h2 class="text-subtitle-1 mb-1">Neu in euren Bibliotheken</h2>
+            <p class="text-caption text-medium-emphasis mb-0">
+              Echte Erwerbsdaten, sofern der Store sie liefert; sonst der Zeitpunkt der ersten späteren Erkennung.
+            </p>
           </div>
           <v-select
             v-model="acquisitionDays"
@@ -139,17 +141,19 @@
           <template #item.game="{ item }">
             <em>{{ item.game.title }}</em>
           </template>
-          <template #item.owned_since="{ item }">
-            {{ formatDate(item.owned_since) }}
+          <template #item.date_kind="{ item }">
+            {{ item.date_kind === 'acquired' ? 'Erworben' : 'Erstmals erkannt' }}
+          </template>
+          <template #item.occurred_at="{ item }">
+            {{ formatDate(item.occurred_at) }}
           </template>
           <template #no-data>
             <div class="pa-4 text-medium-emphasis">
-              Keine Spiele mit Erwerbsdatum im gewählten Zeitraum gefunden.
+              Keine neuen Bibliothekseinträge im gewählten Zeitraum gefunden.
             </div>
           </template>
         </v-data-table>
       </section>
-    -->      
   </div>
 </template>
 
@@ -179,7 +183,8 @@ const acquisitionDayOptions = [
 const acquisitionHeaders = [
   { title: 'Spieler:in', key: 'participant' },
   { title: 'Spiel', key: 'game' },
-  { title: 'Erworben', key: 'owned_since' },
+  { title: 'Art', key: 'date_kind' },
+  { title: 'Datum', key: 'occurred_at' },
 ]
 const currentParticipant = computed(() =>
   store.participants.find((participant) => participant.id === currentParticipantId.value)

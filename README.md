@@ -53,7 +53,7 @@ POSTGRES_PASSWORD=lanparty
 
 ## Direkte Provider
 
-- Steam: offizielle Steam Web API
+- Steam: wahlweise QR-Anmeldung mit vollstaendiger Bibliotheks- und Lizenzabfrage, offizieller Steam-Browser-Login ohne Token oder manuelle Verbindung ueber die oeffentliche Steam-Community-ID
 - Epic: direkt ueber `legendary`
 - GOG: direkt ueber GOG-Web-APIs mit Auth-Cache
 - Ubisoft Connect: dialoggefuehrter Login mit optionaler 2FA
@@ -73,11 +73,42 @@ Der Login fuer die Teilnehmer benoetigt nur einen kurzen Microsoft-Code. Der Ser
 XBOX_CLIENT_ID=00000000-0000-0000-0000-000000000000
 ```
 
-Danach `docker compose up -d --build backend frontend` ausfuehren. Auf `Accounts & Logins` zeigt der Xbox-Assistent einen einmaligen Code, oeffnet die Microsoft-Anmeldung und synchronisiert direkt nach der Bestaetigung.
+Danach `docker compose up -d --build` ausfuehren. Auf `Accounts & Logins` zeigt der Xbox-Assistent einen einmaligen Code, oeffnet die Microsoft-Anmeldung und synchronisiert direkt nach der Bestaetigung.
 
 Der Xbox-Webdienst liefert normalen Drittanbietern keine vollstaendige Microsoft-Store-Besitzliste. Importiert werden deshalb Eintraege aus der Xbox-Titelhistorie, die Microsoft mit dem Geraet `PC` kennzeichnet. Noch nie gestartete und nicht installierte Store-Spiele koennen fehlen; Konsolentitel werden bewusst ausgeschlossen. Ein Playnite-Backup kann diese Liste ergaenzen.
 
 EA App kann ueber einen gefuehrten Browser-Login direkt synchronisiert oder alternativ ueber ein Playnite-Backup importiert werden. Der Assistent erkennt den Browser, erklaert das Kopieren der EA-GraphQL-Anfrage als cURL und speichert daraus nur den Bearer-Token. Die komplette cURL-Anfrage und darin enthaltene Cookies werden verworfen.
+
+Der Steam-Assistent bietet drei bewusst getrennte Verbindungsarten:
+
+- **QR-Anmeldung (empfohlen):** Der QR-Code wird mit der Steam-App bestaetigt.
+  Ein interner Hilfsdienst liest SteamID, Bibliothek und vorhandene
+  Lizenzzeitpunkte. Das Steam-Passwort gelangt nie zur Anwendung. Ein
+  erneuerbares Zugangstoken wird im geschuetzten `provider-auth`-Volume
+  gespeichert und fuer spaetere Synchronisationen intern wiederverwendet; es
+  wird nie an den Browser zurueckgegeben.
+- **Offizielle Browser-Anmeldung ohne gespeichertes Token:** Die Anwendung
+  leitet zur offiziellen Steam-OpenID-Seite weiter. Benutzername, Passwort und
+  Steam Guard werden ausschliesslich bei Steam eingegeben. Die Anwendung
+  erhaelt nur die bestaetigte SteamID. Diese Variante benoetigt weder die
+  Steam-Mobile-App noch ein gespeichertes Steam-Token.
+- **Community-ID manuell:** Angegeben werden
+  SteamID64, Profilname oder Profillink. Die Anwendung speichert nur die
+  SteamID und die importierten Bibliotheksdaten. Dieser Weg ist ein manueller
+  Fallback und bestaetigt nicht, dass die eingebende Person das Profil selbst
+  kontrolliert.
+
+Bei beiden tokenlosen Wegen muessen Profil und `Spieldetails` oeffentlich sein.
+Spaetere Synchronisationen funktionieren ohne erneute Anmeldung ueber die
+offizielle Steam Web API; sichtbare Spielzeiten werden aus `playtime_forever`
+uebernommen. Private Bibliotheken koennen nicht gelesen werden.
+Lizenz- und Erwerbszeitpunkte fehlen; ungenutzte oder deinstallierte
+Gratisspiele koennen ebenfalls fehlen. Separat ausgeblendete Spielzeiten sind
+in keiner der drei Verbindungsarten lesbar: Auch die QR-Anmeldung umgeht diese
+Steam-Privatsphaereeinstellung nicht. Beim Wechsel vom QR-Login zu einer
+tokenlosen Verbindung wird ein zuvor gespeichertes Steam-Token geloescht. Beim
+Loeschen des Accounts werden dessen gespeicherte Anmeldedaten ebenfalls
+entfernt.
 
 ## Playnite-Import
 

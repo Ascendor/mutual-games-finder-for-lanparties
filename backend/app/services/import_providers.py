@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Protocol
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import httpx
 import yaml
@@ -22,6 +22,7 @@ from app.models import Account, Platform
 from app.services.account_identity import apply_account_identity, is_placeholder_display_name
 from app.services.game_classification import classify_game
 from app.services.normalization import normalize_title
+from app.services.steam_client_credentials import load_authenticated_steam_library
 
 GOG_CLIENT_ID = settings.gog_client_id
 GOG_CLIENT_SECRET = settings.gog_client_secret
@@ -36,6 +37,12 @@ AMAZON_TOKEN_URL = settings.amazon_token_url
 EA_GRAPHQL_URL = settings.ea_graphql_url
 EA_OWNED_GAMES_QUERY_HASH = settings.ea_owned_games_query_hash
 EA_PLAY_TIMES_QUERY_HASH = settings.ea_play_times_query_hash
+EA_IDENTITY_URL = settings.ea_identity_url
+EA_ORIGIN_API_BASE_URLS = tuple(
+    url.strip().rstrip("/")
+    for url in settings.ea_origin_api_base_urls.split(",")
+    if url.strip()
+)
 LOGGER = logging.getLogger(__name__)
 
 def platform_value(platform: Platform | str) -> str:
@@ -128,6 +135,8 @@ def ea_owned_games_url(offset: str = "0", limit: int = 500) -> str:
 def ea_request_headers(access_token: str) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {access_token}",
+        "AuthToken": access_token,
+        "X-AuthToken": access_token,
         "Accept": "application/json",
         "Origin": "https://www.ea.com",
         "Referer": "https://www.ea.com/",
@@ -290,7 +299,6 @@ def _ubisoft_detail_game(app: dict[str, Any], details: dict[str, Any]) -> Import
     return ImportedGame(
         platform_game_id=str(app_id),
         title=str(title),
-        owned_since=_parse_datetime(_first(app, "firstSessionDate", "firstDatePlayed", "createdAt")),
         description=str(_first(details, "description", default="") or f"Ubisoft application id: {app_id}"),
         cover_url=_first(images, "highBoxArt", "lowBoxArt", "highThumbnail", "lowThumbnail", "background"),
         genres=_as_list(_first(details, "genre", "genres")),
@@ -327,6 +335,65 @@ def _ubisoft_games_from_applications(payload: Any, client: httpx.Client | None =
     return games
 
 
+def _ubisoft_pc_platform_types(game: dict[str, Any]) -> set[str]:
+    viewer = game.get("viewer") if isinstance(game.get("viewer"), dict) else {}
+    meta = viewer.get("meta") if isinstance(viewer.get("meta"), dict) else {}
+    platform_groups = meta.get("ownedPlatformGroups") if isinstance(meta.get("ownedPlatformGroups"), list) else []
+    platform_types: set[str] = set()
+    for group in platform_groups:
+        candidates = group if isinstance(group, list) else [group]
+        for item in candidates:
+            if isinstance(item, dict):
+                platform_type = str(item.get("type") or "").strip().casefold()
+                if platform_type:
+                    platform_types.add(platform_type)
+    return platform_types
+
+
+def _ubisoft_games_from_club_graphql(payload: Any) -> list[ImportedGame]:
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    viewer = data.get("viewer") if isinstance(data.get("viewer"), dict) else {}
+    owned_games = viewer.get("ownedGames") if isinstance(viewer.get("ownedGames"), dict) else {}
+    nodes = owned_games.get("nodes") if isinstance(owned_games.get("nodes"), list) else []
+    games: list[ImportedGame] = []
+    seen: set[str] = set()
+    for item in nodes:
+        if not isinstance(item, dict) or "pc" not in _ubisoft_pc_platform_types(item):
+            continue
+        platform_id = str(_first(item, "spaceId", "id", default="") or "").strip()
+        title = str(_first(item, "name", "title", "displayName", default="") or "").strip()
+        if not platform_id or not title or platform_id in seen:
+            continue
+        seen.add(platform_id)
+        games.append(
+            ImportedGame(
+                platform_game_id=platform_id,
+                title=title,
+                description=f"Ubisoft space id: {platform_id}",
+                feature_metadata_known=False,
+                player_count_known=False,
+            )
+        )
+    return games
+
+
+def _dedupe_imported_games(games: list[ImportedGame]) -> list[ImportedGame]:
+    result: list[ImportedGame] = []
+    seen: set[tuple[str, str]] = set()
+    for game in games:
+        key = (
+            platform_value(game.mapping_platform or game.ownership_platform or Platform.ubisoft),
+            game.platform_game_id,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(game)
+    return result
+
+
 def gog_auth_config_path(account_id: int) -> Path:
     return provider_auth_dir(Platform.gog, account_id) / "auth.json"
 
@@ -360,6 +427,7 @@ class ImportedGame:
     ownership_platform: Platform | None = None
     playtime_minutes: int = 0
     owned_since: datetime | None = None
+    owned_since_source: str | None = None
     description: str = ""
     cover_url: str | None = None
     release_date: date | None = None
@@ -613,27 +681,63 @@ class SteamProvider:
     platform = Platform.steam
     authoritative_library = True
 
-    def sync_account(self, account: Account) -> list[ImportedGame]:
-        if not settings.steam_api_key:
-            raise RuntimeError("STEAM_API_KEY is not configured")
-        url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
-        params = {
-            "key": settings.steam_api_key,
-            "steamid": account.account_id,
-            "include_appinfo": 1,
-            "include_played_free_games": 1,
-            "format": "json",
-        }
-        with httpx.Client(timeout=20) as client:
-            response = client.get(url, params=params)
-            response.raise_for_status()
-            steam_library = response.json().get("response")
-            if not isinstance(steam_library, dict) or "game_count" not in steam_library:
-                raise RuntimeError(
-                    "Steam library is not accessible. In the Steam privacy settings, "
-                    "set 'Game details' to 'Public' and try again."
-                )
-            games = steam_library.get("games") or []
+    def sync_account(self, account: Account) -> list[ImportedGame] | ImportBatch:
+        warnings: list[str] = []
+        authenticated_games: list[dict[str, Any]] | None = None
+        try:
+            authenticated_games = load_authenticated_steam_library(account.id, account.account_id)
+        except Exception as exc:
+            warnings.append(f"Gespeicherte Steam-Anmeldung konnte nicht verwendet werden: {exc}")
+
+        api_games: list[dict[str, Any]] | None = None
+        if settings.steam_api_key:
+            try:
+                url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
+                params = {
+                    "key": settings.steam_api_key,
+                    "steamid": account.account_id,
+                    "include_appinfo": 1,
+                    "include_played_free_games": 1,
+                    "format": "json",
+                }
+                with httpx.Client(timeout=20) as client:
+                    response = client.get(url, params=params)
+                    response.raise_for_status()
+                    steam_library = response.json().get("response")
+                if not isinstance(steam_library, dict) or "game_count" not in steam_library:
+                    raise RuntimeError("Die öffentliche Steam-Bibliothek ist nicht lesbar.")
+                api_games = [item for item in steam_library.get("games") or [] if isinstance(item, dict)]
+            except Exception as exc:
+                warnings.append(f"Steam Web API konnte Spielzeiten nicht ergänzen: {exc}")
+        elif authenticated_games is None:
+            raise RuntimeError("STEAM_API_KEY is not configured and no Steam login is stored")
+
+        if authenticated_games is None and api_games is None:
+            raise RuntimeError("; ".join(warnings) or "Steam hat keine Spielebibliothek geliefert.")
+
+        games_by_appid: dict[int, dict[str, Any]] = {}
+        for item in authenticated_games or []:
+            try:
+                appid = int(item.get("appid"))
+            except (TypeError, ValueError):
+                continue
+            title = str(item.get("title") or "").strip()
+            if not title:
+                continue
+            games_by_appid[appid] = {
+                "appid": appid,
+                "name": title,
+                "playtime_forever": 0,
+                "owned_since": item.get("owned_since"),
+            }
+        for item in api_games or []:
+            try:
+                appid = int(item.get("appid"))
+            except (TypeError, ValueError):
+                continue
+            previous = games_by_appid.get(appid, {})
+            games_by_appid[appid] = {**previous, **item, "owned_since": previous.get("owned_since")}
+        games = list(games_by_appid.values())
 
         details_by_appid = self._load_store_metadata(games)
         imported_games: list[ImportedGame] = []
@@ -647,6 +751,8 @@ class SteamProvider:
                     platform_game_id=str(appid),
                     title=item.get("name") or f"Steam App {appid}",
                     playtime_minutes=int(item.get("playtime_forever") or 0),
+                    owned_since=_parse_datetime(item.get("owned_since")),
+                    owned_since_source="steam_license" if item.get("owned_since") else None,
                     description=metadata.get("description", ""),
                     cover_url=metadata.get("cover_url") or f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg",
                     release_date=metadata.get("release_date"),
@@ -665,6 +771,8 @@ class SteamProvider:
                     player_count_known=metadata.get("player_count_known", False),
                 )
             )
+        if warnings:
+            return ImportBatch(games=imported_games, warnings=warnings, authoritative_snapshot=True)
         return imported_games
 
     def _load_store_metadata(self, games: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
@@ -908,6 +1016,8 @@ class GOGProvider:
                     game = _game_from_mapping(data, fallback_platform_id=str(game_id))
                     if not game:
                         raise ValueError("GOG-Produkt konnte nicht in ein Spiel umgewandelt werden")
+                    if game.owned_since:
+                        game.owned_since_source = "gog_entitlement"
                     results.append(game)
                 except Exception as exc:
                     warning = f"GOG-Produkt {game_id} wurde übersprungen: {exc}"
@@ -949,6 +1059,32 @@ def _resolved_gog_title(
 
 
 UBISOFT_APP_ID = settings.ubisoft_app_id
+UBISOFT_CLUB_GRAPHQL_URL = settings.ubisoft_club_graphql_url
+UBISOFT_CLUB_OWNED_GAMES_QUERY = """
+query AllGames {
+  viewer {
+    id
+    ownedGames: games(filterBy: {isOwned: true}) {
+      totalCount
+      nodes {
+        id
+        spaceId
+        name
+        viewer {
+          meta {
+            id
+            ownedPlatformGroups {
+              id
+              name
+              type
+            }
+          }
+        }
+      }
+    }
+  }
+}
+""".strip()
 
 
 class UbisoftProvider:
@@ -999,17 +1135,42 @@ class UbisoftProvider:
             f"https://public-ubiservices.ubi.com/v1/users/{profile_id}/entitlements",
         ]
         errors: list[str] = []
+        imported_games: list[ImportedGame] = []
         with httpx.Client(headers=headers, timeout=30) as client:
+            try:
+                response = client.post(
+                    UBISOFT_CLUB_GRAPHQL_URL,
+                    json={
+                        "operationName": "AllGames",
+                        "variables": {"owned": True},
+                        "query": UBISOFT_CLUB_OWNED_GAMES_QUERY,
+                    },
+                    headers={"Content-Type": "application/json"},
+                )
+                if response.is_success:
+                    games = _ubisoft_games_from_club_graphql(response.json())
+                    if games:
+                        imported_games.extend(games)
+                    else:
+                        errors.append(f"{UBISOFT_CLUB_GRAPHQL_URL}: no PC games found")
+                else:
+                    errors.append(f"{UBISOFT_CLUB_GRAPHQL_URL}: {response.status_code}")
+            except Exception as exc:
+                errors.append(f"{UBISOFT_CLUB_GRAPHQL_URL}: {exc.__class__.__name__}")
+
             for url in urls:
                 response = client.get(url)
                 if response.is_success:
                     payload = response.json()
                     games = _ubisoft_games_from_applications(payload, client) or _games_from_payload(payload, "ubisoft")
                     if games:
-                        return games
+                        imported_games.extend(games)
+                        continue
                     errors.append(f"{url}: no games found")
                 else:
                     errors.append(f"{url}: {response.status_code}")
+        if imported_games:
+            return _dedupe_imported_games(imported_games)
         raise RuntimeError("Ubisoft sync did not return a library: " + "; ".join(errors[-3:]))
 
 
@@ -1095,15 +1256,17 @@ def _ea_imported_game(item: dict[str, Any]) -> tuple[ImportedGame, str | None] |
     product_user = product.get("gameProductUser")
     if not isinstance(product_user, dict):
         product_user = {}
+    owned_since = _parse_datetime(
+        product_user.get("initialEntitlementDate")
+        or item.get("initialEntitlementDate")
+        or item.get("entitlementDate")
+    )
     game = ImportedGame(
         platform_game_id=str(product_id),
         title=str(title).strip(),
         playtime_minutes=0,
-        owned_since=_parse_datetime(
-            product_user.get("initialEntitlementDate")
-            or item.get("initialEntitlementDate")
-            or item.get("entitlementDate")
-        ),
+        owned_since=owned_since,
+        owned_since_source="ea_entitlement" if owned_since else None,
         description=str(product.get("shortDescription") or product.get("description") or ""),
         cover_url=_ea_product_image(product),
         release_date=_parse_date(product.get("releaseDate") or product.get("releaseDateTime")),
@@ -1135,6 +1298,86 @@ def _ea_play_times(data: dict[str, Any]) -> dict[str, tuple[int, datetime | None
     return result
 
 
+def _ea_response_json(response: httpx.Response, operation_name: str) -> dict[str, Any]:
+    if response.status_code in {401, 403}:
+        raise RuntimeError("Die EA-Anmeldung ist abgelaufen. Bitte EA erneut verbinden.")
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"EA {operation_name} hat keine verwertbaren Daten geliefert.")
+    return payload
+
+
+def _ea_origin_user_id(client: httpx.Client) -> str:
+    payload = _ea_response_json(client.get(EA_IDENTITY_URL), "Origin-Identitätsabfrage")
+    pid = payload.get("pid") if isinstance(payload.get("pid"), dict) else {}
+    user_id = pid.get("pidId") or pid.get("id")
+    if not user_id:
+        raise RuntimeError("EA Origin-Identitätsabfrage lieferte keine User-ID.")
+    return str(user_id)
+
+
+def _ea_origin_entitlements(client: httpx.Client, user_id: str) -> tuple[str, list[dict[str, Any]]]:
+    errors: list[str] = []
+    for base_url in EA_ORIGIN_API_BASE_URLS:
+        url = f"{base_url}/ecommerce2/consolidatedentitlements/{quote(user_id, safe='')}?machine_hash=1"
+        try:
+            payload = _ea_response_json(client.get(url), "Origin-Entitlements")
+        except (httpx.HTTPError, RuntimeError, ValueError) as exc:
+            errors.append(f"{base_url}: {exc}")
+            continue
+        entitlements = payload.get("entitlements")
+        if isinstance(entitlements, list):
+            return base_url, [item for item in entitlements if isinstance(item, dict)]
+        errors.append(f"{base_url}: keine Entitlement-Liste")
+    raise RuntimeError("; ".join(errors) or "EA Origin-Entitlements nicht erreichbar.")
+
+
+def _ea_origin_offer(client: httpx.Client, base_url: str, offer_id: str) -> dict[str, Any]:
+    url = f"{base_url}/ecommerce2/public/supercat/{quote(offer_id, safe=':.')}/en_US"
+    return _ea_response_json(client.get(url), "Origin-Angebotsdetails")
+
+
+def _ea_origin_imported_games(client: httpx.Client) -> list[ImportedGame]:
+    user_id = _ea_origin_user_id(client)
+    base_url, entitlements = _ea_origin_entitlements(client, user_id)
+    games: list[ImportedGame] = []
+    seen: set[str] = set()
+    for entitlement in entitlements:
+        if str(entitlement.get("offerType") or "").casefold() != "basegame":
+            continue
+        offer_id = str(entitlement.get("offerId") or "").strip()
+        if not offer_id:
+            continue
+        external_type = str(entitlement.get("externalType") or "").strip().casefold()
+        platform_id = f"{offer_id}@{external_type}" if external_type else offer_id
+        if platform_id in seen:
+            continue
+        try:
+            offer = _ea_origin_offer(client, base_url, offer_id)
+        except (httpx.HTTPError, RuntimeError, ValueError):
+            continue
+        i18n = offer.get("i18n") if isinstance(offer.get("i18n"), dict) else {}
+        title = str(i18n.get("displayName") or offer.get("displayName") or offer.get("name") or "").strip()
+        if not title:
+            continue
+        seen.add(platform_id)
+        grant_date = _parse_datetime(entitlement.get("grantDate"))
+        games.append(
+            ImportedGame(
+                platform_game_id=platform_id,
+                title=title,
+                owned_since=grant_date,
+                owned_since_source="ea_entitlement" if grant_date else None,
+                description=str(i18n.get("longDescription") or i18n.get("shortDescription") or ""),
+                cover_url=_ea_product_image(offer),
+                release_date=_parse_date(offer.get("releaseDate") or offer.get("downloadStartDate")),
+                feature_metadata_known=False,
+            )
+        )
+    return games
+
+
 class EAProvider:
     platform = Platform.ea
     authoritative_library = True
@@ -1155,6 +1398,7 @@ class EAProvider:
         declared_total: int | None = None
         unresolved_items = 0
         pagination_complete = True
+        origin_fallback_added = 0
 
         with httpx.Client(headers=ea_request_headers(token), timeout=45) as client:
             while True:
@@ -1235,6 +1479,16 @@ class EAProvider:
                     warnings.append(f"EA-Spielzeiten konnten teilweise nicht geladen werden: {exc}")
                     break
 
+            try:
+                for game in _ea_origin_imported_games(client):
+                    if game.platform_game_id in games_by_id:
+                        continue
+                    games_by_id[game.platform_game_id] = game
+                    origin_fallback_added += 1
+            except Exception as exc:
+                if not games_by_id or not pagination_complete:
+                    warnings.append(f"EA-Origin-Fallback konnte nicht gelesen werden: {exc}")
+
         if not games_by_id and declared_total != 0:
             raise RuntimeError("EA hat keine Spielebibliothek zurückgegeben; vorhandene Daten bleiben erhalten.")
         if unresolved_items:
@@ -1247,6 +1501,12 @@ class EAProvider:
             if not timing:
                 continue
             games_by_id[product_id].playtime_minutes = timing[0]
+        if origin_fallback_added:
+            warnings.append(
+                f"EA-Origin-Fallback ergänzte {origin_fallback_added} Spiele, die Juno nicht geliefert hat; "
+                "bestehende EA-Besitzstände wurden deshalb nicht gelöscht."
+            )
+            pagination_complete = False
         return ImportBatch(
             games=list(games_by_id.values()),
             warnings=warnings,
@@ -1432,6 +1692,8 @@ class HumbleProvider:
                             ImportedGame(
                                 platform_game_id=product_id,
                                 title=title,
+                                owned_since=_parse_datetime(order.get("created")),
+                                owned_since_source="humble_order" if order.get("created") else None,
                                 cover_url=product.get("icon"),
                                 feature_metadata_known=False,
                             )
@@ -1505,6 +1767,7 @@ def _humble_available_key_game(order: dict[str, Any], item: Any) -> ImportedGame
         mapping_platform=Platform.humble_key,
         ownership_platform=Platform.humble_key,
         owned_since=_parse_datetime(order.get("created")),
+        owned_since_source="humble_order" if order.get("created") else None,
         feature_metadata_known=False,
     )
 
@@ -1578,13 +1841,6 @@ PROVIDERS: dict[Platform, ImportProvider] = {
     Platform.humble: HumbleProvider(),
     Platform.meta: MetaProvider(),
 }
-
-
-
-
-
-
-
 
 
 

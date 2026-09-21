@@ -15,7 +15,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import Account, Game, Participant, Platform, SyncRun
+from app.models import Account, Game, Participant, Platform, PlatformGameMapping, SyncRun
 from app.services.account_identity import is_placeholder_display_name
 from app.services.import_providers import ImportedGame
 from app.services.metadata_service import METADATA_SYNC_LOCK, enrich_all_game_metadata
@@ -25,6 +25,7 @@ from app.services.sync_service import resolve_game, upsert_ownership
 GalaxyProgressCallback = Callable[[str, int, int, int], None]
 
 TITLE_TYPES = ("title", "originalTitle", "originalSortingTitle")
+ALL_RELEASE_TYPES = ("allGameReleases",)
 PC_PLATFORM_PREFIXES: dict[str, Platform] = {
     "amazon": Platform.amazon,
     "battlenet": Platform.battle_net,
@@ -83,6 +84,7 @@ class GalaxyEntry:
     platform_game_id: str
     title: str
     playtime_minutes: int = 0
+    related_releases: tuple[tuple[Platform, str], ...] = field(default_factory=tuple)
 
 
 def import_gog_galaxy_export_path(
@@ -151,6 +153,7 @@ def _read_galaxy_entries(path: Path) -> list[GalaxyEntry]:
     with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
         _ensure_galaxy_schema(connection)
         title_type_ids = _game_piece_type_ids(connection, TITLE_TYPES)
+        all_release_type_ids = _game_piece_type_ids(connection, ALL_RELEASE_TYPES)
         if not title_type_ids:
             raise ValueError("GOG-Galaxy-Datenbank enthaelt keine Titel-Metadaten.")
         owned_rows = connection.execute(
@@ -163,6 +166,7 @@ def _read_galaxy_entries(path: Path) -> list[GalaxyEntry]:
             """
         ).fetchall()
         title_lookup = _title_lookup(connection, title_type_ids)
+        all_release_lookup = _all_game_releases_lookup(connection, all_release_type_ids)
         for user_id, release_key, playtime in owned_rows:
             parsed = _parse_release_key(str(release_key))
             if not parsed:
@@ -171,6 +175,11 @@ def _read_galaxy_entries(path: Path) -> list[GalaxyEntry]:
             title = title_lookup.get((int(user_id), str(release_key))) or title_lookup.get((0, str(release_key)))
             if not title:
                 continue
+            related_releases = (
+                all_release_lookup.get((int(user_id), str(release_key)))
+                or all_release_lookup.get((0, str(release_key)))
+                or ()
+            )
             entries.append(
                 GalaxyEntry(
                     release_key=str(release_key),
@@ -178,6 +187,7 @@ def _read_galaxy_entries(path: Path) -> list[GalaxyEntry]:
                     platform_game_id=platform_game_id,
                     title=title,
                     playtime_minutes=max(0, int(playtime or 0)),
+                    related_releases=related_releases,
                 )
             )
     return entries
@@ -230,6 +240,58 @@ def _title_lookup(connection: sqlite3.Connection, title_type_ids: dict[int, str]
             lookup[key] = title
             current_priority[key] = item_priority
     return lookup
+
+
+def _all_game_releases_lookup(
+    connection: sqlite3.Connection,
+    all_release_type_ids: dict[int, str],
+) -> dict[tuple[int, str], tuple[tuple[Platform, str], ...]]:
+    if not all_release_type_ids:
+        return {}
+    lookup: dict[tuple[int, str], tuple[tuple[Platform, str], ...]] = {}
+    placeholders = ",".join("?" for _ in all_release_type_ids)
+    rows = connection.execute(
+        f"""
+        SELECT releaseKey, userId, value
+        FROM GamePieces
+        WHERE gamePieceTypeId IN ({placeholders})
+        """,
+        tuple(all_release_type_ids),
+    ).fetchall()
+    for release_key, user_id, value in rows:
+        releases = _release_mappings_from_piece(value)
+        if releases:
+            lookup[(int(user_id or 0), str(release_key))] = releases
+    return lookup
+
+
+def _release_mappings_from_piece(value: Any) -> tuple[tuple[Platform, str], ...]:
+    if value in (None, ""):
+        return ()
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="ignore")
+    try:
+        parsed = json.loads(str(value))
+    except json.JSONDecodeError:
+        return ()
+    raw_releases = parsed.get("releases") if isinstance(parsed, dict) else parsed
+    if not isinstance(raw_releases, list):
+        return ()
+    mappings: list[tuple[Platform, str]] = []
+    seen: set[tuple[Platform, str]] = set()
+    for release_key in raw_releases:
+        parsed_release = _parse_release_key(str(release_key))
+        if not parsed_release:
+            continue
+        platform, platform_game_id = parsed_release
+        if platform == Platform.local:
+            continue
+        key = (platform, platform_game_id)
+        if key in seen:
+            continue
+        mappings.append(key)
+        seen.add(key)
+    return tuple(mappings)
 
 
 def _title_from_piece(value: Any) -> str:
@@ -295,7 +357,15 @@ def _import_galaxy_entries(
         if created:
             result.created_accounts += 1
         game = resolve_game(db, entry.platform.value, imported)
-        upsert_ownership(db, account, game, imported, playtime_priority="fallback")
+        upsert_ownership(
+            db,
+            account,
+            game,
+            imported,
+            playtime_priority="fallback",
+            discovery_is_baseline=True,
+        )
+        _add_galaxy_related_mappings(db, game, entry.title, entry.related_releases)
         result.imported_games += 1
         result.updated_ownerships += 1
         result.game_ids.add(game.id)
@@ -307,6 +377,59 @@ def _import_galaxy_entries(
     result.message = f"{result.imported_games} Spiele aus GOG Galaxy importiert"
     db.commit()
     return result
+
+
+def _add_galaxy_related_mappings(
+    db: Session,
+    game: Game,
+    title: str,
+    related_releases: tuple[tuple[Platform, str], ...],
+) -> None:
+    if not related_releases:
+        return
+    existing_numeric_steam_ids = {
+        str(platform_game_id)
+        for platform_game_id in db.scalars(
+            select(PlatformGameMapping.platform_game_id).where(
+                PlatformGameMapping.game_id == game.id,
+                PlatformGameMapping.platform == Platform.steam,
+            )
+        )
+        if str(platform_game_id).isdigit()
+    }
+    related_numeric_steam_ids = {
+        platform_game_id
+        for platform, platform_game_id in related_releases
+        if platform == Platform.steam and platform_game_id.isdigit()
+    }
+    ambiguous_new_steam_mapping = len(related_numeric_steam_ids) > 1 and not existing_numeric_steam_ids
+
+    for platform, platform_game_id in related_releases:
+        if platform == Platform.steam and platform_game_id.isdigit():
+            if ambiguous_new_steam_mapping:
+                continue
+            if existing_numeric_steam_ids and platform_game_id not in existing_numeric_steam_ids:
+                continue
+        existing = db.scalar(
+            select(PlatformGameMapping).where(
+                PlatformGameMapping.platform == platform,
+                PlatformGameMapping.platform_game_id == platform_game_id,
+            )
+        )
+        if existing:
+            continue
+        db.add(
+            PlatformGameMapping(
+                game_id=game.id,
+                platform=platform,
+                platform_game_id=platform_game_id,
+                platform_title=title,
+                normalized_title=normalize_title(title),
+            )
+        )
+        if platform == Platform.steam and platform_game_id.isdigit():
+            existing_numeric_steam_ids.add(platform_game_id)
+    db.flush()
 
 
 def _account_for_import(db: Session, participant_id: int, platform: Platform) -> tuple[Account, bool]:

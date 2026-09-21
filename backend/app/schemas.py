@@ -172,6 +172,9 @@ class OwnershipCreate(BaseModel):
 
 class OwnershipRead(OwnershipCreate):
     id: int
+    owned_since_source: str | None = None
+    first_seen_at: datetime | None = None
+    first_seen_is_baseline: bool = False
     last_seen: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -201,7 +204,8 @@ class PersonalGamePageRead(BaseModel):
 class RecentAcquisitionRead(BaseModel):
     participant: ParticipantRead
     game: GameRead
-    owned_since: datetime
+    occurred_at: datetime
+    date_kind: Literal["acquired", "first_seen"]
     platforms: list[Platform] = Field(default_factory=list)
 
 

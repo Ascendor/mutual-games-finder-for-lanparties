@@ -198,7 +198,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import ManualOwnershipPicker from '../components/ManualOwnershipPicker.vue'
 import ProviderConnectDialog from '../components/ProviderConnectDialog.vue'
@@ -222,6 +222,7 @@ const props = withDefaults(defineProps<{
 })
 
 const router = useRouter()
+const route = useRoute()
 const store = useLanStore()
 const statuses = ref<ProviderAuthStatus[]>([])
 const loading = ref(false)
@@ -256,7 +257,10 @@ const slotsByParticipant = computed(() =>
     }))
 )
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  await handleSteamOpenIdReturn()
+})
 
 async function load() {
   loading.value = true
@@ -320,17 +324,63 @@ function statusColor(slot: ProviderSlot) {
 
 function providerDetail(slot: ProviderSlot) {
   if (!slot.account) return 'Noch nicht eingerichtet'
+  const steamMode = slot.platform === 'steam' ? statusFor(slot.account.id)?.connection_mode : undefined
+  const connectionMode = steamMode === 'qr'
+    ? 'QR-Anmeldung'
+    : steamMode === 'community'
+      ? 'Browser/Community-ID ohne Token'
+      : ''
   if (slot.account.last_successful_sync) {
-    return `Zuletzt synchronisiert: ${new Intl.DateTimeFormat('de-DE', {
+    const syncedAt = new Intl.DateTimeFormat('de-DE', {
       dateStyle: 'short',
       timeStyle: 'short'
-    }).format(new Date(slot.account.last_successful_sync))}`
+    }).format(new Date(slot.account.last_successful_sync))
+    return connectionMode
+      ? `${connectionMode} · Zuletzt synchronisiert: ${syncedAt}`
+      : `Zuletzt synchronisiert: ${syncedAt}`
   }
-  return slot.account.display_name || 'Noch nicht synchronisiert'
+  return connectionMode || slot.account.display_name || 'Noch nicht synchronisiert'
 }
 
 function connectedCount(slots: ProviderSlot[]) {
   return slots.filter(isConnected).length
+}
+
+async function handleSteamOpenIdReturn() {
+  const result = typeof route.query.steam_openid === 'string' ? route.query.steam_openid : ''
+  if (!result) return
+
+  const accountId = Number(route.query.account_id)
+  const steamMessage = typeof route.query.steam_message === 'string' ? route.query.steam_message : ''
+  const cleanQuery = { ...route.query }
+  delete cleanQuery.steam_openid
+  delete cleanQuery.account_id
+  delete cleanQuery.steam_message
+  await router.replace({ path: route.path, query: cleanQuery })
+
+  if (result !== 'success' || !Number.isInteger(accountId) || accountId <= 0) {
+    error.value = steamMessage || 'Die Steam-Anmeldung konnte nicht abgeschlossen werden.'
+    return
+  }
+
+  busy.value = `sync:${accountId}`
+  error.value = ''
+  message.value = 'Steam wurde bestätigt. Deine Bibliothek wird jetzt synchronisiert.'
+  try {
+    const syncResult = await api.syncAccount(accountId)
+    if (!syncResult.success) {
+      throw new Error(syncResult.message || 'Die Steam-Bibliothek konnte nicht geladen werden.')
+    }
+    await load()
+    message.value = `Steam ist verbunden. ${syncResult.imported_games} Spiele wurden aktualisiert.`
+  } catch (err) {
+    const syncError = readableError(err)
+    message.value = 'Steam ist verbunden, aber die Bibliothek konnte noch nicht synchronisiert werden.'
+    await load()
+    error.value = syncError
+  } finally {
+    busy.value = null
+  }
 }
 
 function accountsFor(participantId: number) {

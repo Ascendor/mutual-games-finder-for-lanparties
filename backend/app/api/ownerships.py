@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, distinct, func, or_, select
+from sqlalchemy import and_, case, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -41,7 +41,22 @@ def list_ownerships(db: Session = Depends(get_db)):
 
 @router.post("", response_model=OwnershipRead, status_code=201)
 def create_ownership(payload: OwnershipCreate, db: Session = Depends(get_db)):
-    ownership = Ownership(**payload.model_dump(), last_seen=datetime.utcnow())
+    existing_first_seen = db.execute(
+        select(Ownership.first_seen_at, Ownership.first_seen_is_baseline)
+        .where(
+            Ownership.participant_id == payload.participant_id,
+            Ownership.game_id == payload.game_id,
+        )
+        .order_by(Ownership.first_seen_at.asc().nulls_last())
+        .limit(1)
+    ).first()
+    ownership = Ownership(
+        **payload.model_dump(),
+        owned_since_source="manual" if payload.owned_since else None,
+        first_seen_at=existing_first_seen[0] if existing_first_seen else datetime.utcnow(),
+        first_seen_is_baseline=existing_first_seen[1] if existing_first_seen else False,
+        last_seen=datetime.utcnow(),
+    )
     db.add(ownership)
     db.commit()
     db.refresh(ownership)
@@ -55,30 +70,52 @@ def recent_acquisitions(
     db: Session = Depends(get_db),
 ):
     cutoff = datetime.utcnow() - timedelta(days=days)
-    first_owned = (
+    library_dates = (
         select(
             Ownership.participant_id.label("participant_id"),
             Ownership.game_id.label("game_id"),
-            func.min(Ownership.owned_since).label("owned_since"),
+            func.min(
+                case(
+                    (
+                        Ownership.owned_since_source.is_not(None),
+                        Ownership.owned_since,
+                    ),
+                    else_=None,
+                )
+            ).label("owned_since"),
+            func.min(
+                case(
+                    (
+                        Ownership.first_seen_is_baseline == False,  # noqa: E712
+                        Ownership.first_seen_at,
+                    ),
+                    else_=None,
+                )
+            ).label("first_seen_at"),
         )
         .join(Game, Game.id == Ownership.game_id)
         .where(
-            Ownership.owned_since.is_not(None),
             Game.is_game == True,  # noqa: E712
         )
         .group_by(Ownership.participant_id, Ownership.game_id)
         .subquery()
     )
+    occurred_at = func.coalesce(library_dates.c.owned_since, library_dates.c.first_seen_at)
 
     rows = db.execute(
-        select(Participant, Game, first_owned.c.owned_since)
-        .join(first_owned, first_owned.c.participant_id == Participant.id)
-        .join(Game, Game.id == first_owned.c.game_id)
-        .where(first_owned.c.owned_since >= cutoff)
-        .order_by(first_owned.c.owned_since.desc(), func.lower(Participant.nickname), func.lower(Game.title))
+        select(
+            Participant,
+            Game,
+            occurred_at.label("occurred_at"),
+            library_dates.c.owned_since,
+        )
+        .join(library_dates, library_dates.c.participant_id == Participant.id)
+        .join(Game, Game.id == library_dates.c.game_id)
+        .where(occurred_at >= cutoff)
+        .order_by(occurred_at.desc(), func.lower(Participant.nickname), func.lower(Game.title))
         .limit(limit)
     ).all()
-    pairs = [(participant.id, game.id) for participant, game, _owned_since in rows]
+    pairs = [(participant.id, game.id) for participant, game, _occurred_at, _owned_since in rows]
     platforms_by_pair: dict[tuple[int, int], set] = {pair: set() for pair in pairs}
     if pairs:
         ownership_filters = [
@@ -96,10 +133,11 @@ def recent_acquisitions(
         {
             "participant": participant,
             "game": game,
-            "owned_since": owned_since,
+            "occurred_at": occurred_at_value,
+            "date_kind": "acquired" if owned_since is not None else "first_seen",
             "platforms": sorted(platforms_by_pair.get((participant.id, game.id), set()), key=str),
         }
-        for participant, game, owned_since in rows
+        for participant, game, occurred_at_value, owned_since in rows
     ]
 
 
@@ -368,6 +406,15 @@ def create_manual_ownership(payload: ManualOwnershipCreate, db: Session = Depend
         )
     )
     if ownership is None:
+        existing_first_seen = db.execute(
+            select(Ownership.first_seen_at, Ownership.first_seen_is_baseline)
+            .where(
+                Ownership.participant_id == payload.participant_id,
+                Ownership.game_id == payload.game_id,
+            )
+            .order_by(Ownership.first_seen_at.asc().nulls_last())
+            .limit(1)
+        ).first()
         accounts = db.scalars(
             select(Account).where(
                 Account.participant_id == payload.participant_id,
@@ -385,6 +432,8 @@ def create_manual_ownership(payload: ManualOwnershipCreate, db: Session = Depend
                 account_id=account.id if account else None,
                 game_id=payload.game_id,
                 platform=payload.platform,
+                first_seen_at=existing_first_seen[0] if existing_first_seen else datetime.utcnow(),
+                first_seen_is_baseline=existing_first_seen[1] if existing_first_seen else False,
                 last_seen=datetime.utcnow(),
             )
         )

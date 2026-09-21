@@ -146,6 +146,9 @@ class Ownership(Base):
     platform: Mapped[Platform] = mapped_column(String(40), nullable=False)
     playtime_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     owned_since: Mapped[datetime | None] = mapped_column(DateTime)
+    owned_since_source: Mapped[str | None] = mapped_column(String(40))
+    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime)
+    first_seen_is_baseline: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     participant: Mapped[Participant] = relationship(back_populates="ownerships")

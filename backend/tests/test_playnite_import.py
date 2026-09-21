@@ -303,7 +303,7 @@ def test_playnite_import_ignores_object_values_misread_as_titles(db):
     assert [ownership.game.title for ownership in participant.ownerships] == ["while True: learn()"]
 
 
-def test_playnite_import_reads_bson_dates_as_milliseconds(db):
+def test_playnite_import_does_not_treat_added_date_as_acquisition_date(db):
     participant = Participant(nickname="BsonDate", present=True)
     db.add(participant)
     db.commit()
@@ -328,7 +328,8 @@ def test_playnite_import_reads_bson_dates_as_milliseconds(db):
     result = import_playnite_export(db, participant.id, buffer.getvalue())
 
     assert result.imported_games == 1
-    assert participant.ownerships[0].owned_since.year == 2024
+    assert participant.ownerships[0].owned_since is None
+    assert participant.ownerships[0].owned_since_source is None
 
 
 def test_playnite_import_reads_games_from_litedb_extend_pages(db):

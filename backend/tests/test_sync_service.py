@@ -1,7 +1,8 @@
-﻿from app.models import Account, Participant, Platform, PlatformGameMapping
+﻿from datetime import datetime
+
 from sqlalchemy import select
 
-from app.models import Ownership
+from app.models import Account, Ownership, Participant, Platform, PlatformGameMapping
 from app.services import sync_service
 from app.services.import_providers import ImportBatch, ImportedGame, _is_non_game_steam_entry, _steam_metadata_from_details
 from app.services.sync_service import _reconcile_account_ownerships, resolve_game, upsert_ownership
@@ -94,6 +95,78 @@ def test_upsert_ownership_does_not_replace_known_playtime_with_zero(db):
     db.flush()
 
     assert participant.ownerships[0].playtime_minutes == 240
+
+
+def test_upsert_ownership_only_accepts_sourced_acquisition_dates(db):
+    participant = Participant(nickname="Dates")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.gog, account_id="dates")
+    db.add(account)
+    db.flush()
+    game = resolve_game(db, Platform.gog, ImportedGame(platform_game_id="1", title="Reliable Date"))
+
+    upsert_ownership(
+        db,
+        account,
+        game,
+        ImportedGame(platform_game_id="1", title="Reliable Date", owned_since=datetime(2025, 1, 1)),
+    )
+    assert participant.ownerships[0].owned_since is None
+
+    upsert_ownership(
+        db,
+        account,
+        game,
+        ImportedGame(
+            platform_game_id="1",
+            title="Reliable Date",
+            owned_since=datetime(2024, 1, 1),
+            owned_since_source="gog_entitlement",
+        ),
+    )
+    assert participant.ownerships[0].owned_since == datetime(2024, 1, 1)
+    assert participant.ownerships[0].owned_since_source == "gog_entitlement"
+
+
+def test_upsert_ownership_tracks_first_seen_and_copies_it_across_platforms(db):
+    participant = Participant(nickname="Discovery")
+    db.add(participant)
+    db.flush()
+    steam = Account(participant_id=participant.id, platform=Platform.steam, account_id="steam")
+    gog = Account(participant_id=participant.id, platform=Platform.gog, account_id="gog")
+    db.add_all([steam, gog])
+    db.flush()
+    game = resolve_game(db, Platform.steam, ImportedGame(platform_game_id="10", title="Detected Game"))
+
+    first = upsert_ownership(db, steam, game, ImportedGame(platform_game_id="10", title="Detected Game"))
+    second = upsert_ownership(db, gog, game, ImportedGame(platform_game_id="20", title="Detected Game"))
+    db.flush()
+
+    assert first.first_seen_at is not None
+    assert second.first_seen_at == first.first_seen_at
+    assert second.first_seen_is_baseline is False
+
+
+def test_upsert_ownership_can_mark_initial_import_as_baseline(db):
+    participant = Participant(nickname="Baseline")
+    db.add(participant)
+    db.flush()
+    account = Account(participant_id=participant.id, platform=Platform.steam, account_id="steam")
+    db.add(account)
+    db.flush()
+    game = resolve_game(db, Platform.steam, ImportedGame(platform_game_id="10", title="Baseline Game"))
+
+    ownership = upsert_ownership(
+        db,
+        account,
+        game,
+        ImportedGame(platform_game_id="10", title="Baseline Game"),
+        discovery_is_baseline=True,
+    )
+
+    assert ownership.first_seen_at is not None
+    assert ownership.first_seen_is_baseline is True
 
 
 def test_playnite_fallback_playtime_does_not_replace_direct_provider_time(db):

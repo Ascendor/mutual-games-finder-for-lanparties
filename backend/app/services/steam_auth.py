@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass
-from typing import Mapping
-from urllib.parse import unquote, urlencode, urlparse
+from urllib.parse import unquote, urlparse
 
 import httpx
 from sqlalchemy import select
@@ -12,15 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import Account, Platform
-
-STEAM_OPENID_ENDPOINT = "https://steamcommunity.com/openid/login"
-STEAM_OPENID_NAMESPACE = "http://specs.openid.net/auth/2.0"
-STEAM_OPENID_IDENTIFIER = f"{STEAM_OPENID_NAMESPACE}/identifier_select"
-STEAM_CLAIMED_ID_PATTERN = re.compile(
-    r"^https?://steamcommunity\.com/openid/id/(\d{17})/?$",
-    flags=re.IGNORECASE,
-)
-
 
 @dataclass(frozen=True)
 class SteamProfile:
@@ -33,62 +23,6 @@ class SteamProfile:
 
     def to_dict(self) -> dict[str, str | int | bool | None]:
         return asdict(self)
-
-
-def build_steam_login_url(return_to: str, realm: str) -> str:
-    params = {
-        "openid.ns": STEAM_OPENID_NAMESPACE,
-        "openid.mode": "checkid_setup",
-        "openid.return_to": return_to,
-        "openid.realm": realm,
-        "openid.identity": STEAM_OPENID_IDENTIFIER,
-        "openid.claimed_id": STEAM_OPENID_IDENTIFIER,
-    }
-    return f"{STEAM_OPENID_ENDPOINT}?{urlencode(params)}"
-
-
-def verify_steam_openid(parameters: Mapping[str, str]) -> str:
-    if parameters.get("openid.mode") != "id_res":
-        raise ValueError("Steam-Anmeldung wurde abgebrochen oder nicht bestätigt.")
-    if parameters.get("openid.ns") != STEAM_OPENID_NAMESPACE:
-        raise ValueError("Steam hat eine unerwartete OpenID-Antwort geliefert.")
-
-    claimed_id = parameters.get("openid.claimed_id", "")
-    if claimed_id != parameters.get("openid.identity"):
-        raise ValueError("Die bestätigte Steam-Identität ist nicht eindeutig.")
-    match = STEAM_CLAIMED_ID_PATTERN.fullmatch(claimed_id)
-    if not match:
-        raise ValueError("SteamID64 fehlt in der bestätigten Steam-Antwort.")
-
-    endpoint = parameters.get("openid.op_endpoint", "")
-    if endpoint.rstrip("/") not in {
-        STEAM_OPENID_ENDPOINT.rstrip("/"),
-        "https://steamcommunity.com/openid".rstrip("/"),
-    }:
-        raise ValueError("Die OpenID-Antwort stammt nicht vom erwarteten Steam-Endpunkt.")
-
-    verification = {
-        key: value
-        for key, value in parameters.items()
-        if key.startswith("openid.")
-    }
-    verification["openid.mode"] = "check_authentication"
-    response = httpx.post(
-        STEAM_OPENID_ENDPOINT,
-        data=verification,
-        timeout=15,
-        headers={"User-Agent": "LAN Party Game Finder"},
-    )
-    response.raise_for_status()
-    values = dict(
-        line.split(":", 1)
-        for line in response.text.splitlines()
-        if ":" in line
-    )
-    if values.get("is_valid", "").strip().casefold() != "true":
-        raise ValueError("Steam konnte die Anmeldung nicht bestätigen.")
-    return match.group(1)
-
 
 def resolve_steam_profile(reference: str) -> SteamProfile:
     steam_id = _steam_id_from_reference(reference)

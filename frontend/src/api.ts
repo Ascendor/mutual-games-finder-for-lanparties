@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, RecentAcquisition, Recommendation, SteamConnection, SteamLoginStart, SteamProfile, SyncRun } from './types'
+import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, RecentAcquisition, Recommendation, SteamConnection, SteamLoginStart, SteamLoginStatus, SteamOpenIdStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -235,11 +235,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ participant_id: participantId, profile })
     }),
-  startSteamLogin: (participantId: number, origin: string) =>
+  startSteamLogin: (participantId: number) =>
     request<SteamLoginStart>('/provider-auth/steam/start', {
       method: 'POST',
-      body: JSON.stringify({ participant_id: participantId, origin })
+      body: JSON.stringify({ participant_id: participantId })
     }),
+  startSteamOpenId: (participantId: number, origin: string, returnPath: string) =>
+    request<SteamOpenIdStart>('/provider-auth/steam/openid/start', {
+      method: 'POST',
+      body: JSON.stringify({ participant_id: participantId, origin, return_path: returnPath })
+    }),
+  pollSteamLogin: (state: string) =>
+    request<SteamLoginStatus>(`/provider-auth/steam/poll/${encodeURIComponent(state)}`),
   startProviderLogin: (accountId: number) => request<ProviderLoginStart>(`/provider-auth/accounts/${accountId}/start`),
   pollProviderLogin: (accountId: number) =>
     request<ProviderAuthStatus>(`/provider-auth/accounts/${accountId}/poll`, { method: 'POST' }),

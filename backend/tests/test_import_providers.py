@@ -318,6 +318,7 @@ def test_steam_provider_uses_playtime_forever(monkeypatch):
 
     monkeypatch.setattr(import_providers.settings, "steam_api_key", "key")
     monkeypatch.setattr(import_providers.settings, "steam_metadata_limit", 0)
+    monkeypatch.setattr(import_providers, "load_authenticated_steam_library", lambda *args: None)
     monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: SteamClient(**kwargs))
 
     games = provider.sync_account(account)
@@ -342,14 +343,39 @@ def test_steam_provider_rejects_inaccessible_library(monkeypatch):
             return FakeResponse({"response": {}})
 
     monkeypatch.setattr(import_providers.settings, "steam_api_key", "key")
+    monkeypatch.setattr(import_providers, "load_authenticated_steam_library", lambda *args: None)
     monkeypatch.setattr(
         import_providers.httpx,
         "Client",
         lambda **kwargs: PrivateSteamClient(**kwargs),
     )
 
-    with pytest.raises(RuntimeError, match="Game details"):
+    with pytest.raises(RuntimeError, match="öffentliche Steam-Bibliothek"):
         SteamProvider().sync_account(account)
+
+
+def test_steam_provider_reuses_login_for_private_library(monkeypatch):
+    account = Account(id=5, participant_id=1, platform=Platform.steam, account_id="76561198000000005")
+    monkeypatch.setattr(import_providers.settings, "steam_api_key", None)
+    monkeypatch.setattr(import_providers.settings, "steam_metadata_limit", 0)
+    monkeypatch.setattr(
+        import_providers,
+        "load_authenticated_steam_library",
+        lambda account_id, steam_id: [
+            {
+                "appid": "620",
+                "title": "Portal 2",
+                "owned_since": "2024-01-02T03:04:05.000Z",
+            }
+        ],
+    )
+
+    games = SteamProvider().sync_account(account)
+
+    assert isinstance(games, list)
+    assert games[0].title == "Portal 2"
+    assert games[0].owned_since.year == 2024
+    assert games[0].owned_since_source == "steam_license"
 
 
 def test_xbox_provider_parses_title_history(monkeypatch, tmp_path):
@@ -493,6 +519,67 @@ def test_ea_provider_accepts_filtered_count_without_next_cursor(monkeypatch, tmp
     assert len(result.games) == 1
     assert result.authoritative_snapshot is False
     assert any("meldete 2 Einträge" in warning for warning in result.warnings)
+
+
+def test_ea_provider_merges_origin_entitlements_when_juno_is_partial(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(Platform.ea, 10, {"access_token": "token"})
+
+    class EAOriginFallbackClient(FakeClient):
+        def get(self, url):
+            query = parse_qs(urlparse(url).query)
+            if query.get("operationName") == ["getPreloadedOwnedGames"]:
+                return FakeResponse(
+                    {
+                        "data": {
+                            "me": {
+                                "ownedGameProducts": {
+                                    "items": [
+                                        {
+                                            "originOfferId": "ea-1",
+                                            "product": {"name": "Mass Effect", "gameSlug": "mass-effect"},
+                                        }
+                                    ],
+                                    "next": None,
+                                    "totalCount": 2,
+                                }
+                            }
+                        }
+                    }
+                )
+            if query.get("operationName") == ["GetGamePlayTimes"]:
+                return FakeResponse({"data": {"me": {"recentGames": {"items": []}}}})
+            if url == import_providers.EA_IDENTITY_URL:
+                return FakeResponse({"pid": {"pidId": "pid-1"}})
+            if "/consolidatedentitlements/pid-1" in url:
+                return FakeResponse(
+                    {
+                        "entitlements": [
+                            {"offerId": "ea-1", "offerType": "basegame"},
+                            {
+                                "offerId": "Origin.OFR.50.000252",
+                                "offerType": "basegame",
+                                "grantDate": "2024-05-06T12:00:00Z",
+                            },
+                            {"offerId": "dlc-1", "offerType": "dlc"},
+                        ]
+                    }
+                )
+            if "/supercat/ea-1/" in url:
+                return FakeResponse({"offerId": "ea-1", "i18n": {"displayName": "Mass Effect"}})
+            if "/supercat/Origin.OFR.50.000252/" in url:
+                return FakeResponse({"offerId": "Origin.OFR.50.000252", "i18n": {"displayName": "Unravel Two"}})
+            return FakeResponse({}, ok=False)
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: EAOriginFallbackClient(**kwargs))
+
+    result = EAProvider().sync_account(Account(id=10, participant_id=1, platform=Platform.ea, account_id="ea"))
+
+    assert {game.title for game in result.games} == {"Mass Effect", "Unravel Two"}
+    assert result.authoritative_snapshot is False
+    unravel = next(game for game in result.games if game.title == "Unravel Two")
+    assert unravel.owned_since_source == "ea_entitlement"
+    assert any("Origin-Fallback" in warning for warning in result.warnings)
 
 
 def test_ea_provider_keeps_valid_games_when_later_page_fails(monkeypatch, tmp_path):
@@ -900,6 +987,121 @@ def test_ubisoft_provider_parses_applications_library(monkeypatch, tmp_path):
     assert any("limit=100" in url for url in requested_urls)
 
 
+def test_ubisoft_provider_uses_club_graphql_pc_library(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(
+        Platform.ubisoft,
+        15,
+        {"ticket": "ticket", "profileId": "profile-1", "sessionId": "session"},
+    )
+
+    class UbisoftClubClient:
+        def __init__(self, headers=None, timeout=None):
+            self.headers = headers or {}
+            self.timeout = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json=None, headers=None):
+            assert url == import_providers.UBISOFT_CLUB_GRAPHQL_URL
+            assert json["operationName"] == "AllGames"
+            return FakeResponse(
+                {
+                    "data": {
+                        "viewer": {
+                            "ownedGames": {
+                                "nodes": [
+                                    {
+                                        "id": "anno-console",
+                                        "spaceId": "anno-console",
+                                        "name": "Anno Console",
+                                        "viewer": {"meta": {"ownedPlatformGroups": [[{"type": "XBOX"}]]}},
+                                    },
+                                    {
+                                        "id": "anno-pc",
+                                        "spaceId": "anno-pc",
+                                        "name": "Anno 1602",
+                                        "viewer": {"meta": {"ownedPlatformGroups": [[{"type": "PC"}]]}},
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            )
+
+        def get(self, url):
+            return FakeResponse({}, ok=False)
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: UbisoftClubClient(**kwargs))
+
+    games = UbisoftProvider().sync_account(
+        Account(id=15, participant_id=1, platform=Platform.ubisoft, account_id="local-ubi")
+    )
+
+    assert len(games) == 1
+    assert games[0].platform_game_id == "anno-pc"
+    assert games[0].title == "Anno 1602"
+
+
+def test_ubisoft_provider_combines_club_graphql_and_application_fallback(monkeypatch, tmp_path):
+    monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    import_providers.save_provider_auth_json(
+        Platform.ubisoft,
+        16,
+        {"ticket": "ticket", "profileId": "profile-1", "sessionId": "session"},
+    )
+
+    class MixedUbisoftClient:
+        def __init__(self, headers=None, timeout=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json=None, headers=None):
+            return FakeResponse(
+                {
+                    "data": {
+                        "viewer": {
+                            "ownedGames": {
+                                "nodes": [
+                                    {
+                                        "id": "bridge-crew",
+                                        "spaceId": "bridge-crew",
+                                        "name": "Star Trek: Bridge Crew",
+                                        "viewer": {"meta": {"ownedPlatformGroups": [[{"type": "PC"}]]}},
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            )
+
+        def get(self, url):
+            if "/applications/beyond-good-evil" in url:
+                return FakeResponse({"applicationId": "beyond-good-evil", "name": "Beyond Good and Evil", "platform": "PC"})
+            if "/applications" in url:
+                return FakeResponse({"applications": [{"applicationId": "beyond-good-evil"}]})
+            return FakeResponse({}, ok=False)
+
+    monkeypatch.setattr(import_providers.httpx, "Client", lambda **kwargs: MixedUbisoftClient(**kwargs))
+
+    games = UbisoftProvider().sync_account(
+        Account(id=16, participant_id=1, platform=Platform.ubisoft, account_id="local-ubi")
+    )
+
+    assert {game.title for game in games} == {"Star Trek: Bridge Crew", "Beyond Good and Evil"}
+
+
 def test_battlenet_provider_reads_web_session_library(monkeypatch, tmp_path):
     monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
     import_providers.save_provider_auth_json(Platform.battle_net, 41, {"cookie": "sid=abc"})
@@ -1041,5 +1243,3 @@ def test_meta_provider_combines_pc_and_quest_entitlements(monkeypatch, tmp_path)
     )
 
     assert len(games) == 3
-
-

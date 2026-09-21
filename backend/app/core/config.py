@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     steam_store_timeout_seconds: float = 8.0
     steam_metadata_workers: int = 4
     steam_metadata_budget_seconds: float = 90.0
+    steam_helper_url: str = "http://steam-helper:3000"
+    steam_helper_timeout_seconds: float = 15.0
     rawg_api_key: str | None = None
     igdb_client_id: str | None = None
     igdb_client_secret: str | None = None
@@ -26,6 +28,7 @@ class Settings(BaseSettings):
     gog_api_url: str = "https://api.gog.com"
     epic_login_url: str = "https://legendary.gl/epiclogin"
     ubisoft_app_id: str = "f68a4bb5-608a-4ff2-8123-be8ef797e0a6"
+    ubisoft_club_graphql_url: str = "https://public-ubiservices.ubi.com/v1/profiles/me/uplay/graphql"
     amazon_device_type: str = "A2UMVHOX7UP4V7"
     amazon_login_url: str = "https://www.amazon.com/ap/signin"
     amazon_entitlements_url: str = "https://gaming.amazon.com/api/distribution/entitlements"
@@ -33,6 +36,8 @@ class Settings(BaseSettings):
     ea_graphql_url: str = "https://service-aggregation-layer.juno.ea.com/graphql"
     ea_owned_games_query_hash: str = "779f1cd1355699752e20c0b3877847f4e3010ef5de131c248e98f8eff84f0718"
     ea_play_times_query_hash: str = "3f09b35e06b75c74d8ec3e520a598ebb5e2992b1e1268b6dd3b8ed99b9fafb29"
+    ea_identity_url: str = "https://gateway.ea.com/proxy/identity/pids/me"
+    ea_origin_api_base_urls: str = "https://api1.origin.com,https://api2.origin.com,https://api3.origin.com,https://api4.origin.com"
     meta_graphql_url: str = "https://graph.oculus.com/graphql?locale=en_US"
     meta_graphql_document_ids: str = "9431935310238631,29383114651302983,29143116735333849"
     playnite_upload_dir: str = "/tmp/playnite-uploads"
@@ -82,8 +87,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-
 
 
 
