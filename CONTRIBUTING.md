@@ -15,6 +15,21 @@ scope and do not weaken its data-safety guarantees.
 5. Update user, operator, privacy, and provider documentation when behaviour or
    collected data changes.
 
+## Dependency updates
+
+Dependabot groups monthly frontend minor and patch updates. Frontend major
+versions are excluded from automatic version updates and require a separate
+migration with a Docker build and UI verification. For example, TypeScript 7
+does not expose the compiler path required by vue-tsc 3.3.11; rebasing a dependency
+PR does not make that combination compatible. Review security alerts even when
+the required fix involves a major upgrade.
+
+The frontend Docker build prints the installed direct dependency versions before
+type checking. Reproduce a failing dependency PR using its actual package.json
+and package-lock.json, not just the default branch. After changing the Dependabot
+rules on the default branch, use `@dependabot recreate` on an existing generated
+PR to regenerate its dependency selection before reviewing the new CI result.
+
 ## Provenance
 
 Contributors must have the right to submit their work and preserve notices for

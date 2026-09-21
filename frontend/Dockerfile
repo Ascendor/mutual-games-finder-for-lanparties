@@ -6,7 +6,7 @@ COPY frontend/ .
 RUN mkdir -p public/legal
 COPY LICENSE THIRD_PARTY_NOTICES.md public/legal/
 COPY LICENSES public/legal/licenses/
-RUN npm run build
+RUN npm ls --depth=0 && npm run build
 
 FROM mirror.gcr.io/library/nginx:1.27-alpine
 LABEL org.opencontainers.image.source="https://github.com/Ascendor/mutual-games-finder-for-lanparties"

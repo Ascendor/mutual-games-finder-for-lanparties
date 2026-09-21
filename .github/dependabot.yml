@@ -16,6 +16,12 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 2
+    # Major frontend upgrades need a coordinated migration and UI verification.
+    # In particular, vue-tsc 3.3.11 cannot use TypeScript 7's compiler exports.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     groups:
       frontend-npm-dependencies:
         patterns:
