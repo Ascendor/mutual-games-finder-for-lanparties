@@ -1,6 +1,6 @@
 [project]
 name = "lan-party-game-finder-backend"
-version = "0.1.0"
+version = "2.0.0"
 description = "Local game-library matcher for LAN parties"
 license = "MIT"
 requires-python = ">=3.12"

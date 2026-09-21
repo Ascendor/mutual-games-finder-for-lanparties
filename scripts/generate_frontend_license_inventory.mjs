@@ -9,6 +9,7 @@ const licenseCorrections = {
   'node-bignumber': 'LicenseRef-Tom-Wu-and-MIT'
 }
 const lock = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'))
+const componentVersion = lock.packages?.['']?.version || lock.version || 'UNKNOWN'
 const inventory = ['package\tversion\tlicense\tsource']
 const notices = [
   `${componentName} dependency license documents`,
@@ -80,7 +81,7 @@ fs.writeFileSync(
         component: {
           type: 'application',
           name: componentName,
-          version: '0.1.0'
+          version: componentVersion
         }
       },
       components

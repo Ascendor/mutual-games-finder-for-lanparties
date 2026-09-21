@@ -1,9 +1,9 @@
 {
   "name": "lan-party-game-finder-frontend",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "license": "MIT",
-  "repository": "https://codeberg.org/Ascendor/ref_ju_geeks-play-together",
+  "repository": "https://github.com/Ascendor/mutual-games-finder-for-lanparties",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

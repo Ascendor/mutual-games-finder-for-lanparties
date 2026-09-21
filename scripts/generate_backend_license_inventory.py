@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
+import tomllib
 from pathlib import Path
 from urllib.parse import quote
 
@@ -9,6 +10,14 @@ from urllib.parse import quote
 OUTPUT_DIR = Path("/out")
 EXCLUDED_PACKAGES = {"lan-party-game-finder-backend", "pip"}
 LICENSE_PREFIXES = ("license", "copying", "notice", "authors")
+
+
+def project_version() -> str:
+    metadata_path = Path("/app/pyproject.toml")
+    if not metadata_path.is_file():
+        return "UNKNOWN"
+    with metadata_path.open("rb") as handle:
+        return str(tomllib.load(handle)["project"]["version"])
 
 
 def license_name(distribution: importlib.metadata.Distribution) -> str:
@@ -120,7 +129,7 @@ def main() -> None:
                     "component": {
                         "type": "application",
                         "name": "lan-party-game-finder-backend",
-                        "version": "0.1.0",
+                        "version": project_version(),
                     }
                 },
                 "components": components,

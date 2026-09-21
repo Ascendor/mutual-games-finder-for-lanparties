@@ -33,7 +33,7 @@ auf Disk gepuffert und nicht mehr vollstaendig in den Arbeitsspeicher geladen.
 
 ```bash
 sudo install -d -o "$USER" -g "$USER" /opt/refjuplay-together
-git clone https://codeberg.org/Ascendor/ref_ju_geeks-play-together.git /opt/refjuplay-together
+git clone https://github.com/Ascendor/mutual-games-finder-for-lanparties.git /opt/refjuplay-together
 cd /opt/refjuplay-together
 git fetch --tags
 git checkout <release-tag>

@@ -50,7 +50,7 @@
         <a href="https://rawg.io/" target="_blank" rel="noopener noreferrer">RAWG</a>
         <span aria-hidden="true">·</span>
         <a
-          href="https://codeberg.org/Ascendor/ref_ju_geeks-play-together"
+          href="https://github.com/Ascendor/mutual-games-finder-for-lanparties"
           target="_blank"
           rel="noopener noreferrer"
         >

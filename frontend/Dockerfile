@@ -9,7 +9,7 @@ COPY LICENSES public/legal/licenses/
 RUN npm run build
 
 FROM mirror.gcr.io/library/nginx:1.27-alpine
-LABEL org.opencontainers.image.source="https://codeberg.org/Ascendor/ref_ju_geeks-play-together"
+LABEL org.opencontainers.image.source="https://github.com/Ascendor/mutual-games-finder-for-lanparties"
 LABEL org.opencontainers.image.licenses="MIT"
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

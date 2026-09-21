@@ -296,7 +296,7 @@
         <a href="/legal/LICENSE" target="_blank">MIT-Lizenz</a>
         <a href="/legal/THIRD_PARTY_NOTICES.md" target="_blank">Drittanbieterhinweise</a>
         <a
-          href="https://codeberg.org/Ascendor/ref_ju_geeks-play-together"
+          href="https://github.com/Ascendor/mutual-games-finder-for-lanparties"
           target="_blank"
           rel="noopener noreferrer"
         >

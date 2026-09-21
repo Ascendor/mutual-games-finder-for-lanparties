@@ -881,33 +881,36 @@ def test_provider_auth_accepts_ea_curl_and_stores_only_token(monkeypatch, tmp_pa
         lambda token: {"me": {"id": "ea-user-1", "displayName": "Commander Shepard"}},
     )
     account = Account(id=99, participant_id=1, platform=Platform.ea, account_id="local-ea")
-    curl = """curl 'https://service-aggregation-layer.juno.ea.com/graphql?operationName=getPreloadedOwnedGames' \
+    fake_token = "ea-token.with.dots-1234567890"
+    edge_fake_token = "edge-token.with.dots-1234567890"
+    curl = f"""curl 'https://service-aggregation-layer.juno.ea.com/graphql?operationName=getPreloadedOwnedGames' \
       -H 'accept: application/json' \
-      -H 'authorization: Bearer ea-token.with.dots-1234567890' \
+      -H 'authorization: Bearer {fake_token}' \
       -H 'cookie: session=must-not-be-stored'"""
 
     result = provider_auth.complete(account, curl)
     stored = import_providers.load_provider_auth_json(Platform.ea, 99)
 
     assert result["authenticated"] is True
-    assert stored["access_token"] == "ea-token.with.dots-1234567890"
+    assert stored["access_token"] == fake_token
     assert "cookie" not in stored
     assert "curl" not in stored
     assert provider_auth._extract_ea_bearer(
         'curl.exe ^"https://service-aggregation-layer.juno.ea.com/graphql^" '
-        '^-H ^"Authorization: Bearer edge-token.with.dots-1234567890^"'
-    ) == "edge-token.with.dots-1234567890"
+        f'^-H ^"Authorization: Bearer {edge_fake_token}^"'
+    ) == edge_fake_token
 
 
 def test_provider_auth_rejects_wrong_ea_curl():
     from app.services import provider_auth
 
     account = Account(id=99, participant_id=1, platform=Platform.ea, account_id="local-ea")
+    fake_token = "ea-token.with.dots-1234567890"
 
     with pytest.raises(ValueError, match="juno.ea.com/graphql"):
         provider_auth.complete(
             account,
-            "curl 'https://www.ea.com/' -H 'Authorization: Bearer ea-token.with.dots-1234567890'",
+            f"curl 'https://www.ea.com/' -H 'Authorization: Bearer {fake_token}'",
         )
 
 

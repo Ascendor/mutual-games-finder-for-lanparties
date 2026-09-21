@@ -13,7 +13,7 @@ from app.services.recommendation_cache import warm_dashboard_recommendations
 from app.services.analytics_service import purge_expired_usage_events
 from app.services.steam_metadata_service import close_interrupted_steam_metadata_runs
 
-app = FastAPI(title="LAN Party Game Finder", version="0.1.0")
+app = FastAPI(title="LAN Party Game Finder", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,

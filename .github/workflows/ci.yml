@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Generate ephemeral development secrets
+        run: python3 scripts/generate_env_secrets.py --output .env
+
+      - name: Validate Compose configurations
+        run: |
+          docker compose config --quiet
+          docker compose --env-file .env.production.example -f compose.production.yml config --quiet
+
+      - name: Build application images
+        run: docker compose build backend frontend gateway steam-helper
+
+      - name: Run backend tests
+        run: docker compose run --rm backend pytest
+
+      - name: Stop test stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
