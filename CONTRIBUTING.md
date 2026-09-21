@@ -17,6 +17,12 @@ scope and do not weaken its data-safety guarantees.
 
 ## Dependency updates
 
+Backend dependency PRs must update both `backend/pyproject.toml` and
+`backend/requirements.lock`. The Docker build checks the installed runtime and
+test dependencies against the manifest and runs `pip check`. See
+`docs/open-source-compliance.md` for the lockfile regeneration command. Refresh
+the affected license inventories and SBOMs whenever dependencies change.
+
 Dependabot groups monthly frontend minor and patch updates. Frontend major
 versions are excluded from automatic version updates and require a separate
 migration with a Docker build and UI verification. For example, TypeScript 7

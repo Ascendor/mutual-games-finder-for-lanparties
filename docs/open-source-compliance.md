@@ -28,6 +28,8 @@ gedacht. Sie ersetzt keine Rechtsberatung.
    Danach muessen auch die drei `*.cdx.json`-Dateien als CycloneDX-SBOMs
    aktualisiert sein. `npm audit` muss separat bewertet werden;
    ein ungeprueftes `npm audit fix --force` ist kein Release-Schritt.
+   Nach der Generierung die Images erneut bauen, damit sie die aktualisierten
+   Inventare enthalten: `docker compose build backend frontend gateway steam-helper`.
 4. Pruefen, dass `/licenses` in Backend-, Frontend- und Gateway-Image vorhanden
    ist.
 5. Bei einer neuen Legendary-Version deren GPL-Lizenz, Versionsangabe und
@@ -35,6 +37,35 @@ gedacht. Sie ersetzt keine Rechtsberatung.
 6. IGDB-/RAWG-Attribution und die Seite `/legal` im gebauten Frontend pruefen.
 7. API-Schluessel, Provider-Tokens, `.env` und Datenbank-Backups niemals in
    Quellcode, Image oder Release-Archiv aufnehmen.
+
+## Backend-Abhaengigkeiten aktualisieren
+
+`backend/pyproject.toml` beschreibt die gewuenschten direkten Abhaengigkeiten,
+`backend/requirements.lock` die beim Docker-Build installierten Versionen
+einschliesslich transitiver Abhaengigkeiten. Beide muessen zusammenpassen.
+Ein Dependabot-PR, der nur `pyproject.toml` aendert, ist noch nicht vollstaendig.
+
+Die Lockdatei im gleichen Python-/Linux-Umfeld wie das Backend regenerieren
+(Befehle im Repository-Hauptverzeichnis ausfuehren):
+
+```bash
+docker run --rm -v "$PWD/backend:/work" -w /work \
+  mirror.gcr.io/library/python:3.12-slim sh -ec '
+    pip install pip-tools==7.6.1
+    pip-compile --extra dev --strip-extras --allow-unsafe \
+      --no-header --no-annotate --no-emit-index-url --no-emit-trusted-host \
+      --output-file requirements.lock pyproject.toml
+  '
+docker compose build backend
+docker compose run --rm backend pytest
+```
+
+Ohne `--upgrade` behaelt pip-compile bestehende transitive Versionen bei,
+soweit sie mit den neuen Anforderungen vereinbar sind. Der Backend-Build
+prueft die installierten Laufzeit- und Testabhaengigkeiten gegen
+`pyproject.toml` und fuehrt `pip check` aus. Bei einer veralteten Lockdatei
+bricht bereits der Build ab. Danach die Lizenzinventare wie oben erneuern
+und gemeinsam mit Manifest und Lockdatei committen.
 
 ## Verteilung
 
@@ -49,7 +80,7 @@ Upstream-Repository verwiesen werden:
 
 ```bash
 python -m pip download --no-deps --no-binary=:all: \
-  legendary-gl==0.20.34 --dest release-sources
+  legendary-gl==0.21.1 --dest release-sources
 ```
 
 Wird nur dieses Quellrepository angeboten und baut jeder Betreiber sein Image

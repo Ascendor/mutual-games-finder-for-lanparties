@@ -7,9 +7,12 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 
 COPY backend/requirements.lock ./requirements.lock
-RUN pip install --no-cache-dir --requirement requirements.lock
-
 COPY backend/pyproject.toml ./pyproject.toml
+COPY backend/check_dependencies.py ./check_dependencies.py
+RUN pip install --no-cache-dir --requirement requirements.lock \
+    && python check_dependencies.py \
+    && pip check
+
 COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic
 COPY backend/app ./app

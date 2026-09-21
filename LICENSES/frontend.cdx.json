@@ -39,8 +39,8 @@
     {
       "type": "library",
       "name": "@babel/parser",
-      "version": "7.29.7",
-      "purl": "pkg:npm/%40babel%2Fparser@7.29.7",
+      "version": "7.29.9",
+      "purl": "pkg:npm/%40babel%2Fparser@7.29.9",
       "licenses": [
         {
           "license": {
@@ -52,8 +52,8 @@
     {
       "type": "library",
       "name": "@babel/types",
-      "version": "7.29.7",
-      "purl": "pkg:npm/%40babel%2Ftypes@7.29.7",
+      "version": "7.29.8",
+      "purl": "pkg:npm/%40babel%2Ftypes@7.29.8",
       "licenses": [
         {
           "license": {
@@ -403,8 +403,8 @@
     {
       "type": "library",
       "name": "@jridgewell/sourcemap-codec",
-      "version": "1.5.5",
-      "purl": "pkg:npm/%40jridgewell%2Fsourcemap-codec@1.5.5",
+      "version": "1.6.0",
+      "purl": "pkg:npm/%40jridgewell%2Fsourcemap-codec@1.6.0",
       "licenses": [
         {
           "license": {
@@ -780,8 +780,8 @@
     {
       "type": "library",
       "name": "@vitejs/plugin-vue",
-      "version": "6.0.7",
-      "purl": "pkg:npm/%40vitejs%2Fplugin-vue@6.0.7",
+      "version": "6.0.9",
+      "purl": "pkg:npm/%40vitejs%2Fplugin-vue@6.0.9",
       "licenses": [
         {
           "license": {
@@ -793,8 +793,8 @@
     {
       "type": "library",
       "name": "@volar/language-core",
-      "version": "2.4.15",
-      "purl": "pkg:npm/%40volar%2Flanguage-core@2.4.15",
+      "version": "2.4.28",
+      "purl": "pkg:npm/%40volar%2Flanguage-core@2.4.28",
       "licenses": [
         {
           "license": {
@@ -806,8 +806,8 @@
     {
       "type": "library",
       "name": "@volar/source-map",
-      "version": "2.4.15",
-      "purl": "pkg:npm/%40volar%2Fsource-map@2.4.15",
+      "version": "2.4.28",
+      "purl": "pkg:npm/%40volar%2Fsource-map@2.4.28",
       "licenses": [
         {
           "license": {
@@ -819,8 +819,8 @@
     {
       "type": "library",
       "name": "@volar/typescript",
-      "version": "2.4.15",
-      "purl": "pkg:npm/%40volar%2Ftypescript@2.4.15",
+      "version": "2.4.28",
+      "purl": "pkg:npm/%40volar%2Ftypescript@2.4.28",
       "licenses": [
         {
           "license": {
@@ -832,8 +832,8 @@
     {
       "type": "library",
       "name": "@vue/compiler-core",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fcompiler-core@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fcompiler-core@3.5.43",
       "licenses": [
         {
           "license": {
@@ -845,8 +845,8 @@
     {
       "type": "library",
       "name": "@vue/compiler-dom",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fcompiler-dom@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fcompiler-dom@3.5.43",
       "licenses": [
         {
           "license": {
@@ -858,8 +858,8 @@
     {
       "type": "library",
       "name": "@vue/compiler-sfc",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fcompiler-sfc@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fcompiler-sfc@3.5.43",
       "licenses": [
         {
           "license": {
@@ -871,21 +871,8 @@
     {
       "type": "library",
       "name": "@vue/compiler-ssr",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fcompiler-ssr@3.5.39",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "@vue/compiler-vue2",
-      "version": "2.7.16",
-      "purl": "pkg:npm/%40vue%2Fcompiler-vue2@2.7.16",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fcompiler-ssr@3.5.43",
       "licenses": [
         {
           "license": {
@@ -910,8 +897,8 @@
     {
       "type": "library",
       "name": "@vue/language-core",
-      "version": "2.2.12",
-      "purl": "pkg:npm/%40vue%2Flanguage-core@2.2.12",
+      "version": "3.3.11",
+      "purl": "pkg:npm/%40vue%2Flanguage-core@3.3.11",
       "licenses": [
         {
           "license": {
@@ -923,8 +910,8 @@
     {
       "type": "library",
       "name": "@vue/reactivity",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Freactivity@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Freactivity@3.5.43",
       "licenses": [
         {
           "license": {
@@ -936,8 +923,8 @@
     {
       "type": "library",
       "name": "@vue/runtime-core",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fruntime-core@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fruntime-core@3.5.43",
       "licenses": [
         {
           "license": {
@@ -949,8 +936,8 @@
     {
       "type": "library",
       "name": "@vue/runtime-dom",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fruntime-dom@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fruntime-dom@3.5.43",
       "licenses": [
         {
           "license": {
@@ -962,8 +949,8 @@
     {
       "type": "library",
       "name": "@vue/server-renderer",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fserver-renderer@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fserver-renderer@3.5.43",
       "licenses": [
         {
           "license": {
@@ -975,8 +962,8 @@
     {
       "type": "library",
       "name": "@vue/shared",
-      "version": "3.5.39",
-      "purl": "pkg:npm/%40vue%2Fshared@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/%40vue%2Fshared@3.5.43",
       "licenses": [
         {
           "license": {
@@ -988,34 +975,8 @@
     {
       "type": "library",
       "name": "alien-signals",
-      "version": "1.0.13",
-      "purl": "pkg:npm/alien-signals@1.0.13",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "balanced-match",
-      "version": "1.0.2",
-      "purl": "pkg:npm/balanced-match@1.0.2",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "brace-expansion",
-      "version": "2.1.7",
-      "purl": "pkg:npm/brace-expansion@2.1.7",
+      "version": "3.2.1",
+      "purl": "pkg:npm/alien-signals@3.2.1",
       "licenses": [
         {
           "license": {
@@ -1029,19 +990,6 @@
       "name": "csstype",
       "version": "3.2.3",
       "purl": "pkg:npm/csstype@3.2.3",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "de-indent",
-      "version": "1.0.2",
-      "purl": "pkg:npm/de-indent@1.0.2",
       "licenses": [
         {
           "license": {
@@ -1117,19 +1065,6 @@
     },
     {
       "type": "library",
-      "name": "he",
-      "version": "1.2.0",
-      "purl": "pkg:npm/he@1.2.0",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "magic-string",
       "version": "0.30.21",
       "purl": "pkg:npm/magic-string@0.30.21",
@@ -1137,19 +1072,6 @@
         {
           "license": {
             "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "minimatch",
-      "version": "9.0.9",
-      "purl": "pkg:npm/minimatch@9.0.9",
-      "licenses": [
-        {
-          "license": {
-            "name": "ISC"
           }
         }
       ]
@@ -1313,8 +1235,8 @@
     {
       "type": "library",
       "name": "vscode-uri",
-      "version": "3.1.0",
-      "purl": "pkg:npm/vscode-uri@3.1.0",
+      "version": "3.2.0",
+      "purl": "pkg:npm/vscode-uri@3.2.0",
       "licenses": [
         {
           "license": {
@@ -1326,8 +1248,8 @@
     {
       "type": "library",
       "name": "vue",
-      "version": "3.5.39",
-      "purl": "pkg:npm/vue@3.5.39",
+      "version": "3.5.43",
+      "purl": "pkg:npm/vue@3.5.43",
       "licenses": [
         {
           "license": {
@@ -1365,8 +1287,8 @@
     {
       "type": "library",
       "name": "vue-tsc",
-      "version": "2.2.12",
-      "purl": "pkg:npm/vue-tsc@2.2.12",
+      "version": "3.3.11",
+      "purl": "pkg:npm/vue-tsc@3.3.11",
       "licenses": [
         {
           "license": {
@@ -1378,8 +1300,8 @@
     {
       "type": "library",
       "name": "vuetify",
-      "version": "3.12.8",
-      "purl": "pkg:npm/vuetify@3.12.8",
+      "version": "3.13.4",
+      "purl": "pkg:npm/vuetify@3.13.4",
       "licenses": [
         {
           "license": {
