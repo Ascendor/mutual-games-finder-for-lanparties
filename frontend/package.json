@@ -12,15 +12,15 @@
   },
   "dependencies": {
     "@mdi/js": "7.4.47",
-    "pinia": "2.3.1",
-    "vue": "3.5.39",
-    "vue-router": "4.6.4",
-    "vuetify": "3.12.8"
+    "pinia": "4.0.3",
+    "vue": "3.5.43",
+    "vue-router": "5.3.1",
+    "vuetify": "4.2.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "6.0.7",
-    "typescript": "5.9.3",
-    "vite": "7.3.6",
-    "vue-tsc": "2.2.12"
+    "@vitejs/plugin-vue": "6.0.9",
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "vue-tsc": "3.3.11"
   }
 }
