@@ -2,7 +2,7 @@
 set -eu
 
 : "${BASIC_AUTH_USER:=lanparty}"
-: "${BASIC_AUTH_PASSWORD:=QC4lF93bYgwTHRT4xRynsAIz3San1lDW}"
+: "${BASIC_AUTH_PASSWORD:?BASIC_AUTH_PASSWORD must be configured}"
 : "${LAN_UPLOAD_LIMIT:=2g}"
 
 mkdir -p /etc/nginx/auth /etc/nginx/certs
@@ -13,7 +13,7 @@ else
   PASSWORD_HASH="{PLAIN}$BASIC_AUTH_PASSWORD"
 fi
 printf "%s:%s\n" "$BASIC_AUTH_USER" "$PASSWORD_HASH" > /etc/nginx/auth/.htpasswd
-chmod 644 /etc/nginx/auth/.htpasswd
+chmod 600 /etc/nginx/auth/.htpasswd
 
 if [ ! -f /etc/nginx/certs/lan-party.crt ] || [ ! -f /etc/nginx/certs/lan-party.key ]; then
   openssl req \

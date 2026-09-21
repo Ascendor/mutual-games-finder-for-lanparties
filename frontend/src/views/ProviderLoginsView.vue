@@ -145,8 +145,11 @@
               </div>
 
               <div class="provider-actions">
+                <v-chip v-if="!isProviderEnabled(slot.platform)" size="small" variant="tonal">
+                  Deaktiviert
+                </v-chip>
                 <v-btn
-                  v-if="!isConnected(slot)"
+                  v-else-if="!isConnected(slot)"
                   color="primary"
                   variant="tonal"
                   prepend-icon="mdi-link-plus"
@@ -206,7 +209,7 @@ import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { loginPlatforms, platformIcon, platformTitle } from '../platforms'
 import { stateFromRun, waitForGogGalaxyImport, waitForPlayniteImport, type PlayniteProgressState } from '../playniteImport'
 import { useLanStore } from '../store'
-import type { Account, Participant, Platform, ProviderAuthStatus } from '../types'
+import type { Account, Participant, Platform, ProviderAuthStatus, ProviderAvailability } from '../types'
 
 interface ProviderSlot {
   key: string
@@ -225,6 +228,7 @@ const router = useRouter()
 const route = useRoute()
 const store = useLanStore()
 const statuses = ref<ProviderAuthStatus[]>([])
+const availability = ref<ProviderAvailability[]>([])
 const loading = ref(false)
 const busy = ref<string | null>(null)
 const error = ref('')
@@ -266,14 +270,16 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [participants, accounts, providerStatuses] = await Promise.all([
+    const [participants, accounts, providerStatuses, providerAvailability] = await Promise.all([
       api.participants(),
       api.accounts(),
-      api.providerAuthStatus()
+      api.providerAuthStatus(),
+      api.providerAvailability()
     ])
     store.participants = participants
     store.accounts = accounts
     statuses.value = providerStatuses
+    availability.value = providerAvailability
     if (!props.adminMode && !participants.some((participant) => participant.id === currentParticipantId.value)) {
       clearParticipant()
       await router.replace({ path: '/player', query: { redirect: '/logins' } })
@@ -302,7 +308,12 @@ function isConnected(slot: ProviderSlot) {
   return Boolean(statusFor(slot.account.id)?.authenticated)
 }
 
+function isProviderEnabled(platform: Platform) {
+  return availability.value.find((item) => item.platform === platform)?.enabled ?? true
+}
+
 function statusLabel(slot: ProviderSlot) {
+  if (!isProviderEnabled(slot.platform)) return 'Deaktiviert'
   if (isConnected(slot)) return 'Verbunden'
   if (slot.account?.account_id.startsWith('playnite:')) return 'Nur Playnite'
   if (slot.account?.account_id.startsWith('gog-galaxy:')) return 'Nur GOG Galaxy'
@@ -312,6 +323,7 @@ function statusLabel(slot: ProviderSlot) {
 }
 
 function statusColor(slot: ProviderSlot) {
+  if (!isProviderEnabled(slot.platform)) return 'default'
   if (isConnected(slot)) return 'success'
   if (slot.account?.last_error) return 'error'
   if (
@@ -323,6 +335,9 @@ function statusColor(slot: ProviderSlot) {
 }
 
 function providerDetail(slot: ProviderSlot) {
+  if (!isProviderEnabled(slot.platform)) {
+    return 'Inoffizielle Direktanbindung ist auf diesem Server deaktiviert. Nutze Playnite oder GOG Galaxy.'
+  }
   if (!slot.account) return 'Noch nicht eingerichtet'
   const steamMode = slot.platform === 'steam' ? statusFor(slot.account.id)?.connection_mode : undefined
   const connectionMode = steamMode === 'qr'
@@ -343,7 +358,7 @@ function providerDetail(slot: ProviderSlot) {
 }
 
 function connectedCount(slots: ProviderSlot[]) {
-  return slots.filter(isConnected).length
+  return slots.filter((slot) => isProviderEnabled(slot.platform) && isConnected(slot)).length
 }
 
 async function handleSteamOpenIdReturn() {

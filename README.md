@@ -13,6 +13,7 @@ Die Anwendung ist fuer ein vertrautes LAN gedacht. Innerhalb der Anwendung gibt 
 ## Start
 
 ```bash
+python scripts/generate_env_secrets.py --output .env
 docker compose up --build
 ```
 
@@ -24,34 +25,35 @@ Danach:
 
 Der Gateway nutzt ein selbstsigniertes TLS-Zertifikat. Der Browser wird deshalb beim ersten Aufruf eine Zertifikatswarnung anzeigen. Das Zertifikat bleibt im Docker-Volume `gateway-certs` erhalten.
 
-Default Basic Auth:
+Das Skript erzeugt fuer jede Installation unterschiedliche alphanumerische
+Kennwoerter in der nicht versionierten Datei `.env`. Der Basic-Auth-Benutzer
+lautet standardmaessig `lanparty`. Das In-App-Adminpasswort entsperrt nur die
+Administrationsansichten; die eigentliche Zugriffskontrolle fuer die gesamte
+Anwendung erfolgt durch Basic Auth am Gateway.
 
-- Benutzer: `lanparty`
-- Passwort: `QC4lF93bYgwTHRT4xRynsAIz3San1lDW`
+Ein einzelnes Kennwort kann spaeter gezielt rotiert werden:
 
-Das In-App-Adminpasswort ist im lokalen Compose-Setup ebenfalls auf `QC4lF93bYgwTHRT4xRynsAIz3San1lDW` gesetzt. Basic Auth schuetzt den Zugriff auf die gesamte Anwendung; das Adminpasswort entsperrt nur die Administrationsbereiche innerhalb der Anwendung.
-
-Die Werte koennen in `.env` angepasst werden:
-
-```env
-BASIC_AUTH_USER=lanparty
-BASIC_AUTH_PASSWORD=QC4lF93bYgwTHRT4xRynsAIz3San1lDW
-ADMIN_PASSWORD=QC4lF93bYgwTHRT4xRynsAIz3San1lDW
+```bash
+python scripts/generate_env_secrets.py --output .env --rotate ADMIN_PASSWORD
 ```
 
 Backend und Frontend werden im Docker-Compose-Betrieb nicht mehr direkt veroeffentlicht. Der Zugriff laeuft ueber den Gateway, damit TLS und Basic Auth nicht umgangen werden.
 
 PostgreSQL speichert seine Daten im Docker-Volume `postgres-data`. Es ist das einzige unterstuetzte Datenbanksystem der Anwendung.
 
-Die PostgreSQL-Zugangsdaten koennen in `.env` angepasst werden:
-
-```env
-POSTGRES_DB=lanparty
-POSTGRES_USER=lanparty
-POSTGRES_PASSWORD=lanparty
-```
+Die PostgreSQL-Zugangsdaten stehen ebenfalls in `.env`. Bei einer bestehenden
+Datenbank darf `POSTGRES_PASSWORD` nicht nur in der Datei geaendert werden;
+die Rolle muss zuerst innerhalb von PostgreSQL auf dasselbe Passwort umgestellt
+werden.
 
 ## Direkte Provider
+
+Steam und Xbox verwenden dokumentierte Anmeldewege. Weitere Direktanbindungen
+sind experimentell und bei neuen Installationen standardmaessig deaktiviert.
+Sie koennen nach bewusster Risikoabwaegung mit
+`UNOFFICIAL_PROVIDER_INTEGRATIONS_ENABLED=true` aktiviert werden. Details,
+verarbeitete Zugangsdaten und Importalternativen stehen in
+[`PROVIDERS.md`](PROVIDERS.md).
 
 - Steam: wahlweise QR-Anmeldung mit vollstaendiger Bibliotheks- und Lizenzabfrage, offizieller Steam-Browser-Login ohne Token oder manuelle Verbindung ueber die oeffentliche Steam-Community-ID
 - Epic: direkt ueber `legendary`
@@ -194,7 +196,18 @@ Die vollstaendige manuelle Anleitung fuer DNS, Apache, Wildcard-Zertifikate,
 Basic Auth, Backups, Updates und Rollback steht in
 [`docs/production-deployment.md`](docs/production-deployment.md). Als Vorlage
 fuer Secrets dient `.env.production.example`; echte Produktionswerte gehoeren
-in die ignorierte Datei `.env.production`.
+in die ignorierte Datei `.env.production`. Bei einer neuen Installation wird
+sie mit zufaelligen alphanumerischen Werten erzeugt:
+
+```bash
+python3 scripts/generate_env_secrets.py \
+  --template .env.production.example \
+  --output .env.production
+```
+
+Bei einer bestehenden Produktionsdatenbank darf das PostgreSQL-Passwort nicht
+allein durch erneutes Ausfuehren des Skripts geaendert werden; dazu muss auch
+die Datenbankrolle kontrolliert rotiert werden.
 
 ## Lizenz, Datenschutz und Drittanbieter
 
@@ -203,7 +216,7 @@ Playnite-Referenzen, Legendary und externe Datenquellen sind in
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) dokumentiert. Die
 vollstaendigen Lizenztexte und versionierten Paketinventare liegen unter
 [`LICENSES/`](LICENSES/); dort befinden sich ausserdem CycloneDX-SBOMs fuer
-Backend und Frontend.
+Backend, Frontend und Steam-Helfer.
 
 Die Anwendung zeigt IGDB und RAWG als Metadatenquellen dauerhaft im Footer an.
 Unter `/legal` sind die tatsaechlich verarbeiteten Daten, externe Uebertragungen
@@ -213,3 +226,6 @@ Pflichtangaben ergaenzen.
 
 Die Release-Checkliste fuer eine spaetere Quellcode- oder Image-Veroeffentlichung
 steht in [`docs/open-source-compliance.md`](docs/open-source-compliance.md).
+Das Sicherheitsmodell ist in [`SECURITY.md`](SECURITY.md) beschrieben; die
+Bereinigung einer bestehenden Git-Historie in
+[`docs/open-source-release.md`](docs/open-source-release.md).

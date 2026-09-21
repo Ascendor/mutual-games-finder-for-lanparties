@@ -51,7 +51,7 @@ class FakeClient:
 
     def get(self, url):
         if url.endswith("/userData.json"):
-            return FakeResponse({"userId": "gog-user-7", "username": "PlayerOneOnGOG"})
+            return FakeResponse({"userId": "gog-user-7", "username": "ExampleGogUser"})
         if url.endswith("/user/data/games"):
             return FakeResponse({"owned": [101]})
         if url.endswith("/products/101"):
@@ -142,7 +142,7 @@ def test_gog_provider_uses_auth_cache_and_direct_api(monkeypatch, tmp_path):
     assert batch.warnings == []
     assert batch.authoritative_snapshot is True
     assert provider.authoritative_library is True
-    assert account.display_name == "PlayerOneOnGOG"
+    assert account.display_name == "ExampleGogUser"
 
 
 def test_epic_provider_repairs_placeholder_display_name_from_legendary_status(monkeypatch):
@@ -157,7 +157,7 @@ def test_epic_provider_repairs_placeholder_display_name_from_legendary_status(mo
     def fake_run(command, *args, **kwargs):
         if "status" in command:
             return SimpleNamespace(
-                stdout=json.dumps({"account": "EpicPlayerOne"}),
+                stdout=json.dumps({"account": "ExampleEpicUser"}),
                 stderr="",
                 returncode=0,
             )
@@ -167,7 +167,7 @@ def test_epic_provider_repairs_placeholder_display_name_from_legendary_status(mo
 
     EpicProvider().sync_account(account)
 
-    assert account.display_name == "EpicPlayerOne"
+    assert account.display_name == "ExampleEpicUser"
 
 
 def test_account_identity_uses_participant_only_as_placeholder_fallback():
@@ -633,6 +633,7 @@ def test_provider_auth_status_accepts_string_platform(monkeypatch, tmp_path):
     from app.services import provider_auth
 
     monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    monkeypatch.setattr(provider_auth.settings, "unofficial_provider_integrations_enabled", True)
     account = Account(id=11, participant_id=1, platform="ubisoft", account_id="ubi")
 
     status = provider_auth.account_status(account)
@@ -640,6 +641,23 @@ def test_provider_auth_status_accepts_string_platform(monkeypatch, tmp_path):
     assert status["platform"] == Platform.ubisoft
     assert status["authenticated"] is False
     assert "ubisoft" in status["message"]
+
+
+def test_disabled_provider_status_does_not_contact_provider(monkeypatch):
+    from app.services import provider_auth
+
+    monkeypatch.setattr(provider_auth.settings, "unofficial_provider_integrations_enabled", False)
+    monkeypatch.setattr(
+        provider_auth,
+        "epic_status",
+        lambda account: pytest.fail("disabled provider must not be contacted"),
+    )
+    account = Account(id=12, participant_id=1, platform=Platform.epic, account_id="epic")
+
+    status = provider_auth.account_status(account)
+
+    assert status["available"] is False
+    assert status["authenticated"] is False
 
 
 def test_provider_auth_cleans_common_epic_paste_variants():
@@ -651,8 +669,8 @@ def test_provider_auth_cleans_common_epic_paste_variants():
     assert _clean_epic_code('```json\n{"AuthorizationCode": "abc-123"}\n```') == "abc-123"
     assert _clean_epic_code('authorizationCode: "abc-123"') == "abc-123"
     assert _clean_epic_code("https://example.test/callback?authorizationCode=abc-123") == "abc-123"
-    assert _epic_identity_from_output('Successfully logged in as "EpicPlayerOne"') == {
-        "provider_display_name": "EpicPlayerOne"
+    assert _epic_identity_from_output('Successfully logged in as "ExampleEpicUser"') == {
+        "provider_display_name": "ExampleEpicUser"
     }
 
 
@@ -680,7 +698,7 @@ def test_gog_login_returns_provider_identity(monkeypatch, tmp_path):
                     "user_id": "gog-user-7",
                 }
             )
-        return FakeResponse({"userId": "gog-user-7", "username": "PlayerOneOnGOG"})
+        return FakeResponse({"userId": "gog-user-7", "username": "ExampleGogUser"})
 
     monkeypatch.setattr(provider_auth.httpx, "get", fake_get)
     account = Account(
@@ -694,7 +712,7 @@ def test_gog_login_returns_provider_identity(monkeypatch, tmp_path):
     result = provider_auth.complete_gog(account, "gog-code")
 
     assert result["provider_account_id"] == "gog-user-7"
-    assert result["provider_display_name"] == "PlayerOneOnGOG"
+    assert result["provider_display_name"] == "ExampleGogUser"
 
 
 def test_provider_login_persists_resolved_identity(monkeypatch, db):
@@ -718,7 +736,7 @@ def test_provider_login_persists_resolved_identity(monkeypatch, db):
         lambda *args, **kwargs: {
             "authenticated": True,
             "provider_account_id": "gog-user-7",
-            "provider_display_name": "PlayerOneOnGOG",
+            "provider_display_name": "ExampleGogUser",
         },
     )
 
@@ -730,7 +748,7 @@ def test_provider_login_persists_resolved_identity(monkeypatch, db):
 
     db.refresh(account)
     assert account.account_id == "gog-user-7"
-    assert account.display_name == "PlayerOneOnGOG"
+    assert account.display_name == "ExampleGogUser"
 
 
 def test_provider_auth_extracts_firefox_curl_and_cookie_json():

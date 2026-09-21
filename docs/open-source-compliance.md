@@ -6,8 +6,8 @@ gedacht. Sie ersetzt keine Rechtsberatung.
 ## Vor jedem Release
 
 1. `LICENSE`, `THIRD_PARTY_NOTICES.md` und `LICENSES/` mit ausliefern.
-2. Backend ausschliesslich aus `backend/requirements.lock` und Frontend mit
-   `npm ci` bauen.
+2. Backend ausschliesslich aus `backend/requirements.lock`, Frontend und
+   Steam-Helfer jeweils mit `npm ci` bauen.
 3. Nach Abhaengigkeitsupdates die Inventare und gesammelten Lizenztexte
    erneuern:
 
@@ -20,9 +20,13 @@ gedacht. Sie ersetzt keine Rechtsberatung.
      -v "$PWD/scripts:/scripts:ro" -w /app \
      mirror.gcr.io/library/node:20-alpine \
      sh -c "npm ci && node /scripts/generate_frontend_license_inventory.mjs /app /out"
+   docker run --rm -v "$PWD/steam-helper:/app" -v "$PWD/LICENSES:/out" \
+     -v "$PWD/scripts:/scripts:ro" -w /app \
+     mirror.gcr.io/library/node:20-alpine \
+     sh -c "npm ci && node /scripts/generate_frontend_license_inventory.mjs /app /out steam-helper lan-party-steam-helper"
    ```
-   Danach muessen auch `backend.cdx.json` und `frontend.cdx.json` als
-   CycloneDX-SBOMs aktualisiert sein. `npm audit` muss separat bewertet werden;
+   Danach muessen auch die drei `*.cdx.json`-Dateien als CycloneDX-SBOMs
+   aktualisiert sein. `npm audit` muss separat bewertet werden;
    ein ungeprueftes `npm audit fix --force` ist kein Release-Schritt.
 4. Pruefen, dass `/licenses` in Backend-, Frontend- und Gateway-Image vorhanden
    ist.

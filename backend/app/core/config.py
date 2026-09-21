@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     igdb_client_secret: str | None = None
     legendary_command: str = "legendary"
     provider_auth_root: str = "/provider-auth"
+    unofficial_provider_integrations_enabled: bool = False
     gog_auth_config_path: str | None = None
     xbox_client_id: str | None = None
     gog_client_id: str = "46899977096215655"
@@ -42,6 +43,10 @@ class Settings(BaseSettings):
     meta_graphql_document_ids: str = "9431935310238631,29383114651302983,29143116735333849"
     playnite_upload_dir: str = "/tmp/playnite-uploads"
     playnite_upload_max_bytes: int = 4 * 1024 * 1024 * 1024
+    import_archive_max_members: int = 25_000
+    import_archive_max_member_bytes: int = 2 * 1024 * 1024 * 1024
+    import_archive_max_uncompressed_bytes: int = 6 * 1024 * 1024 * 1024
+    import_archive_max_compression_ratio: float = 500.0
     games_options_cache_seconds: int = 300
     games_options_stale_seconds: int = 60
     recommendation_http_cache_seconds: int = 30
@@ -87,7 +92,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-
 
 

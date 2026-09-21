@@ -3,7 +3,7 @@
 from sqlalchemy import select
 
 from app.models import Account, Ownership, Participant, Platform, PlatformGameMapping
-from app.services import sync_service
+from app.services import provider_policy, sync_service
 from app.services.import_providers import ImportBatch, ImportedGame, _is_non_game_steam_entry, _steam_metadata_from_details
 from app.services.sync_service import _reconcile_account_ownerships, resolve_game, upsert_ownership
 
@@ -307,6 +307,7 @@ def test_authoritative_library_reconciliation_keeps_known_free_games(db):
 
 
 def test_incomplete_provider_snapshot_keeps_ownerships_for_skipped_products(db, monkeypatch):
+    monkeypatch.setattr(provider_policy.settings, "unofficial_provider_integrations_enabled", True)
     participant = Participant(nickname="Partial GOG")
     db.add(participant)
     db.flush()

@@ -276,6 +276,13 @@
         können sich jederzeit ändern und dürfen nur vom jeweiligen
         Accountinhaber für dessen eigene Bibliothek verwendet werden.
       </p>
+      <p>
+        Diese experimentellen Direktanbindungen sind in einer neuen
+        Installation standardmäßig deaktiviert. Die betreibende Person muss
+        sie bewusst freischalten und sollte zuvor die jeweils aktuellen
+        Bedingungen der Plattform prüfen. Lokale Importe über Playnite oder
+        GOG Galaxy bleiben davon unberührt.
+      </p>
     </section>
 
     <section>
@@ -299,7 +306,7 @@
     </section>
 
     <v-alert type="info" variant="tonal" class="mt-8">
-      Stand: Juli 2026. Diese Information beschreibt die konfigurierte
+      Stand: September 2026. Diese Information beschreibt die konfigurierte
       Installation und ist keine Rechtsberatung.
     </v-alert>
   </main>

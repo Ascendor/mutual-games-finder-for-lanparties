@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models import Account, Game, Participant, Platform, SyncRun
 from app.services.account_identity import is_placeholder_display_name
+from app.services.archive_safety import validate_archive_members
 from app.services.import_providers import ImportedGame, _as_int, _as_list, _parse_date
 from app.services.genre_utils import sanitize_genres
 from app.services.metadata_service import METADATA_SYNC_LOCK, enrich_all_game_metadata
@@ -344,6 +345,17 @@ def _extract_entries_from_zip(raw: bytes | Path) -> list[dict[str, Any]]:
     seen_keys: set[tuple[str, str, str]] = set()
     source = BytesIO(raw) if isinstance(raw, bytes) else raw
     with zipfile.ZipFile(source) as archive:
+        relevant_names = [
+            name
+            for name in archive.namelist()
+            if name.casefold().endswith(".json")
+            or (
+                name.replace("\\", "/").casefold().startswith("library/")
+                and name.replace("\\", "/").casefold().rsplit("/", 1)[-1]
+                in {"games.db", "sources.db", "platforms.db", "genres.db"}
+            )
+        ]
+        validate_archive_members(archive, relevant_names, label="Playnite-Backup")
         db_entries = _extract_litedb_entries_from_zip(archive)
         for entry in db_entries:
             _append_unique_playnite_entry(all_entries, seen_keys, entry)

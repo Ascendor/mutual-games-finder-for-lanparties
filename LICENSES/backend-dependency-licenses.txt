@@ -78,7 +78,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-anyio 4.14.1: LICENSE
+anyio 4.15.1: LICENSE
 ------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -3230,7 +3230,7 @@ Requests
 Copyright 2019 Kenneth Reitz
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to
@@ -3251,7 +3251,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 GNU LESSER GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
@@ -3420,7 +3420,7 @@ permanent authorization for you to choose that version for the
 Library.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to
@@ -3441,7 +3441,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 Apache License
 Version 2.0, January 2004
@@ -3518,7 +3518,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to
@@ -3539,7 +3539,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 MIT License
 
@@ -3561,7 +3561,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 MIT License
 
@@ -3583,7 +3583,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 Copyright (c) 2012 Erik Rose
 
@@ -3606,14 +3606,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 This software is made available under the terms of *either* of the licenses
 found in LICENSE.APACHE or LICENSE.BSD. Contributions to this software is made
 under the terms of *both* these licenses.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE.APACHE
+setuptools 84.0.0: LICENSE.APACHE
 ------------------------------------------------------------------------------
 
                                  Apache License
@@ -3794,7 +3794,7 @@ setuptools 82.0.1: LICENSE.APACHE
    END OF TERMS AND CONDITIONS
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE.BSD
+setuptools 84.0.0: LICENSE.BSD
 ------------------------------------------------------------------------------
 Copyright (c) Donald Stufft and individual contributors.
 All rights reserved.
@@ -3821,7 +3821,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 MIT License
 
@@ -3846,7 +3846,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 MIT License
 
@@ -3871,7 +3871,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE.txt
+setuptools 84.0.0: LICENSE.txt
 ------------------------------------------------------------------------------
 MIT License
 
@@ -3896,7 +3896,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: LICENSE
+setuptools 84.0.0: LICENSE
 ------------------------------------------------------------------------------
 MIT License
 
@@ -3918,7 +3918,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: NOTICE
+setuptools 84.0.0: NOTICE
 ------------------------------------------------------------------------------
 The code contained in this directory was automatically generated using the
 following command:
@@ -4360,7 +4360,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
       the Mozilla Public License, v. 2.0.
 
 ------------------------------------------------------------------------------
-setuptools 82.0.1: NOTICE
+setuptools 84.0.0: NOTICE
 ------------------------------------------------------------------------------
 The following files include code from opensource projects
 (either as direct copies or modified versions):
@@ -4475,7 +4475,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-typing_extensions 4.15.0: LICENSE
+typing_extensions 4.16.0: LICENSE
 ------------------------------------------------------------------------------
 A. HISTORY OF THE SOFTWARE
 ==========================

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models import Account, Game, Participant, Platform, PlatformGameMapping, SyncRun
 from app.services.account_identity import is_placeholder_display_name
+from app.services.archive_safety import validate_archive_members
 from app.services.import_providers import ImportedGame
 from app.services.metadata_service import METADATA_SYNC_LOCK, enrich_all_game_metadata
 from app.services.normalization import normalize_title
@@ -119,6 +120,12 @@ def _extract_galaxy_database(path: Path) -> Path:
         if not candidates:
             raise ValueError("ZIP enthaelt keine galaxy-2.0.db.")
         selected = sorted(candidates, key=lambda value: (0 if "storage" in value.casefold() else 1, len(value)))[0]
+        selected_members = [selected]
+        for sqlite_suffix in ("-wal", "-shm"):
+            sidecar = _find_zip_member(archive, f"galaxy-2.0.db{sqlite_suffix}")
+            if sidecar:
+                selected_members.append(sidecar)
+        validate_archive_members(archive, selected_members, label="GOG-Galaxy-Import")
         with archive.open(selected) as source:
             with NamedTemporaryFile(prefix="gog-galaxy-", suffix=".db", delete=False) as target:
                 while chunk := source.read(1024 * 1024):

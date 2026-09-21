@@ -253,7 +253,7 @@ def test_free_games_can_be_counted_only_for_actual_owners(db):
 def test_common_games_ignore_unreadable_library_and_apply_coverage_threshold(db):
     ada = Participant(nickname="Ada", present=True)
     linus = Participant(nickname="Linus", present=True)
-    player_three = Participant(nickname="player_three", present=True)
+    player_three = Participant(nickname="PlayerThree", present=True)
     broad = Game(
         title="Broadly Owned",
         normalized_title=normalize_title("Broadly Owned"),
@@ -299,7 +299,7 @@ def test_common_games_ignore_unreadable_library_and_apply_coverage_threshold(db)
     assert at_75_percent[0].known_player_count == 2
     assert at_75_percent[0].coverage_percent == 100
     assert [player.nickname for player in at_75_percent[0].unknown_players] == [
-        "player_three"
+        "PlayerThree"
     ]
     assert at_50_percent[1].coverage_percent == 50
 

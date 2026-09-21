@@ -192,6 +192,13 @@ export interface ProviderAuthStatus {
   interval?: number
   connection_mode?: 'qr' | 'community'
   message: string
+  available?: boolean
+}
+
+export interface ProviderAvailability {
+  platform: Platform
+  enabled: boolean
+  experimental: boolean
 }
 
 export interface ProviderLoginStart {

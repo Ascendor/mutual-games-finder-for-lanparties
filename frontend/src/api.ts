@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderLoginStart, RecentAcquisition, Recommendation, SteamConnection, SteamLoginStart, SteamLoginStatus, SteamOpenIdStart, SteamProfile, SyncRun } from './types'
+import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderAvailability, ProviderLoginStart, RecentAcquisition, Recommendation, SteamConnection, SteamLoginStart, SteamLoginStatus, SteamOpenIdStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -225,6 +225,7 @@ export const api = {
   },
   gogGalaxyImportStatus: (runId: number) => request<SyncRun>(`/imports/gog-galaxy/${runId}`),
   providerAuthStatus: () => request<ProviderAuthStatus[]>('/provider-auth/status'),
+  providerAvailability: () => request<ProviderAvailability[]>('/provider-auth/availability'),
   resolveSteamProfile: (profile: string) =>
     request<SteamProfile>('/provider-auth/steam/resolve', {
       method: 'POST',

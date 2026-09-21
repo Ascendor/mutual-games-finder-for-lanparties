@@ -10,6 +10,7 @@ import httpx
 
 from app.core.config import settings
 from app.models import Account, Platform
+from app.services.credential_storage import ensure_private_directory, write_private_json
 
 DEVICE_CODE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode"
 TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
@@ -20,7 +21,7 @@ XBOX_SCOPES = "XboxLive.signin XboxLive.offline_access"
 
 def _auth_path(account_id: int) -> Path:
     path = Path(settings.provider_auth_root) / Platform.xbox.value / str(account_id) / "auth.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(path.parent)
     return path
 
 
@@ -36,7 +37,7 @@ def _load(account_id: int) -> dict[str, Any]:
 
 
 def _save(account_id: int, payload: dict[str, Any]) -> None:
-    _auth_path(account_id).write_text(json.dumps(payload), encoding="utf-8")
+    write_private_json(_auth_path(account_id), payload)
 
 
 def _client_id() -> str:

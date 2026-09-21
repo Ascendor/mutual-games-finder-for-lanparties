@@ -80,7 +80,7 @@ def main() -> None:
                     name,
                     distribution.version,
                     license_value.replace("\t", " "),
-                    package_url(distribution).replace("\t", " "),
+                    package_url(distribution).replace("\t", " ") or "-",
                 )
             )
         )

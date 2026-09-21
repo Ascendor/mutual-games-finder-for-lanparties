@@ -1,5 +1,5 @@
-Frontend dependency license documents
-=======================================
+lan-party-game-finder-frontend dependency license documents
+===========================================================
 
 Generated from the exact npm lockfile and installed dependency tree.
 
@@ -603,7 +603,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-brace-expansion 2.1.1: LICENSE
+brace-expansion 2.1.7: LICENSE
 ------------------------------------------------------------------------------
 MIT License
 
@@ -792,7 +792,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-nanoid 3.3.15: LICENSE
+nanoid 3.3.19: LICENSE
 ------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -909,7 +909,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-postcss 8.5.16: LICENSE
+postcss 8.5.28: LICENSE
 ------------------------------------------------------------------------------
 The MIT License (MIT)
 

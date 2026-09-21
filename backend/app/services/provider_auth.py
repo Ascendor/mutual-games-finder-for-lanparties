@@ -32,6 +32,7 @@ from app.services.import_providers import (
     validate_ea_access_token,
 )
 from app.services.steam_client_credentials import load_steam_credentials
+from app.services.provider_policy import provider_integration_enabled
 
 EPIC_LOGIN_URL = settings.epic_login_url
 UBISOFT_APP_ID = settings.ubisoft_app_id
@@ -503,17 +504,31 @@ def account_status(account: Account) -> dict[str, Any]:
                 if is_direct_connection
                 else "Steam was imported without a direct connection"
             ),
+            "available": True,
         }
     _supported_account(account)
+    if not provider_integration_enabled(platform):
+        return {
+            "account_id": account.id,
+            "participant_id": account.participant_id,
+            "platform": platform,
+            "authenticated": False,
+            "needs_2fa": False,
+            "available": False,
+            "message": "Inoffizielle Provider-Anbindung ist serverseitig deaktiviert",
+        }
     if platform == Platform.epic:
-        return epic_status(account)
-    if platform == Platform.gog:
-        return gog_status(account)
-    if platform == Platform.xbox:
+        result = epic_status(account)
+    elif platform == Platform.gog:
+        result = gog_status(account)
+    elif platform == Platform.xbox:
         from app.services.xbox_auth import xbox_status
 
-        return xbox_status(account)
-    return generic_json_status(account)
+        result = xbox_status(account)
+    else:
+        result = generic_json_status(account)
+    result["available"] = True
+    return result
 
 
 def status(db: Session) -> list[dict[str, Any]]:

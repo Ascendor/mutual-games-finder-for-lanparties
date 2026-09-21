@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import Account, Participant
+from app.models import Account, Participant, Platform
 from app.schemas import AccountRead, SteamConnectionRead, SteamProfileRead
 from app.services import provider_auth
 from app.services.account_identity import apply_account_identity
@@ -22,6 +22,11 @@ from app.services.steam_auth import (
 from app.services.steam_client_auth import complete_steam_qr_login, poll_steam_qr_login, start_steam_qr_login
 from app.services.steam_client_credentials import delete_steam_credentials
 from app.services.steam_openid import build_steam_openid_url, verify_steam_openid_response
+from app.services.provider_policy import (
+    UNOFFICIAL_DIRECT_PROVIDERS,
+    provider_integration_enabled,
+    require_provider_integration,
+)
 
 router = APIRouter()
 STEAM_LOGIN_TTL_SECONDS = 10 * 60
@@ -77,6 +82,18 @@ def _get_account(db: Session, account_id: int) -> Account:
 @router.get("/status")
 def auth_status(db: Session = Depends(get_db)):
     return provider_auth.status(db)
+
+
+@router.get("/availability")
+def provider_availability():
+    return [
+        {
+            "platform": platform,
+            "enabled": provider_integration_enabled(platform),
+            "experimental": platform in UNOFFICIAL_DIRECT_PROVIDERS,
+        }
+        for platform in sorted(provider_auth.LOGIN_PLATFORMS | {Platform.steam}, key=lambda item: item.value)
+    ]
 
 
 @router.post("/steam/resolve", response_model=SteamProfileRead)
@@ -259,6 +276,7 @@ def _steam_openid_redirect(pending: PendingSteamOpenId, **query: str) -> Redirec
 def start_login(account_id: int, db: Session = Depends(get_db)):
     account = _get_account(db, account_id)
     try:
+        require_provider_integration(account.platform)
         return provider_auth.start(account)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -268,6 +286,7 @@ def start_login(account_id: int, db: Session = Depends(get_db)):
 def complete_login(account_id: int, payload: ProviderCodePayload, db: Session = Depends(get_db)):
     account = _get_account(db, account_id)
     try:
+        require_provider_integration(account.platform)
         result = provider_auth.complete(account, payload.code.strip(), payload.model_dump(exclude_none=True))
         if result.get("authenticated"):
             apply_account_identity(account, result, participant_fallback=True)
@@ -283,6 +302,7 @@ def complete_login(account_id: int, payload: ProviderCodePayload, db: Session = 
 def poll_login(account_id: int, db: Session = Depends(get_db)):
     account = _get_account(db, account_id)
     try:
+        require_provider_integration(account.platform)
         result = provider_auth.poll(account)
         if result.get("authenticated"):
             if result.get("xuid"):

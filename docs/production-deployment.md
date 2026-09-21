@@ -46,7 +46,9 @@ beweglichen Branches verwendet werden.
 
 ```bash
 cd /opt/refjuplay-together
-cp .env.production.example .env.production
+python3 scripts/generate_env_secrets.py \
+  --template .env.production.example \
+  --output .env.production
 chmod 600 .env.production
 joe .env.production
 openssl rand -hex 32
@@ -57,7 +59,8 @@ folgende Werte anpassen:
 
 ```env
 APP_HOST=refjuplay-together.example.org
-ADMIN_PASSWORD=<zufaelliges-admin-passwort>
+ADMIN_PASSWORD=<bereits zufaellig erzeugter Wert>
+UNOFFICIAL_PROVIDER_INTEGRATIONS_ENABLED=false
 POSTGRES_DB=lanparty
 POSTGRES_USER=lanparty
 POSTGRES_PASSWORD=<zufaelliger-hex-wert>
@@ -67,6 +70,10 @@ IGDB_CLIENT_SECRET=
 RAWG_API_KEY=
 XBOX_CLIENT_ID=
 PLAYNITE_UPLOAD_MAX_BYTES=4294967296
+IMPORT_ARCHIVE_MAX_MEMBERS=25000
+IMPORT_ARCHIVE_MAX_MEMBER_BYTES=2147483648
+IMPORT_ARCHIVE_MAX_UNCOMPRESSED_BYTES=6442450944
+IMPORT_ARCHIVE_MAX_COMPRESSION_RATIO=500
 PRIVACY_CONTROLLER_NAME=<name-der-verantwortlichen-person>
 PRIVACY_CONTROLLER_CONTACT=<kontaktmoeglichkeit>
 PRIVACY_HOSTING_PROVIDER=<name-des-vserver-hosters>

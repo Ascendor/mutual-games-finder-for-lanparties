@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.services.credential_storage import write_private_json
 
 
 def steam_credentials_path(account_id: int) -> Path:
@@ -15,14 +16,7 @@ def steam_credentials_path(account_id: int) -> Path:
 
 def save_steam_credentials(account_id: int, steam_id: str, refresh_token: str) -> None:
     path = steam_credentials_path(account_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(
-        json.dumps({"steam_id": steam_id, "refresh_token": refresh_token}),
-        encoding="utf-8",
-    )
-    temporary.chmod(0o600)
-    temporary.replace(path)
+    write_private_json(path, {"steam_id": steam_id, "refresh_token": refresh_token})
 
 
 def load_steam_credentials(account_id: int) -> dict[str, str] | None:

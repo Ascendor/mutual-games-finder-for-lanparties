@@ -8,3 +8,12 @@ dist/
 .env
 .env.production
 .tmp-license-*
+backups/
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.bak
+*.backup
+provider-auth/

@@ -28,6 +28,7 @@ def remove_stale_uploads() -> None:
 async def _store_upload(file: UploadFile, *, prefix: str, default_suffix: str, label: str) -> Path:
     upload_dir = Path(settings.playnite_upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
+    upload_dir.chmod(0o700)
     filename = str(file.filename or "").casefold()
     suffix = Path(filename).suffix
     if suffix not in {".db", ".sqlite", ".sqlite3", ".zip", ".json"}:
@@ -45,6 +46,7 @@ async def _store_upload(file: UploadFile, *, prefix: str, default_suffix: str, l
                         detail=f"{label} ueberschreitet das Uploadlimit von {settings.playnite_upload_max_bytes} Bytes.",
                     )
                 target.write(chunk)
+        path.chmod(0o600)
         return path
     except HTTPException:
         if path:

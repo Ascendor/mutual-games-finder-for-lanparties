@@ -12,6 +12,7 @@ from app.services.account_identity import apply_account_identity
 from app.services.import_providers import ImportBatch, ImportedGame, PROVIDERS
 from app.services.genre_utils import sanitize_genres
 from app.services.normalization import normalize_title
+from app.services.provider_policy import require_provider_integration
 
 SYNC_LOCK = Lock()
 ROMAN_NUMERALS = {
@@ -330,6 +331,7 @@ def _sync_account_unlocked(db: Session, account_id: int) -> SyncRun:
     db.add(run)
     db.flush()
     try:
+        require_provider_integration(account.platform)
         provider = PROVIDERS[account.platform]
         initial_account_sync = account.last_successful_sync is None
         provider_result = provider.sync_account(account)

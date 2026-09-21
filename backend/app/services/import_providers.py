@@ -20,6 +20,7 @@ import yaml
 from app.core.config import settings
 from app.models import Account, Platform
 from app.services.account_identity import apply_account_identity, is_placeholder_display_name
+from app.services.credential_storage import ensure_private_directory, write_private_json
 from app.services.game_classification import classify_game
 from app.services.normalization import normalize_title
 from app.services.steam_client_credentials import load_authenticated_steam_library
@@ -55,8 +56,7 @@ def coerce_platform(platform: Platform | str) -> Platform:
 
 def provider_auth_dir(platform: Platform, account_id: int) -> Path:
     path = Path(settings.provider_auth_root) / platform_value(platform) / str(account_id)
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return ensure_private_directory(path)
 
 
 
@@ -73,8 +73,7 @@ def load_provider_auth_json(platform: Platform, account_id: int) -> dict[str, An
 
 def save_provider_auth_json(platform: Platform, account_id: int, payload: dict[str, Any]) -> None:
     path = provider_auth_json_path(platform, account_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    write_private_json(path, payload)
 
 
 def _ea_graphql_url(operation_name: str, variables: dict[str, Any], query_hash: str) -> str:
@@ -912,7 +911,7 @@ class GOGAuthStore:
 
     def _save_all(self, payload: dict[str, Any]) -> None:
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.config_path.write_text(json.dumps(payload), encoding="utf-8")
+        write_private_json(self.config_path, payload)
 
     def get_credentials(self) -> dict[str, Any]:
         all_credentials = self._load_all()
@@ -1841,7 +1840,6 @@ PROVIDERS: dict[Platform, ImportProvider] = {
     Platform.humble: HumbleProvider(),
     Platform.meta: MetaProvider(),
 }
-
 
 
 

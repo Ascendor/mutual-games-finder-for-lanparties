@@ -57,7 +57,9 @@ No source code from that repository is incorporated in this project.
 - License: MIT
 
 The helper also uses `qrcode` 1.5.4 (MIT) to render the challenge supplied by
-Steam as an image in the browser.
+Steam as an image in the browser. Its transitive `node-bignumber` dependency
+contains the Tom Wu and Kenji Urushima notices reproduced in
+`LICENSES/node-bignumber-MIT.txt`.
 
 The internal Steam helper uses these libraries for the user-approved QR login
 and the reading of Steam license data. A renewable login token is stored in the
@@ -102,8 +104,10 @@ Complete package/version/license inventories are stored in:
 
 - `LICENSES/backend-dependencies.tsv`
 - `LICENSES/frontend-dependencies.tsv`
+- `LICENSES/steam-helper-dependencies.tsv`
 - `LICENSES/backend.cdx.json`
 - `LICENSES/frontend.cdx.json`
+- `LICENSES/steam-helper.cdx.json`
 
 The standard license texts referenced by those inventories are included in
 the `LICENSES` directory. The inventory generator scripts additionally collect

@@ -3,11 +3,16 @@ import path from 'node:path'
 
 const projectRoot = process.argv[2] || '/app'
 const outputDirectory = process.argv[3] || '/out'
+const outputPrefix = process.argv[4] || 'frontend'
+const componentName = process.argv[5] || 'lan-party-game-finder-frontend'
+const licenseCorrections = {
+  'node-bignumber': 'LicenseRef-Tom-Wu-and-MIT'
+}
 const lock = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'))
 const inventory = ['package\tversion\tlicense\tsource']
 const notices = [
-  'Frontend dependency license documents',
-  '=======================================',
+  `${componentName} dependency license documents`,
+  '='.repeat(componentName.length + 29),
   '',
   'Generated from the exact npm lockfile and installed dependency tree.',
   ''
@@ -20,12 +25,13 @@ const packages = Object.entries(lock.packages || {})
 
 for (const [packagePath, metadata] of packages) {
   const name = packagePath.replace(/^.*node_modules\//, '')
+  const license = metadata.license || licenseCorrections[name] || 'UNKNOWN'
   const source =
     typeof metadata.repository === 'string'
       ? metadata.repository
       : metadata.repository?.url || metadata.homepage || ''
   inventory.push(
-    [name, metadata.version || '', metadata.license || 'UNKNOWN', source]
+    [name, metadata.version || '', license, source || '-']
       .map((value) => String(value).replaceAll('\t', ' '))
       .join('\t')
   )
@@ -34,7 +40,7 @@ for (const [packagePath, metadata] of packages) {
     name,
     version: metadata.version || '',
     purl: `pkg:npm/${encodeURIComponent(name)}@${encodeURIComponent(metadata.version || '')}`,
-    licenses: [{ license: { name: metadata.license || 'UNKNOWN' } }]
+    licenses: [{ license: { name: license } }]
   })
 
   const installedPath = path.join(projectRoot, packagePath)
@@ -58,13 +64,13 @@ for (const [packagePath, metadata] of packages) {
 }
 
 fs.mkdirSync(outputDirectory, { recursive: true })
-fs.writeFileSync(path.join(outputDirectory, 'frontend-dependencies.tsv'), `${inventory.join('\n')}\n`)
+fs.writeFileSync(path.join(outputDirectory, `${outputPrefix}-dependencies.tsv`), `${inventory.join('\n')}\n`)
 fs.writeFileSync(
-  path.join(outputDirectory, 'frontend-dependency-licenses.txt'),
+  path.join(outputDirectory, `${outputPrefix}-dependency-licenses.txt`),
   `${notices.join('\n')}\n`
 )
 fs.writeFileSync(
-  path.join(outputDirectory, 'frontend.cdx.json'),
+  path.join(outputDirectory, `${outputPrefix}.cdx.json`),
   `${JSON.stringify(
     {
       bomFormat: 'CycloneDX',
@@ -73,7 +79,7 @@ fs.writeFileSync(
       metadata: {
         component: {
           type: 'application',
-          name: 'lan-party-game-finder-frontend',
+          name: componentName,
           version: '0.1.0'
         }
       },

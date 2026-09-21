@@ -129,23 +129,23 @@ def test_participant_games_groups_platforms_and_searches(db):
 
 def test_recent_acquisitions_prefer_store_dates_and_include_non_baseline_discoveries(db):
     now = datetime.utcnow()
-    lob = Participant(nickname="PlayerOne")
-    reactionman = Participant(nickname="PlayerTwo")
+    player_one = Participant(nickname="PlayerOne")
+    player_two = Participant(nickname="PlayerTwo")
     old_game = Game(title="Old Game", normalized_title="old game", multiplayer=True)
     new_game = Game(title="Fresh Game", normalized_title="fresh game", multiplayer=True)
     detected_game = Game(title="Newly Detected", normalized_title="newly detected", multiplayer=True)
     import_only = Game(title="Just Imported", normalized_title="just imported", multiplayer=True)
     tool = Game(title="Video Tool", normalized_title="video tool", is_game=False)
-    db.add_all([lob, reactionman, old_game, new_game, detected_game, import_only, tool])
+    db.add_all([player_one, player_two, old_game, new_game, detected_game, import_only, tool])
     db.flush()
-    steam = Account(participant_id=lob.id, platform=Platform.steam, account_id="steam", display_name="Steam")
-    gog = Account(participant_id=lob.id, platform=Platform.gog, account_id="gog", display_name="GOG")
+    steam = Account(participant_id=player_one.id, platform=Platform.steam, account_id="steam", display_name="Steam")
+    gog = Account(participant_id=player_one.id, platform=Platform.gog, account_id="gog", display_name="GOG")
     db.add_all([steam, gog])
     db.flush()
     db.add_all(
         [
             Ownership(
-                participant_id=lob.id,
+                participant_id=player_one.id,
                 account_id=steam.id,
                 game_id=old_game.id,
                 platform=Platform.steam,
@@ -154,7 +154,7 @@ def test_recent_acquisitions_prefer_store_dates_and_include_non_baseline_discove
                 last_seen=now,
             ),
             Ownership(
-                participant_id=lob.id,
+                participant_id=player_one.id,
                 account_id=gog.id,
                 game_id=old_game.id,
                 platform=Platform.gog,
@@ -163,7 +163,7 @@ def test_recent_acquisitions_prefer_store_dates_and_include_non_baseline_discove
                 last_seen=now,
             ),
             Ownership(
-                participant_id=reactionman.id,
+                participant_id=player_two.id,
                 game_id=new_game.id,
                 platform=Platform.steam,
                 owned_since=now - timedelta(days=2),
@@ -171,7 +171,7 @@ def test_recent_acquisitions_prefer_store_dates_and_include_non_baseline_discove
                 last_seen=now,
             ),
             Ownership(
-                participant_id=lob.id,
+                participant_id=player_one.id,
                 game_id=detected_game.id,
                 platform=Platform.steam,
                 first_seen_at=now - timedelta(days=1),
@@ -179,7 +179,7 @@ def test_recent_acquisitions_prefer_store_dates_and_include_non_baseline_discove
                 last_seen=now,
             ),
             Ownership(
-                participant_id=lob.id,
+                participant_id=player_one.id,
                 game_id=import_only.id,
                 platform=Platform.steam,
                 owned_since=now - timedelta(days=1),
@@ -189,7 +189,7 @@ def test_recent_acquisitions_prefer_store_dates_and_include_non_baseline_discove
                 last_seen=now,
             ),
             Ownership(
-                participant_id=lob.id,
+                participant_id=player_one.id,
                 game_id=tool.id,
                 platform=Platform.steam,
                 owned_since=now - timedelta(days=1),
