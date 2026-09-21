@@ -13,7 +13,9 @@ else
   PASSWORD_HASH="{PLAIN}$BASIC_AUTH_PASSWORD"
 fi
 printf "%s:%s\n" "$BASIC_AUTH_USER" "$PASSWORD_HASH" > /etc/nginx/auth/.htpasswd
-chmod 600 /etc/nginx/auth/.htpasswd
+chown root:nginx /etc/nginx/auth /etc/nginx/auth/.htpasswd
+chmod 750 /etc/nginx/auth
+chmod 640 /etc/nginx/auth/.htpasswd
 
 if [ ! -f /etc/nginx/certs/lan-party.crt ] || [ ! -f /etc/nginx/certs/lan-party.key ]; then
   openssl req \
