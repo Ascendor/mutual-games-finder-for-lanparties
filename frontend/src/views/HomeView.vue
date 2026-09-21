@@ -8,7 +8,7 @@
 
      <v-spacer class="flex-grow-1" />
      <div class="cards-wrapper w-100">
-    <v-row class="flex-grow-0">
+    <v-row class="flex-grow-1">
       <v-col cols="12" lg="4">
         <v-card variant="flat" class="action-card">
           <v-card-title><strong>Mitspieler:innen finden</strong></v-card-title>
