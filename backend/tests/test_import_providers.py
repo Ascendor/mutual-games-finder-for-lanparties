@@ -718,7 +718,13 @@ def test_gog_login_returns_provider_identity(monkeypatch, tmp_path):
 def test_provider_login_persists_resolved_identity(monkeypatch, db):
     from app.api import provider_auth as provider_auth_api
     from app.models import Participant
+    from app.services import provider_policy
 
+    monkeypatch.setattr(
+        provider_policy.settings,
+        "unofficial_provider_integrations_enabled",
+        True,
+    )
     participant = Participant(nickname="PlayerOne")
     db.add(participant)
     db.flush()
@@ -767,6 +773,8 @@ def test_provider_auth_stores_meta_access_token(monkeypatch, tmp_path):
     from app.services import provider_auth
 
     monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    monkeypatch.setattr(provider_auth.settings, "provider_auth_root", str(tmp_path))
+    monkeypatch.setattr(provider_auth.settings, "unofficial_provider_integrations_enabled", True)
     account = Account(id=31, participant_id=1, platform=Platform.meta, account_id="local-meta-1-1")
 
     result = provider_auth.complete(
@@ -937,6 +945,8 @@ def test_ubisoft_complete_stores_2fa_ticket(monkeypatch, tmp_path):
     from app.services import provider_auth
 
     monkeypatch.setattr(import_providers.settings, "provider_auth_root", str(tmp_path))
+    monkeypatch.setattr(provider_auth.settings, "provider_auth_root", str(tmp_path))
+    monkeypatch.setattr(provider_auth.settings, "unofficial_provider_integrations_enabled", True)
     monkeypatch.setattr(
         provider_auth.httpx,
         "post",
