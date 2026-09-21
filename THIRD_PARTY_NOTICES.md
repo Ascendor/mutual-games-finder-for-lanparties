@@ -75,10 +75,10 @@ Guard data only to Steam and returns only the verified SteamID to this app.
 
 - Project: https://github.com/legendary-gl/legendary
 - Package: `legendary-gl`
-- Version locked by this release: 0.20.34
+- Version locked by this release: 0.21.1
 - License: GNU General Public License v3 or later
 - Local license copy: `LICENSES/Legendary-GPL-3.0-or-later.txt`
-- Corresponding source: https://github.com/legendary-gl/legendary/tree/0.20.34
+- Corresponding source: https://github.com/legendary-gl/legendary/tree/0.21.1
 
 Legendary is installed unmodified in the backend image and invoked as a
 separate command-line process for Epic authentication and library access. It

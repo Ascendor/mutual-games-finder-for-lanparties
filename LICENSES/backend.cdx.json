@@ -13,8 +13,8 @@
     {
       "type": "library",
       "name": "alembic",
-      "version": "1.18.5",
-      "purl": "pkg:pypi/alembic@1.18.5",
+      "version": "1.20.0",
+      "purl": "pkg:pypi/alembic@1.20.0",
       "licenses": [
         {
           "license": {
@@ -104,8 +104,8 @@
     {
       "type": "library",
       "name": "fastapi",
-      "version": "0.138.2",
-      "purl": "pkg:pypi/fastapi@0.138.2",
+      "version": "0.141.1",
+      "purl": "pkg:pypi/fastapi@0.141.1",
       "licenses": [
         {
           "license": {
@@ -234,12 +234,12 @@
     {
       "type": "library",
       "name": "legendary-gl",
-      "version": "0.20.34",
-      "purl": "pkg:pypi/legendary-gl@0.20.34",
+      "version": "0.21.1",
+      "purl": "pkg:pypi/legendary-gl@0.21.1",
       "licenses": [
         {
           "license": {
-            "name": "GPL-3"
+            "name": "GPL-3.0-or-later"
           }
         }
       ]
@@ -299,8 +299,8 @@
     {
       "type": "library",
       "name": "psycopg",
-      "version": "3.3.4",
-      "purl": "pkg:pypi/psycopg@3.3.4",
+      "version": "3.3.6",
+      "purl": "pkg:pypi/psycopg@3.3.6",
       "licenses": [
         {
           "license": {
@@ -312,8 +312,8 @@
     {
       "type": "library",
       "name": "psycopg-binary",
-      "version": "3.3.4",
-      "purl": "pkg:pypi/psycopg-binary@3.3.4",
+      "version": "3.3.6",
+      "purl": "pkg:pypi/psycopg-binary@3.3.6",
       "licenses": [
         {
           "license": {
@@ -324,9 +324,22 @@
     },
     {
       "type": "library",
+      "name": "pycryptodomex",
+      "version": "3.23.0",
+      "purl": "pkg:pypi/pycryptodomex@3.23.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD, Public Domain"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "pydantic",
-      "version": "2.13.4",
-      "purl": "pkg:pypi/pydantic@2.13.4",
+      "version": "2.13.5",
+      "purl": "pkg:pypi/pydantic@2.13.5",
       "licenses": [
         {
           "license": {
@@ -338,8 +351,8 @@
     {
       "type": "library",
       "name": "pydantic-settings",
-      "version": "2.14.2",
-      "purl": "pkg:pypi/pydantic-settings@2.14.2",
+      "version": "2.15.0",
+      "purl": "pkg:pypi/pydantic-settings@2.15.0",
       "licenses": [
         {
           "license": {
@@ -351,8 +364,8 @@
     {
       "type": "library",
       "name": "pydantic_core",
-      "version": "2.46.4",
-      "purl": "pkg:pypi/pydantic_core@2.46.4",
+      "version": "2.46.5",
+      "purl": "pkg:pypi/pydantic_core@2.46.5",
       "licenses": [
         {
           "license": {
@@ -455,8 +468,8 @@
     {
       "type": "library",
       "name": "RapidFuzz",
-      "version": "3.14.5",
-      "purl": "pkg:pypi/rapidfuzz@3.14.5",
+      "version": "3.14.6",
+      "purl": "pkg:pypi/rapidfuzz@3.14.6",
       "licenses": [
         {
           "license": {
@@ -480,19 +493,6 @@
     },
     {
       "type": "library",
-      "name": "setuptools",
-      "version": "84.0.0",
-      "purl": "pkg:pypi/setuptools@84.0.0",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "six",
       "version": "1.17.0",
       "purl": "pkg:pypi/six@1.17.0",
@@ -507,8 +507,8 @@
     {
       "type": "library",
       "name": "SQLAlchemy",
-      "version": "2.0.51",
-      "purl": "pkg:pypi/sqlalchemy@2.0.51",
+      "version": "2.0.54",
+      "purl": "pkg:pypi/sqlalchemy@2.0.54",
       "licenses": [
         {
           "license": {
@@ -572,8 +572,8 @@
     {
       "type": "library",
       "name": "uvicorn",
-      "version": "0.49.0",
-      "purl": "pkg:pypi/uvicorn@0.49.0",
+      "version": "0.53.0",
+      "purl": "pkg:pypi/uvicorn@0.53.0",
       "licenses": [
         {
           "license": {
@@ -617,19 +617,6 @@
         {
           "license": {
             "name": "BSD-3-Clause"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "wheel",
-      "version": "0.47.0",
-      "purl": "pkg:pypi/wheel@0.47.0",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
           }
         }
       ]
