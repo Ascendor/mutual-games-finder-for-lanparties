@@ -100,7 +100,8 @@ must retain the GPL notice and access to the corresponding Legendary source.
 | nginx | Frontend and local gateway | BSD-2-Clause |
 | PostgreSQL | Database server | PostgreSQL License |
 
-Complete package/version/license inventories are stored in:
+Package/version/license inventories for the backend runtime, frontend and
+Steam helper are stored in:
 
 - `LICENSES/backend-dependencies.tsv`
 - `LICENSES/frontend-dependencies.tsv`
@@ -114,6 +115,13 @@ the `LICENSES` directory. The inventory generator scripts additionally collect
 the package-specific copyright, license, and notice files from an installed
 dependency tree. Container base images also contain operating-system packages
 under their respective licenses.
+
+Backend test dependencies are locked separately as the `test` group in
+`backend/uv.lock` and are not included in the production backend image or its
+runtime inventory. The build uses Astral's uv 0.11.0
+(https://github.com/astral-sh/uv/tree/0.11.0, MIT OR Apache-2.0).
+The uv executable is confined to build stages and is not copied into the
+production or test image.
 
 ## Metadata and Platform Terms
 

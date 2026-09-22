@@ -40,10 +40,21 @@ docker compose --env-file .env.production \
   -f compose.production.yml build
 
 docker compose --env-file .env.production \
-  -f compose.production.yml run --rm backend pytest
+  -f compose.production.yml run --build --rm backend-tests
 ```
 
 Bei einem Build- oder Testfehler nicht deployen.
+
+Die Tests laufen im eigenen Image gegen eine separate PostgreSQL-Testdatenbank
+im RAM. Das Produktionsimage enthaelt keine Tests und keine Testpakete.
+Deshalb den Dienst `backend-tests` verwenden. uv wird beim Docker-Build
+bereitgestellt; auf dem Server muss es nicht separat installiert werden.
+Nach den Tests nur die Testdatenbank entfernen:
+
+```bash
+docker compose --env-file .env.production \
+  -f compose.production.yml rm --stop --force test-database
+```
 
 ## 5. Deployment
 

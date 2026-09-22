@@ -35,6 +35,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      target: production
     depends_on:
       database:
         condition: service_healthy
@@ -115,6 +116,38 @@ services:
     volumes:
       - provider-auth:/provider-auth
 
+  backend-tests:
+    profiles: [testing]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: test
+    depends_on:
+      test-database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://test:test-only@test-database:5432/test
+      PROVIDER_AUTH_ROOT: /tmp/test-provider-auth
+    networks:
+      - test-internal
+
+  test-database:
+    profiles: [testing]
+    image: mirror.gcr.io/library/postgres:17-alpine
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d test"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      - test-internal
+
   frontend:
     build:
       context: .
@@ -133,6 +166,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+networks:
+  test-internal:
+    internal: true
 
 volumes:
   gateway-certs:

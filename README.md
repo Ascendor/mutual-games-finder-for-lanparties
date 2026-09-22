@@ -188,17 +188,21 @@ Die Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen d
 
 Das Frontend benoetigt ohne Docker Node.js 20.19 oder neuer.
 
-Backend:
+Backend (Python 3.12 und [uv](https://docs.astral.sh/uv/getting-started/installation/),
+im Docker-Build ist uv 0.11.0 festgeschrieben):
 
-```bash
+```bat
 cd backend
 set DATABASE_URL=postgresql+psycopg://lanparty:lanparty@localhost:5432/lanparty
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.lock
-alembic upgrade head
-uvicorn app.main:app --reload
+uv sync --locked --group test
+uv run --locked alembic upgrade head
+uv run --locked uvicorn app.main:app --reload
 ```
+
+Die Befehle oben verwenden die Windows-Eingabeaufforderung; unter Linux/macOS
+statt `set` den Befehl `export DATABASE_URL=...` verwenden. uv verwaltet `.venv`
+automatisch. `pyproject.toml` und `uv.lock` werden gemeinsam versioniert;
+`--locked` bricht bei einer nicht passenden Lockdatei ab.
 
 Frontend:
 
@@ -211,12 +215,26 @@ npm run dev
 ## Tests
 
 ```bash
-docker compose run --rm backend pytest
+docker compose run --build --rm backend-tests
 ```
 
-Die Tests legen pro Testfall ein eigenes temporaeres PostgreSQL-Schema an und
-entfernen es danach wieder. Ausserhalb von Docker muss `DATABASE_URL` oder
-`TEST_DATABASE_URL` auf eine erreichbare PostgreSQL-Datenbank zeigen.
+Einzelne Tests: `docker compose run --build --rm backend-tests pytest tests/test_api.py`.
+Der Testdienst nutzt das Docker-Buildziel `test` mit der Dependency-Group
+`test` und startet eine eigene PostgreSQL-Testdatenbank im RAM. Produktionsdaten
+und Provider-Tokens werden nicht eingebunden. Die Dienste gehoeren zum Profil
+`testing` und starten nicht bei einem normalen `docker compose up`.
+Nach den Tests kann die Testdatenbank gestoppt und entfernt werden:
+
+```bash
+docker compose rm --stop --force test-database
+```
+
+Das Backend-Produktionsimage enthaelt weder Testpakete noch Tests oder uv.
+Der fruehere Testaufruf ueber den Dienst `backend` funktioniert daher nicht mehr.
+Ausserhalb von Docker startet `uv run --locked --group test pytest` im Ordner
+`backend` die Tests; `DATABASE_URL` oder `TEST_DATABASE_URL` muss dann auf eine
+separate erreichbare PostgreSQL-Testdatenbank zeigen. Pro Testfall wird ein
+temporaeres Schema angelegt und anschliessend entfernt.
 Getestet werden Matching Engine, Normalisierung, Importer-Verhalten und
 API-Integration.
 

@@ -108,12 +108,20 @@ angezeigt. Sie muessen fuer die konkrete Installation ausgefuellt werden.
 cd /opt/mutual-games-finder
 docker compose --env-file .env.production -f compose.production.yml config --quiet
 docker compose --env-file .env.production -f compose.production.yml build
-docker compose --env-file .env.production -f compose.production.yml run --rm backend pytest
+docker compose --env-file .env.production -f compose.production.yml run --build --rm backend-tests
+docker compose --env-file .env.production -f compose.production.yml rm --stop --force test-database
 docker compose --env-file .env.production -f compose.production.yml up -d
 docker compose --env-file .env.production -f compose.production.yml ps
 ```
 
 Alembic aktualisiert die PostgreSQL-Datenbank automatisch beim Backend-Start.
+
+`backend-tests` baut ein eigenes Testimage und startet nur die separate
+PostgreSQL-Testdatenbank im RAM, ohne Produktionsvolumes oder Provider-Tokens.
+Der normale Backend-Dienst enthaelt keine Testpakete. Die Testdienste sind
+hinter dem Profil `testing` und werden beim regulaeren Start nicht gestartet.
+uv wird nur beim Image-Build verwendet; auf dem Host ist keine uv-Installation
+und keine neue Env-Variable erforderlich.
 
 Vor der Apache-Freigabe:
 
@@ -237,7 +245,8 @@ cd /opt/mutual-games-finder
 git fetch --tags
 git checkout <neuer-release-tag>
 docker compose --env-file .env.production -f compose.production.yml build
-docker compose --env-file .env.production -f compose.production.yml run --rm backend pytest
+docker compose --env-file .env.production -f compose.production.yml run --build --rm backend-tests
+docker compose --env-file .env.production -f compose.production.yml rm --stop --force test-database
 docker compose --env-file .env.production -f compose.production.yml up -d --remove-orphans
 docker compose --env-file .env.production -f compose.production.yml ps
 curl --fail http://127.0.0.1:18000/api/health

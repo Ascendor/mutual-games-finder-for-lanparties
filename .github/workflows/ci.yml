@@ -36,8 +36,27 @@ jobs:
         run: docker compose build backend frontend gateway steam-helper
 
       - name: Run backend tests
-        run: docker compose run --rm backend pytest
+        run: docker compose run --build --rm backend-tests
+
+      - name: Verify production image
+        run: |
+          docker compose run --rm --no-deps backend python -c "import importlib.util; from pathlib import Path; import app.main; assert importlib.util.find_spec('pytest') is None; assert importlib.util.find_spec('freezegun') is None; assert not Path('/app/tests').exists()"
+          docker compose up -d backend
+          docker compose exec -T backend python - <<'PY'
+          import time
+          import urllib.request
+
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen('http://localhost:8000/api/health', timeout=3) as response:
+                      print(response.read().decode())
+                  break
+              except OSError:
+                  if attempt == 29:
+                      raise
+                  time.sleep(1)
+          PY
 
       - name: Stop test stack
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose --profile testing down --volumes --remove-orphans

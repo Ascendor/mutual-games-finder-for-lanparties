@@ -17,11 +17,15 @@ scope and do not weaken its data-safety guarantees.
 
 ## Dependency updates
 
-Backend dependency PRs must update both `backend/pyproject.toml` and
-`backend/requirements.lock`. The Docker build checks the installed runtime and
-test dependencies against the manifest and runs `pip check`. See
-`docs/open-source-compliance.md` for the lockfile regeneration command. Refresh
-the affected license inventories and SBOMs whenever dependencies change.
+Backend dependency declarations live in `backend/pyproject.toml`; exact versions
+and artifact hashes are recorded in `backend/uv.lock`. Keep the lockfile in sync
+when changing the manifest. Transitive-only updates may change just the lockfile.
+Both Docker targets use `uv sync --locked` and reject a stale lockfile. Test
+packages belong in `[dependency-groups].test` and are only installed in the
+`test` target. Run `docker compose run --build --rm backend-tests`; it starts
+an isolated PostgreSQL test database without production credentials or volumes.
+See `docs/open-source-compliance.md` for dependency updates using the pinned uv
+tooling image. Refresh runtime license inventories and SBOMs after changes.
 
 Dependabot groups monthly frontend minor and patch updates. Frontend major
 versions are excluded from automatic version updates and require a separate

@@ -6,7 +6,7 @@ gedacht. Sie ersetzt keine Rechtsberatung.
 ## Vor jedem Release
 
 1. `LICENSE`, `THIRD_PARTY_NOTICES.md` und `LICENSES/` mit ausliefern.
-2. Backend ausschliesslich aus `backend/requirements.lock`, Frontend und
+2. Backend mit `uv sync --locked` aus `backend/uv.lock`, Frontend und
    Steam-Helfer jeweils mit `npm ci` bauen.
 3. Nach Abhaengigkeitsupdates die Inventare und gesammelten Lizenztexte
    erneuern:
@@ -30,6 +30,8 @@ gedacht. Sie ersetzt keine Rechtsberatung.
    ein ungeprueftes `npm audit fix --force` ist kein Release-Schritt.
    Nach der Generierung die Images erneut bauen, damit sie die aktualisierten
    Inventare enthalten: `docker compose build backend frontend gateway steam-helper`.
+   Das Backend-Inventar wird im Dienst `backend` erzeugt und umfasst nur
+   Laufzeitabhaengigkeiten, nicht die Pakete aus dem separaten Testimage.
 4. Pruefen, dass `/licenses` in Backend-, Frontend- und Gateway-Image vorhanden
    ist.
 5. Bei einer neuen Legendary-Version deren GPL-Lizenz, Versionsangabe und
@@ -40,32 +42,35 @@ gedacht. Sie ersetzt keine Rechtsberatung.
 
 ## Backend-Abhaengigkeiten aktualisieren
 
-`backend/pyproject.toml` beschreibt die gewuenschten direkten Abhaengigkeiten,
-`backend/requirements.lock` die beim Docker-Build installierten Versionen
-einschliesslich transitiver Abhaengigkeiten. Beide muessen zusammenpassen.
-Ein Dependabot-PR, der nur `pyproject.toml` aendert, ist noch nicht vollstaendig.
+`backend/pyproject.toml` beschreibt die direkten Abhaengigkeiten und die
+Dependency-Group `test`. `backend/uv.lock` enthaelt die aufgeloesten Versionen,
+Plattformbedingungen und Paket-Hashes. Der normale Backend-Dienst verwendet
+das Docker-Buildziel `production` ohne Tests; `backend-tests` das Ziel `test`.
+Beide installieren mit `--locked`, damit veraltete Lockdateien den Build
+abbrechen. Dependabot verwendet das Ecosystem `uv` und aktualisiert die
+Lockdatei mit. Das eigene Versionspruefskript ist damit nicht mehr erforderlich.
 
-Die Lockdatei im gleichen Python-/Linux-Umfeld wie das Backend regenerieren
-(Befehle im Repository-Hauptverzeichnis ausfuehren):
+Nach einer Aenderung der Versionsangaben die Lockdatei mit dem festgeschriebenen
+Buildwerkzeug regenerieren (Befehle im Repository-Hauptverzeichnis ausfuehren):
 
 ```bash
-docker run --rm -v "$PWD/backend:/work" -w /work \
-  mirror.gcr.io/library/python:3.12-slim sh -ec '
-    pip install pip-tools==7.6.1
-    pip-compile --extra dev --strip-extras --allow-unsafe \
-      --no-header --no-annotate --no-emit-index-url --no-emit-trusted-host \
-      --output-file requirements.lock pyproject.toml
-  '
+docker build --target tooling -f backend/Dockerfile -t mutual-games-finder-uv-tooling .
+docker run --rm -v "$PWD/backend:/app" mutual-games-finder-uv-tooling uv lock
 docker compose build backend
-docker compose run --rm backend pytest
+docker compose run --build --rm backend-tests
+docker compose rm --stop --force test-database
 ```
 
-Ohne `--upgrade` behaelt pip-compile bestehende transitive Versionen bei,
-soweit sie mit den neuen Anforderungen vereinbar sind. Der Backend-Build
-prueft die installierten Laufzeit- und Testabhaengigkeiten gegen
-`pyproject.toml` und fuehrt `pip check` aus. Bei einer veralteten Lockdatei
-bricht bereits der Build ab. Danach die Lizenzinventare wie oben erneuern
-und gemeinsam mit Manifest und Lockdatei committen.
+Ohne `--upgrade` behaelt uv bestehende Versionen bei, soweit sie kompatibel
+sind. Fuer ein gezieltes Update `uv lock --upgrade-package <paket>` verwenden.
+Exakt gepinnte direkte Abhaengigkeiten muessen dazu auch im Manifest angepasst
+werden, alternativ mit `uv add "<paket>==<version>"` beziehungsweise
+`uv add --group test "<paket>==<version>"` fuer Testpakete. Lokal sind dieselben
+Befehle mit installiertem uv im Ordner `backend` moeglich.
+
+Danach die Lizenzinventare wie oben erneuern und gemeinsam mit Manifest und
+Lockdatei committen. Die uv-Version selbst steht fest im Dockerfile; bei deren
+Update auch den Hinweis in `THIRD_PARTY_NOTICES.md` aktualisieren.
 
 ## Verteilung
 

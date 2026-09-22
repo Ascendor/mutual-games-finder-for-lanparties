@@ -129,19 +129,6 @@
     },
     {
       "type": "library",
-      "name": "freezegun",
-      "version": "1.5.5",
-      "purl": "pkg:pypi/freezegun@1.5.5",
-      "licenses": [
-        {
-          "license": {
-            "name": "Apache-2.0"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "greenlet",
       "version": "3.5.3",
       "purl": "pkg:pypi/greenlet@3.5.3",
@@ -220,19 +207,6 @@
     },
     {
       "type": "library",
-      "name": "iniconfig",
-      "version": "2.3.0",
-      "purl": "pkg:pypi/iniconfig@2.3.0",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "legendary-gl",
       "version": "0.21.1",
       "purl": "pkg:pypi/legendary-gl@0.21.1",
@@ -266,32 +240,6 @@
         {
           "license": {
             "name": "BSD-3-Clause"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "packaging",
-      "version": "26.2",
-      "purl": "pkg:pypi/packaging@26.2",
-      "licenses": [
-        {
-          "license": {
-            "name": "Apache-2.0 OR BSD-2-Clause"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "pluggy",
-      "version": "1.6.0",
-      "purl": "pkg:pypi/pluggy@1.6.0",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
           }
         }
       ]
@@ -370,45 +318,6 @@
         {
           "license": {
             "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "Pygments",
-      "version": "2.20.0",
-      "purl": "pkg:pypi/pygments@2.20.0",
-      "licenses": [
-        {
-          "license": {
-            "name": "BSD-2-Clause"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "pytest",
-      "version": "9.1.1",
-      "purl": "pkg:pypi/pytest@9.1.1",
-      "licenses": [
-        {
-          "license": {
-            "name": "MIT"
-          }
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "pytest-asyncio",
-      "version": "1.4.0",
-      "purl": "pkg:pypi/pytest-asyncio@1.4.0",
-      "licenses": [
-        {
-          "license": {
-            "name": "Apache-2.0"
           }
         }
       ]

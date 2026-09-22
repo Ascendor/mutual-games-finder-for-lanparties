@@ -75,7 +75,7 @@ def main() -> None:
         "Backend dependency license documents",
         "====================================",
         "",
-        "Generated from the exact Python environment used to build the backend.",
+        "Generated from the backend production environment (runtime dependencies only).",
         "",
     ]
     components = []
