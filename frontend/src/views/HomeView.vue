@@ -99,8 +99,8 @@
             <span class="text-body-1">Eingeloggt als <strong>{{ currentParticipant?.nickname }}</strong></span>
           </v-card-text>
           <v-card-actions class="settings-actions">
-            <v-btn to="/my-games" color="primary" variant="text" prepend-icon="mdi-format-list-bulleted">Meine Spiele</v-btn>
-            <v-btn to="/logins" color="primary" variant="text" prepend-icon="mdi-key-chain-variant">Meine Accounts</v-btn>
+            <v-btn to="/my-games" color="primary" variant="text">Meine Spiele</v-btn>
+            <v-btn to="/logins" color="primary" variant="text">Meine Accounts</v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
