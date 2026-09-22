@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderAvailability, ProviderLoginStart, RecentAcquisition, Recommendation, SteamConnection, SteamLoginStart, SteamLoginStatus, SteamOpenIdStart, SteamProfile, SyncRun } from './types'
+import type { Account, AnalyticsConfiguration, AnalyticsParticipantDetail, AnalyticsPeriod, AnalyticsSummary, AppConfig, Game, GameOption, GameOwner, GamePage, ManualOwnership, ManualOwnershipGameOption, Ownership, Participant, PersonalGamePage, Platform, PrivacyInfo, ProviderAuthStatus, ProviderAvailability, ProviderLoginStart, RecentAcquisition, Recommendation, SteamConnection, SteamLoginStart, SteamLoginStatus, SteamOpenIdStart, SteamProfile, SyncRun } from './types'
 
 const base = '/api'
 export const pendingRequests = ref(0)
@@ -24,6 +24,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  appConfig: () => request<AppConfig>('/config'),
   adminUnlock: (password: string) =>
     request<{ unlocked: boolean }>('/admin/unlock', {
       method: 'POST',

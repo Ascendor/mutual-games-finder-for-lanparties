@@ -4,6 +4,7 @@ set -eu
 : "${BASIC_AUTH_USER:=lanparty}"
 : "${BASIC_AUTH_PASSWORD:?BASIC_AUTH_PASSWORD must be configured}"
 : "${LAN_UPLOAD_LIMIT:=2g}"
+: "${APP_AUTH_REALM:=Mutual Games Finder}"
 
 mkdir -p /etc/nginx/auth /etc/nginx/certs
 
@@ -25,5 +26,5 @@ if [ ! -f /etc/nginx/certs/lan-party.crt ] || [ ! -f /etc/nginx/certs/lan-party.
     -days 3650 \
     -keyout /etc/nginx/certs/lan-party.key \
     -out /etc/nginx/certs/lan-party.crt \
-    -subj "/CN=lan-party-game-finder"
+    -subj "/CN=localhost"
 fi

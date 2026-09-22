@@ -2,6 +2,12 @@
 
 
 class Settings(BaseSettings):
+    app_display_name: str = "Mutual Games Finder"
+    app_title: str = "Mutual Games Finder - Der Spielefinder"
+    app_subtitle: str = "Der Spielefinder"
+    app_source_url: str = "https://github.com/Ascendor/mutual-games-finder-for-lanparties"
+    upstream_source_url: str = "https://github.com/Ascendor/mutual-games-finder-for-lanparties"
+    app_client_name: str = "Mutual Games Finder"
     database_url: str = "postgresql+psycopg://lanparty:lanparty@database:5432/lanparty"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     admin_password: str | None = None
@@ -89,6 +95,16 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def app_client_identifier(self) -> str:
+        identifier: list[str] = []
+        for character in self.app_client_name:
+            if character.isascii() and (character.isalnum() or character in "._"):
+                identifier.append(character)
+            elif identifier and identifier[-1] != "-":
+                identifier.append("-")
+        return "".join(identifier).strip("-") or "Mutual-Games-Finder"
 
 
 settings = Settings()

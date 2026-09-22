@@ -219,7 +219,7 @@ def enrich_steam_game_metadata(
             progress_callback(0, len(games), updated, failed)
         with httpx.Client(
             timeout=httpx.Timeout(20.0, connect=5.0),
-            headers={"User-Agent": "Mozilla/5.0 (LAN Party Game Finder)"},
+            headers={"User-Agent": f"Mozilla/5.0 ({settings.app_client_identifier})"},
         ) as client:
             with ThreadPoolExecutor(
                 max_workers=max(

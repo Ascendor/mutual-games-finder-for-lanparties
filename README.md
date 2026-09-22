@@ -1,4 +1,4 @@
-﻿# LAN Party Game Finder
+﻿# Mutual Games Finder
 
 Lokale Fullstack-Webanwendung zum Zusammenfuehren von Spielebibliotheken mehrerer LAN-Party-Teilnehmer und zum Finden gemeinsamer Koop-, LAN- und Multiplayer-Spiele.
 
@@ -45,6 +45,41 @@ Die PostgreSQL-Zugangsdaten stehen ebenfalls in `.env`. Bei einer bestehenden
 Datenbank darf `POSTGRES_PASSWORD` nicht nur in der Datei geaendert werden;
 die Rolle muss zuerst innerhalb von PostgreSQL auf dasselbe Passwort umgestellt
 werden.
+
+## Name und Titel anpassen
+
+Die sichtbare Bezeichnung einer Installation kann ohne Aenderungen am Quellcode
+und ohne neuen Frontend-Build in `.env` beziehungsweise `.env.production`
+angepasst werden. Ohne eigene Konfiguration lautet der Seitentitel
+`Mutual Games Finder - Der Spielefinder`.
+
+```env
+APP_DISPLAY_NAME=Mutual Games Finder
+APP_TITLE=Mutual Games Finder - Der Spielefinder
+APP_SUBTITLE=Der Spielefinder
+APP_SOURCE_URL=https://github.com/Ascendor/mutual-games-finder-for-lanparties
+UPSTREAM_SOURCE_URL=https://github.com/Ascendor/mutual-games-finder-for-lanparties
+APP_CLIENT_NAME=Mutual Games Finder
+APP_AUTH_REALM=Mutual Games Finder
+```
+
+`APP_DISPLAY_NAME`, `APP_TITLE` und `APP_SUBTITLE` steuern die Texte im
+Frontend. `APP_SOURCE_URL` verweist auf den Quelltext dieser Installation;
+bei einem Fork kann `UPSTREAM_SOURCE_URL` zusaetzlich auf das Ursprungsprojekt
+zeigen. `APP_CLIENT_NAME` ist die technische Bezeichnung gegenueber
+angebundenen Diensten. `APP_AUTH_REALM` benennt den Anmeldedialog des lokalen
+Docker-Gateways. In Produktion kommt dieser Dialog vom Apache-VHost; dessen
+`AuthName` muss daher auf denselben Text gesetzt werden.
+
+Technische Namen wie Compose-Projekt, Docker-Volumes und Serverpfade bleiben
+absichtlich stabil. Eine reine Umbenennung der Anzeige veraendert keine Daten
+und erfordert keine Migration.
+
+Nach einer Aenderung der Env-Datei muessen die betroffenen Container neu
+erstellt, aber nicht neu gebaut werden. Lokal betrifft das `backend`,
+`steam-helper` und `gateway`; in der Produktionskonfiguration `backend` und
+`steam-helper`. Ein geaenderter produktiver Apache-`AuthName` wird mit einem
+Apache-Reload wirksam.
 
 ## Direkte Provider
 

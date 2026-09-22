@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from threading import Thread
 
-from app.api import accounts, admin, analytics, games, imports, ownerships, participants, privacy, provider_auth, recommendations, sync
+from app.api import accounts, admin, analytics, app_config, games, imports, ownerships, participants, privacy, provider_auth, recommendations, sync
 from app.api.imports import remove_stale_uploads
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -13,7 +13,7 @@ from app.services.recommendation_cache import warm_dashboard_recommendations
 from app.services.analytics_service import purge_expired_usage_events
 from app.services.steam_metadata_service import close_interrupted_steam_metadata_runs
 
-app = FastAPI(title="LAN Party Game Finder", version="2.0.0")
+app = FastAPI(title=settings.app_display_name, version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +34,7 @@ app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
 app.include_router(analytics.router, prefix="/api/app-log", tags=["app-log"])
 app.include_router(privacy.router, prefix="/api/privacy", tags=["privacy"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(app_config.router, prefix="/api/config", tags=["configuration"])
 
 
 @app.on_event("startup")

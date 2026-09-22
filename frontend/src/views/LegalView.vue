@@ -296,11 +296,19 @@
         <a href="/legal/LICENSE" target="_blank">MIT-Lizenz</a>
         <a href="/legal/THIRD_PARTY_NOTICES.md" target="_blank">Drittanbieterhinweise</a>
         <a
-          href="https://github.com/Ascendor/mutual-games-finder-for-lanparties"
+          :href="branding.source_url"
           target="_blank"
           rel="noopener noreferrer"
         >
           Repository
+        </a>
+        <a
+          v-if="branding.upstream_source_url !== branding.source_url"
+          :href="branding.upstream_source_url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Upstream-Projekt
         </a>
       </div>
     </section>
@@ -316,6 +324,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
+import { branding } from '../branding'
 import { currentParticipantId } from '../playerIdentity'
 import type { PrivacyInfo } from '../types'
 

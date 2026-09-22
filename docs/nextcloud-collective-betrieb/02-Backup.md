@@ -18,10 +18,10 @@ Das Backup ist online moeglich; die Anwendung muss dafuer nicht gestoppt
 werden.
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 STAMP=$(date +%F-%H%M%S)
-BACKUP_DIR="/var/backups/refjuplay-together/$STAMP"
+BACKUP_DIR="/var/backups/mutual-games-finder/$STAMP"
 
 sudo install -d -o root -g root -m 0700 "$BACKUP_DIR"
 
@@ -31,8 +31,15 @@ docker compose --env-file .env.production \
   gzip |
   sudo tee "$BACKUP_DIR/postgres.sql.gz" >/dev/null
 
+PROVIDER_AUTH_VOLUME="$(
+  docker inspect \
+    "$(docker compose --env-file .env.production -f compose.production.yml ps -q backend)" \
+    --format '{{range .Mounts}}{{if eq .Destination "/provider-auth"}}{{.Name}}{{end}}{{end}}'
+)"
+test -n "$PROVIDER_AUTH_VOLUME"
+
 sudo docker run --rm \
-  -v refjuplay-together_provider-auth:/source:ro \
+  -v "$PROVIDER_AUTH_VOLUME:/source:ro" \
   -v "$BACKUP_DIR:/backup" \
   mirror.gcr.io/library/alpine:3.21 \
   tar -C /source -czf /backup/provider-auth.tar.gz .
@@ -63,7 +70,7 @@ sudo ls -lh "$BACKUP_DIR"
 ## Backup pruefen
 
 ```bash
-BACKUP_DIR=/var/backups/refjuplay-together/<zeitstempel>
+BACKUP_DIR=/var/backups/mutual-games-finder/<zeitstempel>
 
 sudo sh -c "cd '$BACKUP_DIR' && sha256sum -c SHA256SUMS"
 sudo gzip -t "$BACKUP_DIR/postgres.sql.gz"
@@ -85,7 +92,7 @@ Vor einer Loeschung zuerst nur anzeigen, welche Verzeichnisse aelter als
 14 Tage sind:
 
 ```bash
-sudo find /var/backups/refjuplay-together \
+sudo find /var/backups/mutual-games-finder \
   -mindepth 1 -maxdepth 1 -type d -mtime +14 -print
 ```
 

@@ -24,6 +24,7 @@ services:
       BASIC_AUTH_USER: ${BASIC_AUTH_USER:-lanparty}
       BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:?Run scripts/generate_env_secrets.py to configure BASIC_AUTH_PASSWORD}
       LAN_UPLOAD_LIMIT: ${LAN_UPLOAD_LIMIT:-2g}
+      APP_AUTH_REALM: ${APP_AUTH_REALM:-Mutual Games Finder}
     ports:
       - "8080:80"
       - "8443:443"
@@ -40,6 +41,12 @@ services:
       steam-helper:
         condition: service_healthy
     environment:
+      APP_DISPLAY_NAME: ${APP_DISPLAY_NAME:-Mutual Games Finder}
+      APP_TITLE: ${APP_TITLE:-Mutual Games Finder - Der Spielefinder}
+      APP_SUBTITLE: ${APP_SUBTITLE:-Der Spielefinder}
+      APP_SOURCE_URL: ${APP_SOURCE_URL:-https://github.com/Ascendor/mutual-games-finder-for-lanparties}
+      UPSTREAM_SOURCE_URL: ${UPSTREAM_SOURCE_URL:-https://github.com/Ascendor/mutual-games-finder-for-lanparties}
+      APP_CLIENT_NAME: ${APP_CLIENT_NAME:-Mutual Games Finder}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lanparty}:${POSTGRES_PASSWORD:?Run scripts/generate_env_secrets.py to configure POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-lanparty}
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,https://localhost:8443,https://127.0.0.1:8443
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Run scripts/generate_env_secrets.py to configure ADMIN_PASSWORD}
@@ -119,6 +126,8 @@ services:
     build:
       context: .
       dockerfile: steam-helper/Dockerfile
+    environment:
+      APP_CLIENT_NAME: ${APP_CLIENT_NAME:-Mutual Games Finder}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/health"]
       interval: 5s

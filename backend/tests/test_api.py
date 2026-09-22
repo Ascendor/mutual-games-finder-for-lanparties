@@ -10,6 +10,31 @@ from app.api.imports import UPLOAD_CHUNK_SIZE
 from app.core.config import settings
 
 
+def test_public_app_config_uses_configured_branding(client, monkeypatch):
+    monkeypatch.setattr(settings, "app_display_name", "LAN Runde")
+    monkeypatch.setattr(settings, "app_title", "LAN Runde - Spiele finden")
+    monkeypatch.setattr(settings, "app_subtitle", "Gemeinsam spielen")
+    monkeypatch.setattr(settings, "app_source_url", "https://example.test/source")
+    monkeypatch.setattr(settings, "upstream_source_url", "https://example.test/upstream")
+
+    response = client.get("/api/config")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "display_name": "LAN Runde",
+        "title": "LAN Runde - Spiele finden",
+        "subtitle": "Gemeinsam spielen",
+        "source_url": "https://example.test/source",
+        "upstream_source_url": "https://example.test/upstream",
+    }
+
+
+def test_app_client_identifier_is_ascii_safe(monkeypatch):
+    monkeypatch.setattr(settings, "app_client_name", "Unsere Spiele Über & Co.")
+
+    assert settings.app_client_identifier == "Unsere-Spiele-ber-Co."
+
+
 def test_participant_api_roundtrip(client):
     response = client.post("/api/participants", json={"nickname": "Mira", "present": True})
     assert response.status_code == 201

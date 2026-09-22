@@ -139,7 +139,7 @@ def ea_request_headers(access_token: str) -> dict[str, str]:
         "Accept": "application/json",
         "Origin": "https://www.ea.com",
         "Referer": "https://www.ea.com/",
-        "User-Agent": "Mozilla/5.0 LANPartyGameFinder/1.0",
+        "User-Agent": f"Mozilla/5.0 {settings.app_client_identifier}/1.0",
         "X-Request-Source": "SPA",
     }
 
@@ -191,7 +191,7 @@ def _cookie_headers(credentials: dict[str, Any]) -> dict[str, str]:
     cookie = re.sub(r"\^(?=[&|<>()^$!])", "", cookie)
     return {
         "Cookie": cookie,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LANPartyGameFinder/1.0",
+        "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) {settings.app_client_identifier}/1.0",
         "Accept": "application/json, text/plain, */*",
     }
 
@@ -793,7 +793,7 @@ class SteamProvider:
                     response = client.get(
                         "https://store.steampowered.com/api/appdetails",
                         params={"appids": str(appid), "filters": "basic,categories,genres,release_date"},
-                        headers={"User-Agent": "Mozilla/5.0 (LAN Party Game Finder)"},
+                        headers={"User-Agent": f"Mozilla/5.0 ({settings.app_client_identifier})"},
                     )
                     response.raise_for_status()
                     payload = response.json()
@@ -962,7 +962,7 @@ class GOGProvider:
             raise RuntimeError("GOG auth cache is missing an access token")
         headers = {
             "Authorization": f"Bearer {token}",
-            "User-Agent": "gogdl/0 (LAN Party Game Finder)",
+            "User-Agent": f"gogdl/0 ({settings.app_client_identifier})",
             "Accept-Language": "en-US",
         }
         with httpx.Client(headers=headers, timeout=30) as client:
@@ -1122,7 +1122,7 @@ class UbisoftProvider:
         headers = {
             "Authorization": f"Ubi_v1 t={ticket}",
             "Ubi-AppId": str(credentials.get("appId") or UBISOFT_APP_ID),
-            "User-Agent": "UbisoftConnect/1.0 LANPartyGameFinder",
+            "User-Agent": f"UbisoftConnect/1.0 {settings.app_client_identifier}",
         }
         if credentials.get("sessionId"):
             headers["Ubi-SessionId"] = str(credentials["sessionId"])

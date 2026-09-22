@@ -2,7 +2,7 @@
   <v-app>
     <v-navigation-drawer v-if="route.path !== '/player'" permanent width="260">
       <v-list v-model:opened="openedGroups" nav density="compact">
-        <v-list-item title="LAN Party Game Finder" subtitle="Game library matcher" />
+        <v-list-item :title="branding.display_name" :subtitle="branding.subtitle" />
         <v-divider class="my-2" />
         <v-list-item
           to="/player"
@@ -50,7 +50,7 @@
         <a href="https://rawg.io/" target="_blank" rel="noopener noreferrer">RAWG</a>
         <span aria-hidden="true">·</span>
         <a
-          href="https://github.com/Ascendor/mutual-games-finder-for-lanparties"
+          :href="branding.source_url"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -66,6 +66,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminUnlocked, lockAdmin } from './adminAccess'
 import { pendingRequests } from './api'
+import { branding } from './branding'
 import { currentParticipantId, currentParticipantName } from './playerIdentity'
 import { useLanStore } from './store'
 

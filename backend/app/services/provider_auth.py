@@ -351,7 +351,7 @@ def _ubisoft_session_request(email: str, password: str, payload: dict[str, Any])
     base_headers = {
         "Authorization": f"Basic {basic}",
         "Ubi-AppId": app_id,
-        "User-Agent": "UbisoftConnect/1.0 LANPartyGameFinder",
+        "User-Agent": f"UbisoftConnect/1.0 {settings.app_client_identifier}",
     }
     if two_factor_code:
         headers = dict(base_headers)
@@ -369,7 +369,7 @@ def _ubisoft_session_request(email: str, password: str, payload: dict[str, Any])
                 "Ubi-AppId": app_id,
                 "Ubi-2FACode": str(two_factor_code),
                 "Ubi-2FARememberDevice": "true",
-                "User-Agent": "UbisoftConnect/1.0 LANPartyGameFinder",
+                "User-Agent": f"UbisoftConnect/1.0 {settings.app_client_identifier}",
             }
             attempts.append(headers)
     else:

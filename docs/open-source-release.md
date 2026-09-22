@@ -10,8 +10,8 @@ The safest publication path is a new repository containing only the reviewed
 tree and no previous commits:
 
 ```bash
-git archive --format=tar HEAD | tar -xf - -C ../refjuplay-public
-cd ../refjuplay-public
+git archive --format=tar HEAD | tar -xf - -C ../mutual-games-finder-public
+cd ../mutual-games-finder-public
 git init
 git add .
 git commit --signoff -m "Initial open-source release"

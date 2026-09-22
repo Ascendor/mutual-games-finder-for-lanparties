@@ -15,14 +15,14 @@ Deshalb muss neben `pg_isready` auch die Abschlussmeldung des Entry-Points
 abgewartet werden.
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 bash <<'SCRIPT'
 set -Eeuo pipefail
 trap 'echo "Restore-Test fehlgeschlagen (Zeile $LINENO)" >&2' ERR
 
-BACKUP_DIR=/var/backups/refjuplay-together/<zeitstempel>
-CONTAINER="refjuplay-restore-test-$(date +%s)"
+BACKUP_DIR=/var/backups/mutual-games-finder/<zeitstempel>
+CONTAINER="mutual-games-finder-restore-test-$(date +%s)"
 
 cleanup() {
   sudo docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
@@ -90,7 +90,7 @@ plausible Zaehler liefern, ist der Datenbankdump wiederherstellbar.
 ### 1. Sicherungsset pruefen
 
 ```bash
-BACKUP_DIR=/var/backups/refjuplay-together/<zeitstempel>
+BACKUP_DIR=/var/backups/mutual-games-finder/<zeitstempel>
 sudo sh -c "cd '$BACKUP_DIR' && sha256sum -c SHA256SUMS"
 sudo cat "$BACKUP_DIR/release-tag.txt"
 ```
@@ -98,7 +98,7 @@ sudo cat "$BACKUP_DIR/release-tag.txt"
 ### 2. Schreibzugriffe stoppen
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 docker compose --env-file .env.production \
   -f compose.production.yml stop backend
@@ -123,8 +123,15 @@ sudo gzip -dc "$BACKUP_DIR/postgres.sql.gz" |
 Dieser Schritt ersetzt das komplette Provider-Auth-Volume:
 
 ```bash
+PROVIDER_AUTH_VOLUME="$(
+  docker inspect \
+    "$(docker compose --env-file .env.production -f compose.production.yml ps --all -q backend)" \
+    --format '{{range .Mounts}}{{if eq .Destination "/provider-auth"}}{{.Name}}{{end}}{{end}}'
+)"
+test -n "$PROVIDER_AUTH_VOLUME"
+
 sudo docker run --rm \
-  -v refjuplay-together_provider-auth:/target \
+  -v "$PROVIDER_AUTH_VOLUME:/target" \
   -v "$BACKUP_DIR:/backup:ro" \
   mirror.gcr.io/library/alpine:3.21 \
   sh -c 'find /target -mindepth 1 -maxdepth 1 \

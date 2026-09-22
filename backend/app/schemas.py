@@ -8,6 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.models import Platform
 
 
+class AppConfigRead(BaseModel):
+    display_name: str
+    title: str
+    subtitle: str
+    source_url: str
+    upstream_source_url: str
+
+
 class ParticipantBase(BaseModel):
     nickname: str
     real_name: str | None = None

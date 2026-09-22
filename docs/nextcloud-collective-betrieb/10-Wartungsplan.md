@@ -16,7 +16,7 @@
 - Auffaellige Apache- und Backendfehler ueberfliegen.
 
 ```bash
-sudo ls -lht /var/backups/refjuplay-together | head
+sudo ls -lht /var/backups/mutual-games-finder | head
 df -h / /var/lib/docker /var/backups 2>/dev/null
 ```
 
@@ -29,7 +29,7 @@ df -h / /var/lib/docker /var/backups 2>/dev/null
 - Zertifikatslaufzeit kontrollieren.
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 set -a
 source .env.production
 set +a

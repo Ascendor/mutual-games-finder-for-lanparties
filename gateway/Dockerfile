@@ -5,8 +5,8 @@ LABEL org.opencontainers.image.licenses="MIT"
 
 COPY gateway/nginx.conf /etc/nginx/conf.d/default.conf
 RUN mkdir -p /etc/nginx/templates && mv /etc/nginx/conf.d/default.conf /etc/nginx/templates/default.conf.template
-COPY gateway/docker-entrypoint.sh /docker-entrypoint.d/40-lan-party-auth-and-tls.sh
-RUN chmod +x /docker-entrypoint.d/40-lan-party-auth-and-tls.sh
+COPY gateway/docker-entrypoint.sh /docker-entrypoint.d/10-lan-party-auth-and-tls.sh
+RUN chmod +x /docker-entrypoint.d/10-lan-party-auth-and-tls.sh
 COPY LICENSE THIRD_PARTY_NOTICES.md /licenses/
 COPY LICENSES /licenses/
 

@@ -1,7 +1,7 @@
 <template>
   <div class="page home-page home-page-container d-flex flex-column pa-4">
     <div class="mb-6 title-section">
-      <h1 class="text-h3">ref'ju:geeks play together - Der Spielefinder</h1>
+      <h1 class="text-h3">{{ branding.title }}</h1>
     </div>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
@@ -161,6 +161,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
+import { branding } from '../branding'
 import { clearParticipant, currentParticipantId } from '../playerIdentity'
 import { platformTitle } from '../platforms'
 import { useLanStore } from '../store'

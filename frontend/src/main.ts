@@ -9,6 +9,7 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
 import App from './App.vue'
+import { loadBranding } from './branding'
 import { router } from './router'
 
 const vuetify = createVuetify({
@@ -37,4 +38,9 @@ const vuetify = createVuetify({
   }
 })
 
-createApp(App).use(createPinia()).use(router).use(vuetify).mount('#app')
+async function bootstrap() {
+  await loadBranding()
+  createApp(App).use(createPinia()).use(router).use(vuetify).mount('#app')
+}
+
+void bootstrap()

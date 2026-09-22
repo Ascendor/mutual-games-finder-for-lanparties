@@ -1,5 +1,3 @@
-name: refjuplay-together
-
 x-logging: &default-logging
   driver: json-file
   options:
@@ -36,6 +34,12 @@ services:
       steam-helper:
         condition: service_healthy
     environment:
+      APP_DISPLAY_NAME: ${APP_DISPLAY_NAME:-Mutual Games Finder}
+      APP_TITLE: ${APP_TITLE:-Mutual Games Finder - Der Spielefinder}
+      APP_SUBTITLE: ${APP_SUBTITLE:-Der Spielefinder}
+      APP_SOURCE_URL: ${APP_SOURCE_URL:-https://github.com/Ascendor/mutual-games-finder-for-lanparties}
+      UPSTREAM_SOURCE_URL: ${UPSTREAM_SOURCE_URL:-https://github.com/Ascendor/mutual-games-finder-for-lanparties}
+      APP_CLIENT_NAME: ${APP_CLIENT_NAME:-Mutual Games Finder}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be configured}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be configured}@database:5432/${POSTGRES_DB:?POSTGRES_DB must be configured}
       CORS_ORIGINS: https://${APP_HOST:?APP_HOST must be configured}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be configured}
@@ -151,6 +155,8 @@ services:
     build:
       context: .
       dockerfile: steam-helper/Dockerfile
+    environment:
+      APP_CLIENT_NAME: ${APP_CLIENT_NAME:-Mutual Games Finder}
     restart: unless-stopped
     networks:
       - application

@@ -2,7 +2,7 @@
   <div class="player-gate">
     <v-card variant="flat" class="player-card">
       <v-card-text class="pa-6 pa-sm-8">
-        <div class="text-overline text-primary mb-2">ref'ju:geeks play together</div>
+        <div class="text-overline text-primary mb-2">{{ branding.display_name }}</div>
         <h1 class="text-h4 mb-2">Wer bist du?</h1>
         <p class="text-body-1 text-medium-emphasis mb-6">
           Wähle deinen Nickname oder gib einen neuen ein.
@@ -56,6 +56,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
+import { branding } from '../branding'
 import { currentParticipantId, selectParticipant } from '../playerIdentity'
 import { useLanStore } from '../store'
 

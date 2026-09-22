@@ -8,7 +8,7 @@ Produktiv werden nur getestete Release-Tags ausgerollt. Nicht direkt auf
 ## 1. Neue Version vorbereiten
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 git status --short
 git fetch --tags

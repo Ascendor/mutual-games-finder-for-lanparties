@@ -9,7 +9,7 @@
 Geeignet bei einem einmaligen Prozessproblem:
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 docker compose --env-file .env.production \
   -f compose.production.yml restart backend
@@ -49,7 +49,7 @@ sudo reboot
 SSH wird getrennt. Nach dem erneuten Login:
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 systemctl is-active docker apache2 postfix mumble-server
 

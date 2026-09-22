@@ -7,6 +7,7 @@ import { EAuthTokenPlatformType, LoginSession } from 'steam-session'
 const port = Number(process.env.PORT || 3000)
 const loginTimeoutMs = Number(process.env.STEAM_LOGIN_TIMEOUT_MS || 180000)
 const resultRetentionMs = Number(process.env.STEAM_RESULT_RETENTION_MS || 600000)
+const appClientName = String(process.env.APP_CLIENT_NAME || 'Mutual Games Finder').trim() || 'Mutual Games Finder'
 const sessions = new Map()
 
 function sendJson(response, statusCode, payload) {
@@ -113,7 +114,7 @@ function collectLibrary(refreshToken, steamID) {
     user.logOn({
       refreshToken,
       steamID: String(steamID),
-      machineName: 'LAN Party Game Finder'
+      machineName: appClientName
     })
   })
 }

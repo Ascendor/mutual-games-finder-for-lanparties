@@ -1,4 +1,4 @@
-# ref'ju:geeks play together - Betrieb
+# Mutual Games Finder - Betrieb
 
 Diese Seiten beschreiben den Betrieb der produktiven Installation auf dem
 Debian-VServer.
@@ -30,15 +30,21 @@ Zuletzt praktisch geprueft:
 - [Stoerungs- und Notfallcheckliste](09-Notfallcheckliste.md)
 - [Regelmaessiger Wartungsplan](10-Wartungsplan.md)
 
-## Feste Pfade
+## Standardpfade
+
+Die folgenden Pfade gelten fuer Neuinstallationen. Eine bestehende Installation
+muss nicht umbenannt werden; dort weiterhin das tatsaechlich vorhandene
+Repository-, Backup- und Apache-Verzeichnis verwenden. Der Docker-Projektname
+wird aus dem Repository-Verzeichnis abgeleitet, damit bestehende Volumes
+erhalten bleiben.
 
 ```text
-Repository:       /opt/refjuplay-together
-Produktions-Env:  /opt/refjuplay-together/.env.production
-Compose-Datei:    /opt/refjuplay-together/compose.production.yml
-Backups:          /var/backups/refjuplay-together
-Apache-VHost:     /etc/apache2/sites-available/refjuplay-together.conf
-Basic-Auth-Datei: /etc/apache2/auth/refjuplay-together.htpasswd
+Repository:       /opt/mutual-games-finder
+Produktions-Env:  /opt/mutual-games-finder/.env.production
+Compose-Datei:    /opt/mutual-games-finder/compose.production.yml
+Backups:          /var/backups/mutual-games-finder
+Apache-VHost:     /etc/apache2/sites-available/mutual-games-finder.conf
+Basic-Auth-Datei: /etc/apache2/auth/mutual-games-finder.htpasswd
 ```
 
 ## Grundregeln
@@ -57,14 +63,14 @@ Basic-Auth-Datei: /etc/apache2/auth/refjuplay-together.htpasswd
 Alle Produktionsbefehle werden aus dem Repository ausgefuehrt:
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 docker compose --env-file .env.production -f compose.production.yml ps
 ```
 
 ## Schnellster Funktionstest
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 docker compose --env-file .env.production \
   -f compose.production.yml ps

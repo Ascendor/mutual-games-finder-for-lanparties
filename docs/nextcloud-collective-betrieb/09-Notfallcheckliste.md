@@ -26,7 +26,7 @@ und geprueft ist.
 ## 3. Diagnosekette
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 docker compose --env-file .env.production \
   -f compose.production.yml ps

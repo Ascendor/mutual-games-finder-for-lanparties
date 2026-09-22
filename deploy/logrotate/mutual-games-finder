@@ -1,4 +1,4 @@
-/var/log/apache2/refjuplay-together-access.log /var/log/apache2/refjuplay-together-error.log {
+/var/log/apache2/mutual-games-finder-access.log /var/log/apache2/mutual-games-finder-error.log {
     daily
     rotate 7
     maxage 7

@@ -22,7 +22,7 @@ Im Zweifel den vollstaendigen Restore verwenden.
 ## Reiner Anwendungsrollback
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 git fetch --tags
 git checkout <vorheriger-release-tag>

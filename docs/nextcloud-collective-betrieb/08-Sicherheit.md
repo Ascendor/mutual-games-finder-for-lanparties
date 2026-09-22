@@ -14,13 +14,13 @@ Diese Inhalte niemals in Git, Tickets, Chat oder Screenshots posten.
 ## Dateirechte pruefen
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 stat -c '%a %U:%G %n' .env.production
 sudo stat -c '%a %U:%G %n' \
-  /etc/apache2/auth/refjuplay-together.htpasswd
+  /etc/apache2/auth/mutual-games-finder.htpasswd
 sudo stat -c '%a %U:%G %n' \
-  /var/backups/refjuplay-together
+  /var/backups/mutual-games-finder
 ```
 
 Erwartet:
@@ -33,7 +33,7 @@ Erwartet:
 
 ```bash
 sudo htpasswd \
-  /etc/apache2/auth/refjuplay-together.htpasswd \
+  /etc/apache2/auth/mutual-games-finder.htpasswd \
   lanparty
 
 sudo apachectl configtest
@@ -43,7 +43,7 @@ sudo systemctl reload apache2
 ## In-App-Adminpasswort aendern
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 joe .env.production
 
 docker compose --env-file .env.production \
@@ -69,7 +69,7 @@ Administrationsseiten; Apache Basic Auth bleibt davon unabhaengig.
 5. Provider- oder Metadatenzugriff testen.
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 joe .env.production
 
 docker compose --env-file .env.production \
@@ -94,7 +94,7 @@ Die installationsbezogenen Angaben in `.env.production` muessen aktuell
 gehalten werden:
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 joe .env.production
 ```
 
@@ -105,11 +105,11 @@ Aufbewahrungsfristen. Nach einer Aenderung das Backend neu erzeugen.
 Die mitgelieferte Logrotation begrenzt die App-spezifischen Apache-Protokolle:
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 sudo install -o root -g root -m 0644 \
-  deploy/logrotate/refjuplay-together \
-  /etc/logrotate.d/refjuplay-together
-sudo logrotate --debug /etc/logrotate.d/refjuplay-together
+  deploy/logrotate/mutual-games-finder \
+  /etc/logrotate.d/mutual-games-finder
+sudo logrotate --debug /etc/logrotate.d/mutual-games-finder
 ```
 
 Der Apache-VHost verwendet ein minimales Access-Log ohne Client-IP,
@@ -119,5 +119,5 @@ Verbindungsdetails enthalten und werden deshalb ebenfalls rotiert.
 ## Externe Backups
 
 Lokale Backups schuetzen nicht vor Serververlust. Das Verzeichnis
-`/var/backups/refjuplay-together` muss verschluesselt in das bestehende
+`/var/backups/mutual-games-finder` muss verschluesselt in das bestehende
 Offsite-Backup aufgenommen werden.

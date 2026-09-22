@@ -1,12 +1,12 @@
 <VirtualHost *:80>
-    ServerName refjuplay-together.example.org
+    ServerName mutual-games-finder.example.org
 
     RewriteEngine On
     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L,NE]
 </VirtualHost>
 
 <VirtualHost *:443>
-    ServerName refjuplay-together.example.org
+    ServerName mutual-games-finder.example.org
 
     SSLEngine On
     SSLCertificateFile /path/to/wildcard/fullchain.pem
@@ -22,9 +22,9 @@
 
     <Location "/">
         AuthType Basic
-        AuthName "ref'ju:geeks play together"
+        AuthName "Mutual Games Finder"
         AuthBasicProvider file
-        AuthUserFile /etc/apache2/auth/refjuplay-together.htpasswd
+        AuthUserFile /etc/apache2/auth/mutual-games-finder.htpasswd
         Require valid-user
     </Location>
 
@@ -45,7 +45,7 @@
 
     # Deliberately omit client IP, query string, referrer and user agent from
     # routine access logs. Error logs can still contain connection details.
-    LogFormat "%t \"%m %U %H\" %>s %B" refjuplay_minimal
-    ErrorLog ${APACHE_LOG_DIR}/refjuplay-together-error.log
-    CustomLog ${APACHE_LOG_DIR}/refjuplay-together-access.log refjuplay_minimal
+    LogFormat "%t \"%m %U %H\" %>s %B" mutual-games-finder_minimal
+    ErrorLog ${APACHE_LOG_DIR}/mutual-games-finder-error.log
+    CustomLog ${APACHE_LOG_DIR}/mutual-games-finder-access.log mutual-games-finder_minimal
 </VirtualHost>

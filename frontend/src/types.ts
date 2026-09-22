@@ -1,5 +1,13 @@
 export type Platform = string
 
+export interface AppConfig {
+  display_name: string
+  title: string
+  subtitle: string
+  source_url: string
+  upstream_source_url: string
+}
+
 export interface Participant {
   id: number
   nickname: string

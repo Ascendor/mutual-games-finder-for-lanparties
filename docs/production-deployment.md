@@ -5,12 +5,18 @@ Collectives liegen unter
 [`docs/nextcloud-collective-betrieb/`](nextcloud-collective-betrieb/Readme.md).
 
 Diese Anleitung beschreibt die spaetere manuelle Installation unter
-`https://refjuplay-together.<deine-domain>`. Apache bleibt der einzige
+`https://mutual-games-finder.<deine-domain>`. Apache bleibt der einzige
 oeffentliche Webserver. Die Docker-Container lauschen ausschliesslich auf
 Loopback-Adressen; PostgreSQL besitzt keinen Host-Port.
 
 Das vorhandene `docker-compose.yml` bleibt fuer den lokalen Betrieb bestimmt.
 Auf dem VServer wird ausschliesslich `compose.production.yml` verwendet.
+
+Die Beispiele verwenden neutrale Standardpfade fuer Neuinstallationen.
+Bestehende Installationen muessen nicht verschoben oder umbenannt werden:
+Befehle werden dort einfach aus dem bereits vorhandenen Repository-Verzeichnis
+ausgefuehrt. Docker Compose leitet den Projektnamen aus diesem Verzeichnis ab,
+sodass bestehende Volumes unveraendert weiterverwendet werden.
 
 ## 1. Voraussetzungen pruefen
 
@@ -32,9 +38,9 @@ auf Disk gepuffert und nicht mehr vollstaendig in den Arbeitsspeicher geladen.
 ## 2. Repository installieren
 
 ```bash
-sudo install -d -o "$USER" -g "$USER" /opt/refjuplay-together
-git clone https://github.com/Ascendor/mutual-games-finder-for-lanparties.git /opt/refjuplay-together
-cd /opt/refjuplay-together
+sudo install -d -o "$USER" -g "$USER" /opt/mutual-games-finder
+git clone https://github.com/Ascendor/mutual-games-finder-for-lanparties.git /opt/mutual-games-finder
+cd /opt/mutual-games-finder
 git fetch --tags
 git checkout <release-tag>
 ```
@@ -45,7 +51,7 @@ beweglichen Branches verwendet werden.
 ## 3. Produktionsvariablen anlegen
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 python3 scripts/generate_env_secrets.py \
   --template .env.production.example \
   --output .env.production
@@ -58,7 +64,13 @@ Den ausgegebenen Zufallswert als `POSTGRES_PASSWORD` eintragen und mindestens
 folgende Werte anpassen:
 
 ```env
-APP_HOST=refjuplay-together.example.org
+APP_HOST=mutual-games-finder.example.org
+APP_DISPLAY_NAME=Mutual Games Finder
+APP_TITLE=Mutual Games Finder - Der Spielefinder
+APP_SUBTITLE=Der Spielefinder
+APP_SOURCE_URL=https://github.com/Ascendor/mutual-games-finder-for-lanparties
+UPSTREAM_SOURCE_URL=https://github.com/Ascendor/mutual-games-finder-for-lanparties
+APP_CLIENT_NAME=Mutual Games Finder
 ADMIN_PASSWORD=<bereits zufaellig erzeugter Wert>
 UNOFFICIAL_PROVIDER_INTEGRATIONS_ENABLED=false
 POSTGRES_DB=lanparty
@@ -93,7 +105,7 @@ angezeigt. Sie muessen fuer die konkrete Installation ausgefuellt werden.
 ## 4. Produktionskonfiguration pruefen und starten
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 docker compose --env-file .env.production -f compose.production.yml config --quiet
 docker compose --env-file .env.production -f compose.production.yml build
 docker compose --env-file .env.production -f compose.production.yml run --rm backend pytest
@@ -117,29 +129,32 @@ Erforderliche Module:
 ```bash
 sudo a2enmod proxy proxy_http ssl headers rewrite auth_basic authn_file
 sudo install -d -o root -g www-data -m 0750 /etc/apache2/auth
-sudo htpasswd -c /etc/apache2/auth/refjuplay-together.htpasswd lanparty
-sudo chown root:www-data /etc/apache2/auth/refjuplay-together.htpasswd
-sudo chmod 0640 /etc/apache2/auth/refjuplay-together.htpasswd
+sudo htpasswd -c /etc/apache2/auth/mutual-games-finder.htpasswd lanparty
+sudo chown root:www-data /etc/apache2/auth/mutual-games-finder.htpasswd
+sudo chmod 0640 /etc/apache2/auth/mutual-games-finder.htpasswd
 ```
 
 Die Vorlage installieren:
 
 ```bash
-sudo cp deploy/apache/refjuplay-together.conf.example \
-  /etc/apache2/sites-available/refjuplay-together.conf
-sudo joe /etc/apache2/sites-available/refjuplay-together.conf
+sudo cp deploy/apache/mutual-games-finder.conf.example \
+  /etc/apache2/sites-available/mutual-games-finder.conf
+sudo joe /etc/apache2/sites-available/mutual-games-finder.conf
 sudo install -o root -g root -m 0644 \
-  deploy/logrotate/refjuplay-together \
-  /etc/logrotate.d/refjuplay-together
+  deploy/logrotate/mutual-games-finder \
+  /etc/logrotate.d/mutual-games-finder
 ```
 
 In der Kopie muessen der echte `ServerName` sowie die bereits vorhandenen
 Wildcard-Pfade fuer `SSLCertificateFile` und `SSLCertificateKeyFile`
-eingetragen werden. Zertifikate werden nicht in das Repository oder in Docker
-kopiert.
+eingetragen werden. `AuthName` ist die sichtbare Bezeichnung im
+Basic-Auth-Dialog und sollte zum konfigurierten `APP_DISPLAY_NAME` passen.
+`APP_AUTH_REALM` aus der Env-Datei wirkt nur auf das lokale Docker-Gateway,
+nicht auf den Apache des Hosts. Zertifikate werden nicht in das Repository
+oder in Docker kopiert.
 
 ```bash
-sudo a2ensite refjuplay-together.conf
+sudo a2ensite mutual-games-finder.conf
 sudo apachectl configtest
 sudo systemctl reload apache2
 ```
@@ -157,8 +172,8 @@ PostgreSQL darf keinen Host-Port besitzen.
 
 ```bash
 sudo ss -ltnp | grep -E ':(80|443|18000|18080|5432)\b'
-curl --head https://refjuplay-together.example.org/
-curl --user lanparty https://refjuplay-together.example.org/api/health
+curl --head https://mutual-games-finder.example.org/
+curl --user lanparty https://mutual-games-finder.example.org/api/health
 ```
 
 Der erste Request muss ohne Zugangsdaten `401 Unauthorized` liefern, der
@@ -180,15 +195,23 @@ Provider-Auth-Archiv sollte verschluesselt und nur fuer Administratoren lesbar
 sein.
 
 ```bash
-sudo install -d -o root -g root -m 0700 /var/backups/refjuplay-together
-cd /opt/refjuplay-together
+sudo install -d -o root -g root -m 0700 /var/backups/mutual-games-finder
+cd /opt/mutual-games-finder
 docker compose --env-file .env.production -f compose.production.yml exec -T database \
   sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' |
   gzip |
-  sudo tee /var/backups/refjuplay-together/postgres-$(date +%F-%H%M).sql.gz >/dev/null
+  sudo tee /var/backups/mutual-games-finder/postgres-$(date +%F-%H%M).sql.gz >/dev/null
+
+PROVIDER_AUTH_VOLUME="$(
+  docker inspect \
+    "$(docker compose --env-file .env.production -f compose.production.yml ps -q backend)" \
+    --format '{{range .Mounts}}{{if eq .Destination "/provider-auth"}}{{.Name}}{{end}}{{end}}'
+)"
+test -n "$PROVIDER_AUTH_VOLUME"
+
 sudo docker run --rm \
-  -v refjuplay-together_provider-auth:/source:ro \
-  -v /var/backups/refjuplay-together:/backup \
+  -v "$PROVIDER_AUTH_VOLUME:/source:ro" \
+  -v /var/backups/mutual-games-finder:/backup \
   mirror.gcr.io/library/alpine:3.21 \
   tar -C /source -czf /backup/provider-auth-$(date +%F-%H%M).tar.gz .
 ```
@@ -200,7 +223,7 @@ verschluesselt auf ein anderes System kopiert werden. Empfohlen sind mindestens
 PostgreSQL-Restore in eine leere Datenbank:
 
 ```bash
-gunzip -c /var/backups/refjuplay-together/<backup>.sql.gz |
+gunzip -c /var/backups/mutual-games-finder/<backup>.sql.gz |
   docker compose --env-file .env.production -f compose.production.yml exec -T database \
   sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
 ```
@@ -210,7 +233,7 @@ gunzip -c /var/backups/refjuplay-together/<backup>.sql.gz |
 Vor jedem Update zuerst ein Backup erstellen.
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 git fetch --tags
 git checkout <neuer-release-tag>
 docker compose --env-file .env.production -f compose.production.yml build
@@ -234,7 +257,7 @@ hat, muss zusaetzlich das unmittelbar vor dem Update erstellte PostgreSQL-
 Backup wiederhergestellt werden.
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 git checkout <vorheriger-release-tag>
 docker compose --env-file .env.production -f compose.production.yml build
 docker compose --env-file .env.production -f compose.production.yml up -d --remove-orphans

@@ -8,14 +8,14 @@ Docker startet die Container mit `restart: unless-stopped`.
 ## Aktuellen Release anzeigen
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 git describe --tags --exact-match
 ```
 
 ## Containerstatus
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 docker compose --env-file .env.production \
   -f compose.production.yml ps
@@ -40,7 +40,7 @@ curl --noproxy "*" --fail --head \
 ## Externer Healthcheck
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 set -a
 source .env.production
 set +a
@@ -70,7 +70,7 @@ groessten erwarteten Uploads frei sein.
 ## Letzte Logs
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 docker compose --env-file .env.production \
   -f compose.production.yml logs --tail=200

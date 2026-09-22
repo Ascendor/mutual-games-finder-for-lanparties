@@ -5,7 +5,7 @@
 ## Statusuebersicht
 
 ```bash
-cd /opt/refjuplay-together
+cd /opt/mutual-games-finder
 
 docker compose --env-file .env.production \
   -f compose.production.yml ps
@@ -41,10 +41,10 @@ Mit `Ctrl+C` wird nur die Loganzeige beendet, nicht der Container.
 
 ```bash
 sudo tail -n 200 \
-  /var/log/apache2/refjuplay-together-error.log
+  /var/log/apache2/mutual-games-finder-error.log
 
 sudo tail -n 100 \
-  /var/log/apache2/refjuplay-together-access.log
+  /var/log/apache2/mutual-games-finder-access.log
 ```
 
 ## Datenbankgroesse
@@ -84,7 +84,9 @@ Wenn es nur bei aktiver UFW haengt:
 ```bash
 sudo ufw status verbose
 sudo iptables -L ufw-before-input -n --line-numbers
-docker network inspect refjuplay-together_application
+docker inspect \
+  "$(docker compose --env-file .env.production -f compose.production.yml ps -q backend)" \
+  --format '{{json .NetworkSettings.Networks}}'
 ```
 
 Auf diesem Server hatte eine vorgeschaltete FireHOL-Drop-Regel Docker-
