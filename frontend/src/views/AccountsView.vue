@@ -2,7 +2,7 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-4">
       <div>
-        <h1 class="text-h4">Accounts</h1>
+        <h1 class="text-headline-large">Accounts</h1>
         <p class="text-medium-emphasis">Teilnehmer einmalig mit Steam, Epic oder GOG verbinden und danach synchronisieren.</p>
       </div>
       <v-btn to="/admin/sync" color="primary" variant="tonal" prepend-icon="mdi-sync">Zur Synchronisation</v-btn>
@@ -46,7 +46,7 @@
         <v-card v-if="activeLogin" variant="flat" class="mt-4">
           <v-card-title>Login abschliessen</v-card-title>
           <v-card-text>
-            <p class="text-body-2 text-medium-emphasis mb-3">{{ activeLogin.message }}</p>
+            <p class="text-body-medium text-medium-emphasis mb-3">{{ activeLogin.message }}</p>
             <v-btn :href="activeLogin.login_url" target="_blank" color="primary" prepend-icon="mdi-open-in-new" class="mb-3">Login öffnen</v-btn>
             <v-text-field v-model="loginCode" :label="activeLogin.code_label" density="compact" hide-details="auto" class="mb-3" />
             <v-btn color="secondary" prepend-icon="mdi-check" :disabled="!loginCode.trim()" :loading="busy === 'complete-login'" @click="completeLogin">

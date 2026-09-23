@@ -6,7 +6,7 @@ Die Anwendung ist fuer ein vertrautes LAN gedacht. Innerhalb der Anwendung gibt 
 
 ## Stack
 
-- Backend: Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL
+- Backend: Python 3.14, FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL
 - Frontend: Vue 3, TypeScript, Pinia, Vue Router, Vuetify
 - Deployment: Docker Compose
 
@@ -186,13 +186,15 @@ Die Browser-Sitzungsanbindungen sind inoffiziell und koennen durch Aenderungen d
 
 ## Entwicklung ohne Docker
 
-Das Frontend benoetigt ohne Docker Node.js 20.19 oder neuer.
+Frontend und Steam-Helfer verwenden Node.js 24.21.0 LTS.
 
-Backend (Python 3.12 und [uv](https://docs.astral.sh/uv/getting-started/installation/),
-im Docker-Build ist uv 0.11.0 festgeschrieben):
+Backend ([uv](https://docs.astral.sh/uv/getting-started/installation/) installieren;
+im Docker-Build ist uv 0.12.18 festgeschrieben). Python 3.14.7 wird durch uv aus
+`backend/.python-version` installiert, auch beim Docker-Build:
 
 ```bat
 cd backend
+uv python install
 set DATABASE_URL=postgresql+psycopg://lanparty:lanparty@localhost:5432/lanparty
 uv sync --locked --group test
 uv run --locked alembic upgrade head
@@ -208,7 +210,7 @@ Frontend:
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -237,6 +239,22 @@ separate erreichbare PostgreSQL-Testdatenbank zeigen. Pro Testfall wird ein
 temporaeres Schema angelegt und anschliessend entfernt.
 Getestet werden Matching Engine, Normalisierung, Importer-Verhalten und
 API-Integration.
+
+Die Browser-Regressionstests pruefen Anmeldung, Spiel- und Mitspielerauswahl
+sowie das Layout in Chromium, Firefox und einer mobilen Chromium-Ansicht.
+Sie verwenden ausschliesslich synthetische API-Antworten, keine echten Accounts:
+
+```bash
+cd frontend
+npm ci
+npm run build
+npx playwright install chromium firefox
+npm run test:e2e
+```
+
+Unter Linux bei Bedarf `npx playwright install --with-deps chromium firefox`
+verwenden. Die Kompatibilitaetsentscheidungen des aktuellen Upgrades stehen in
+[`docs/dependency-upgrade-2026-09.md`](docs/dependency-upgrade-2026-09.md).
 
 ## Produktion auf Debian
 

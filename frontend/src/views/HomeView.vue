@@ -1,7 +1,7 @@
 <template>
   <div class="page home-page home-page-container d-flex flex-column pa-4">
     <div class="mb-6 title-section">
-      <h1 class="text-h3">{{ branding.title }}</h1>
+      <h1 class="text-display-medium">{{ branding.title }}</h1>
     </div>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
@@ -13,7 +13,7 @@
         <v-card variant="flat" class="action-card">
           <v-card-title><strong>Mitspieler:innen finden</strong></v-card-title>
           <v-card-text class="action-content">
-            <div class="inline-action text-body-1">
+            <div class="inline-action text-body-large">
               <span>Ich will</span>
               <v-autocomplete
                 v-model="gameName"
@@ -42,7 +42,7 @@
         <v-card variant="flat" class="action-card">
           <v-card-title><strong>Gemeinsames Spiel finden</strong></v-card-title>
           <v-card-text class="action-content">
-            <div class="inline-action text-body-1">
+            <div class="inline-action text-body-large">
               <span>Ich will mit</span>
               <v-autocomplete
                 v-model="selectedPlayers"
@@ -56,7 +56,7 @@
                 density="comfortable"
                 hide-details="auto"
               >
-                <template #item="{ props: itemProps, item }">
+                <template #item="{ props: itemProps, internalItem: item }">
                   <v-list-item
                     v-bind="itemProps"
                     :title="participantOptionLabel(item.raw)"
@@ -96,7 +96,7 @@
             </v-btn>
           </v-card-title>
           <v-card-text class="action-content text-center">
-            <span class="text-body-1">Eingeloggt als <strong>{{ currentParticipant?.nickname }}</strong></span>
+            <span class="text-body-large">Eingeloggt als <strong>{{ currentParticipant?.nickname }}</strong></span>
           </v-card-text>
           <v-card-actions class="settings-actions">
             <v-btn to="/my-games" color="primary" variant="text">Meine Spiele</v-btn>
@@ -111,8 +111,8 @@
       <section class="recent-acquisitions mt-auto">
         <div class="recent-acquisitions__header">
           <div>
-            <h2 class="text-subtitle-1 mb-1">Neu in euren Bibliotheken</h2>
-            <p class="text-caption text-medium-emphasis mb-0">
+            <h2 class="text-body-large mb-1">Neu in euren Bibliotheken</h2>
+            <p class="text-body-small text-medium-emphasis mb-0">
               Echte Erwerbsdaten, sofern der Store sie liefert; sonst der Zeitpunkt der ersten späteren Erkennung.
             </p>
           </div>
@@ -294,6 +294,12 @@ function formatDate(value: string) {
   min-height: 260px;
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
+}
+
+.action-card :deep(.v-card-title) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .action-card :deep(.v-card-text) {
@@ -363,7 +369,20 @@ function formatDate(value: string) {
   gap: 4px;
 }
 
+@container (max-width: 400px) {
+  .inline-action {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+}
+
 @media (max-width: 620px) {
+  .title-section h1 {
+    font-size: 32px !important;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
   .inline-action {
     grid-template-columns: 1fr;
   }

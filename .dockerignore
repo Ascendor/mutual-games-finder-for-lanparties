@@ -8,6 +8,8 @@
 **/.pytest_cache
 **/.venv
 **/node_modules
+**/playwright-report
+**/test-results
 **/dist
 *.db
 *.sqlite

@@ -2,7 +2,7 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-h4">{{ adminMode ? 'Accounts & Logins aller Teilnehmer:innen' : 'Meine Accounts & Logins' }}</h1>
+        <h1 class="text-headline-large">{{ adminMode ? 'Accounts & Logins aller Teilnehmer:innen' : 'Meine Accounts & Logins' }}</h1>
         <p class="text-medium-emphasis">
           {{ adminMode ? 'Spielekonten aller Teilnehmer verbinden und aktualisieren.' : 'Verbinde deine Spielekonten und aktualisiere deine Bibliotheken.' }}
         </p>
@@ -83,7 +83,7 @@
                   :color="playniteProgress[group.participant.id].phase === 'failed' ? 'error' : 'primary'"
                   height="8"
                 />
-                <div class="text-caption text-medium-emphasis mt-1">
+                <div class="text-body-small text-medium-emphasis mt-1">
                   {{ playniteProgress[group.participant.id].message }}
                 </div>
               </div>
@@ -115,7 +115,7 @@
                   :color="galaxyProgress[group.participant.id].phase === 'failed' ? 'error' : 'primary'"
                   height="8"
                 />
-                <div class="text-caption text-medium-emphasis mt-1">
+                <div class="text-body-small text-medium-emphasis mt-1">
                   {{ galaxyProgress[group.participant.id].message }}
                 </div>
               </div>
@@ -136,10 +136,10 @@
                     {{ statusLabel(slot) }}
                   </v-chip>
                 </div>
-                <div class="text-caption text-medium-emphasis mt-1">
+                <div class="text-body-small text-medium-emphasis mt-1">
                   {{ providerDetail(slot) }}
                 </div>
-                <div v-if="slot.account?.last_error" class="text-caption text-error mt-1">
+                <div v-if="slot.account?.last_error" class="text-body-small text-error mt-1">
                   {{ readableError(slot.account.last_error) }}
                 </div>
               </div>

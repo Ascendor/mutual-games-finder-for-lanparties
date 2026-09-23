@@ -1,6 +1,10 @@
 ﻿<template>
   <v-app>
-    <v-navigation-drawer v-if="route.path !== '/player'" permanent width="260">
+    <v-app-bar v-if="route.path !== '/player' && mobile" density="compact">
+      <v-app-bar-nav-icon :icon="mdiMenu" aria-label="Navigation öffnen" @click="drawer = !drawer" />
+      <v-app-bar-title>{{ branding.display_name }}</v-app-bar-title>
+    </v-app-bar>
+    <v-navigation-drawer v-if="route.path !== '/player'" v-model="drawer" :permanent="!mobile" :temporary="mobile" width="260">
       <v-list v-model:opened="openedGroups" nav density="compact">
         <v-list-item :title="branding.display_name" :subtitle="branding.subtitle" />
         <v-divider class="my-2" />
@@ -35,7 +39,7 @@
         indeterminate
         color="primary"
         class="global-loader"
-        :class="{ 'global-loader--full': route.path === '/player' }"
+        :class="{ 'global-loader--full': route.path === '/player' || mobile }"
         aria-label="Daten werden geladen"
       />
       <div class="app-content">
@@ -63,6 +67,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { mdiMenu } from '@mdi/js'
+import { useDisplay } from 'vuetify'
 import { useRoute, useRouter } from 'vue-router'
 import { adminUnlocked, lockAdmin } from './adminAccess'
 import { pendingRequests } from './api'
@@ -73,6 +79,9 @@ import { useLanStore } from './store'
 const route = useRoute()
 const router = useRouter()
 const store = useLanStore()
+const { mobile } = useDisplay()
+const drawer = ref(!mobile.value)
+watch(mobile, (isMobile) => { drawer.value = !isMobile })
 const openedGroups = ref<string[]>([])
 const currentParticipant = computed(() =>
   store.participants.find((participant) => participant.id === currentParticipantId.value)

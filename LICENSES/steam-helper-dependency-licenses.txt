@@ -375,7 +375,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
-@types/node 26.6.1: LICENSE
+@types/node 26.6.2: LICENSE
 ------------------------------------------------------------------------------
     MIT License
 
@@ -1556,7 +1556,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-protobufjs 7.6.5: LICENSE
+protobufjs 7.6.6: LICENSE
 ------------------------------------------------------------------------------
 This license applies to all parts of protobuf.js except those files
 either explicitly including or referencing a different license or

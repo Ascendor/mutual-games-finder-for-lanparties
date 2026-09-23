@@ -2,7 +2,7 @@
   <div class="page personal-games-page">
     <div class="d-flex align-center justify-space-between ga-3 flex-wrap mb-4">
       <div>
-        <h1 class="text-h4">Meine Spiele</h1>
+        <h1 class="text-headline-large">Meine Spiele</h1>
         <p class="text-medium-emphasis mb-0">
           {{ total }} Spiele für {{ participantName }}.
         </p>
@@ -24,8 +24,8 @@
     <v-card v-if="currentParticipant" variant="flat" class="library-actions-card mb-4">
       <v-card-text class="library-actions">
         <div>
-          <div class="text-subtitle-1 font-weight-bold">Bibliothek pflegen</div>
-          <p class="text-body-2 text-medium-emphasis mb-0">
+          <div class="text-body-large font-weight-bold">Bibliothek pflegen</div>
+          <p class="text-body-medium text-medium-emphasis mb-0">
             Verbinde oder aktualisiere zuerst deine Spielekonten. Das ist der bevorzugte Weg, damit Plattformen,
             Spielzeiten und spätere Synchronisationen sauber bleiben.
           </p>
@@ -133,7 +133,7 @@
     >
       <template #item.title="{ item }">
         <strong>{{ item.game.title }}</strong>
-        <div class="text-caption text-medium-emphasis">
+        <div class="text-body-small text-medium-emphasis">
           {{ gameMeta(item.game) }}
         </div>
       </template>

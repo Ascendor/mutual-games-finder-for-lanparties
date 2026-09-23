@@ -99,6 +99,8 @@ must retain the GPL notice and access to the corresponding Legendary source.
 | Material Design Icons (`@mdi/js`) | Icons | Apache-2.0 |
 | nginx | Frontend and local gateway | BSD-2-Clause |
 | PostgreSQL | Database server | PostgreSQL License |
+| CPython | Backend language runtime, installed by uv | PSF-2.0 and bundled notices |
+| Node.js | Steam helper runtime and frontend build | MIT and bundled notices |
 
 Package/version/license inventories for the backend runtime, frontend and
 Steam helper are stored in:
@@ -118,10 +120,12 @@ under their respective licenses.
 
 Backend test dependencies are locked separately as the `test` group in
 `backend/uv.lock` and are not included in the production backend image or its
-runtime inventory. The build uses Astral's uv 0.11.0
-(https://github.com/astral-sh/uv/tree/0.11.0, MIT OR Apache-2.0).
+runtime inventory. The build uses Astral's uv 0.12.18
+(https://github.com/astral-sh/uv/tree/0.12.18, MIT OR Apache-2.0).
 The uv executable is confined to build stages and is not copied into the
 production or test image.
+The uv-managed CPython 3.14.7 runtime is copied with its standard-library
+`LICENSE.txt` and bundled component notices under `/opt/python`.
 
 ## Metadata and Platform Terms
 

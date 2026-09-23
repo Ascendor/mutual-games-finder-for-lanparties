@@ -15,15 +15,15 @@
     >
     <template #item.title="{ item }">
       <strong>{{ item.title }}</strong>
-      <div class="text-caption text-medium-emphasis">{{ item.players }}</div>
+      <div class="text-body-small text-medium-emphasis">{{ item.players }}</div>
     </template>
     <template #item.owner_count="{ item }">{{ item.owner_display }}</template>
     <template #item.availability_rank="{ item }">
       <strong>{{ item.availability_display }}</strong>
-      <div v-if="item.library_display" class="text-caption text-medium-emphasis">
+      <div v-if="item.library_display" class="text-body-small text-medium-emphasis">
         {{ item.library_display }}
       </div>
-      <div v-if="item.unknown_display" class="text-caption text-medium-emphasis">
+      <div v-if="item.unknown_display" class="text-body-small text-medium-emphasis">
         {{ item.unknown_display }}
       </div>
     </template>

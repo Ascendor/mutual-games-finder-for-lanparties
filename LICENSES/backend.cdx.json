@@ -26,8 +26,8 @@
     {
       "type": "library",
       "name": "annotated-doc",
-      "version": "0.0.4",
-      "purl": "pkg:pypi/annotated-doc@0.0.4",
+      "version": "0.0.5",
+      "purl": "pkg:pypi/annotated-doc@0.0.5",
       "licenses": [
         {
           "license": {
@@ -39,12 +39,12 @@
     {
       "type": "library",
       "name": "annotated-types",
-      "version": "0.7.0",
-      "purl": "pkg:pypi/annotated-types@0.7.0",
+      "version": "0.8.0",
+      "purl": "pkg:pypi/annotated-types@0.8.0",
       "licenses": [
         {
           "license": {
-            "name": "OSI Approved :: MIT License"
+            "name": "MIT"
           }
         }
       ]
@@ -65,8 +65,8 @@
     {
       "type": "library",
       "name": "certifi",
-      "version": "2026.6.17",
-      "purl": "pkg:pypi/certifi@2026.6.17",
+      "version": "2026.7.22",
+      "purl": "pkg:pypi/certifi@2026.7.22",
       "licenses": [
         {
           "license": {
@@ -78,8 +78,8 @@
     {
       "type": "library",
       "name": "charset-normalizer",
-      "version": "3.4.7",
-      "purl": "pkg:pypi/charset-normalizer@3.4.7",
+      "version": "3.5.1",
+      "purl": "pkg:pypi/charset-normalizer@3.5.1",
       "licenses": [
         {
           "license": {
@@ -91,8 +91,8 @@
     {
       "type": "library",
       "name": "click",
-      "version": "8.4.2",
-      "purl": "pkg:pypi/click@8.4.2",
+      "version": "8.5.0",
+      "purl": "pkg:pypi/click@8.5.0",
       "licenses": [
         {
           "license": {
@@ -117,8 +117,8 @@
     {
       "type": "library",
       "name": "filelock",
-      "version": "3.29.4",
-      "purl": "pkg:pypi/filelock@3.29.4",
+      "version": "4.0.1",
+      "purl": "pkg:pypi/filelock@4.0.1",
       "licenses": [
         {
           "license": {
@@ -130,8 +130,8 @@
     {
       "type": "library",
       "name": "greenlet",
-      "version": "3.5.3",
-      "purl": "pkg:pypi/greenlet@3.5.3",
+      "version": "3.5.6",
+      "purl": "pkg:pypi/greenlet@3.5.6",
       "licenses": [
         {
           "license": {
@@ -195,8 +195,8 @@
     {
       "type": "library",
       "name": "idna",
-      "version": "3.18",
-      "purl": "pkg:pypi/idna@3.18",
+      "version": "3.20",
+      "purl": "pkg:pypi/idna@3.20",
       "licenses": [
         {
           "license": {
@@ -221,8 +221,8 @@
     {
       "type": "library",
       "name": "Mako",
-      "version": "1.3.12",
-      "purl": "pkg:pypi/mako@1.3.12",
+      "version": "1.4.3",
+      "purl": "pkg:pypi/mako@1.4.3",
       "licenses": [
         {
           "license": {
@@ -338,8 +338,8 @@
     {
       "type": "library",
       "name": "python-dotenv",
-      "version": "1.2.2",
-      "purl": "pkg:pypi/python-dotenv@1.2.2",
+      "version": "1.2.3",
+      "purl": "pkg:pypi/python-dotenv@1.2.3",
       "licenses": [
         {
           "license": {
@@ -429,8 +429,8 @@
     {
       "type": "library",
       "name": "starlette",
-      "version": "1.3.1",
-      "purl": "pkg:pypi/starlette@1.3.1",
+      "version": "1.6.0",
+      "purl": "pkg:pypi/starlette@1.6.0",
       "licenses": [
         {
           "license": {
@@ -442,8 +442,8 @@
     {
       "type": "library",
       "name": "typing-inspection",
-      "version": "0.4.2",
-      "purl": "pkg:pypi/typing-inspection@0.4.2",
+      "version": "0.4.4",
+      "purl": "pkg:pypi/typing-inspection@0.4.4",
       "licenses": [
         {
           "license": {
@@ -468,8 +468,8 @@
     {
       "type": "library",
       "name": "urllib3",
-      "version": "2.7.0",
-      "purl": "pkg:pypi/urllib3@2.7.0",
+      "version": "2.8.0",
+      "purl": "pkg:pypi/urllib3@2.8.0",
       "licenses": [
         {
           "license": {
@@ -507,8 +507,8 @@
     {
       "type": "library",
       "name": "watchfiles",
-      "version": "1.2.0",
-      "purl": "pkg:pypi/watchfiles@1.2.0",
+      "version": "1.3.0",
+      "purl": "pkg:pypi/watchfiles@1.3.0",
       "licenses": [
         {
           "license": {
@@ -520,8 +520,8 @@
     {
       "type": "library",
       "name": "websockets",
-      "version": "16.0",
-      "purl": "pkg:pypi/websockets@16.0",
+      "version": "17.1",
+      "purl": "pkg:pypi/websockets@17.1",
       "licenses": [
         {
           "license": {

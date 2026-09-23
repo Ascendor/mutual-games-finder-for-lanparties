@@ -1,11 +1,11 @@
 ﻿<template>
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-4">
-      <h1 class="text-h4">Mitspieler finden</h1>
+      <h1 class="text-headline-large">Mitspieler finden</h1>
       <v-switch v-model="presentOnly" color="primary" label="Nur Anwesende" hide-details @update:model-value="loadOwners" />
     </div>
 
-    <v-row class="mb-4" align="center">
+    <v-row class="mb-4 align-center">
       <v-col cols="12" md="8">
         <v-autocomplete
           v-model="selectedGameId"
@@ -35,7 +35,7 @@
               <v-icon :color="item.present ? 'success' : 'medium-emphasis'" size="small">mdi-circle</v-icon>
               <strong>{{ item.participant_name }}</strong>
             </div>
-            <div v-if="item.real_name" class="text-caption text-medium-emphasis">{{ item.real_name }}</div>
+            <div v-if="item.real_name" class="text-body-small text-medium-emphasis">{{ item.real_name }}</div>
       </template>
       <template #item.platforms="{ item }">
         <v-chip v-for="platform in item.platform_values" :key="platform" size="small" color="primary" class="mr-1">{{ platformLabel(platform) }}</v-chip>

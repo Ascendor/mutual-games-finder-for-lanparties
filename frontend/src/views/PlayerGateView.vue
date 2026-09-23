@@ -2,9 +2,9 @@
   <div class="player-gate">
     <v-card variant="flat" class="player-card">
       <v-card-text class="pa-6 pa-sm-8">
-        <div class="text-overline text-primary mb-2">{{ branding.display_name }}</div>
-        <h1 class="text-h4 mb-2">Wer bist du?</h1>
-        <p class="text-body-1 text-medium-emphasis mb-6">
+        <div class="text-label-medium text-primary mb-2">{{ branding.display_name }}</div>
+        <h1 class="text-headline-large mb-2">Wer bist du?</h1>
+        <p class="text-body-large text-medium-emphasis mb-6">
           Wähle deinen Nickname oder gib einen neuen ein.
         </p>
 

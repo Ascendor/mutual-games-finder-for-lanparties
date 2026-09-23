@@ -2,7 +2,7 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-h4">Administration</h1>
+        <h1 class="text-headline-large">Administration</h1>
         <p class="text-medium-emphasis">Datenpflege fuer Teilnehmer, Accounts und Spiele.</p>
       </div>
       <v-btn v-if="unlocked" color="primary" prepend-icon="mdi-refresh" :loading="store.loading || loading" @click="load">Aktualisieren</v-btn>

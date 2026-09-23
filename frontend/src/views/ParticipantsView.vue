@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <h1 class="text-h4 mb-4">Teilnehmer</h1>
+    <h1 class="text-headline-large mb-4">Teilnehmer</h1>
     <v-row>
       <v-col cols="12" md="4">
         <v-card variant="flat">

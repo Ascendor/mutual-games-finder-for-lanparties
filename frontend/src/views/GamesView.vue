@@ -2,7 +2,7 @@
   <div class="page">
     <div class="d-flex align-center justify-space-between ga-3 flex-wrap mb-4">
       <div>
-        <h1 class="text-h4">Spieleverwaltung</h1>
+        <h1 class="text-headline-large">Spieleverwaltung</h1>
         <p class="text-medium-emphasis mb-0">{{ total }} Spiele entsprechen der Auswahl.</p>
       </div>
       <div class="d-flex ga-2 flex-wrap">
@@ -123,8 +123,8 @@
     >
       <template #item.title="{ item }">
         <strong>{{ item.title }}</strong>
-        <div class="text-caption text-medium-emphasis game-description">{{ item.description }}</div>
-        <div v-if="!item.is_game" class="text-caption text-error">
+        <div class="text-body-small text-medium-emphasis game-description">{{ item.description }}</div>
+        <div v-if="!item.is_game" class="text-body-small text-error">
           Ausgeblendet: {{ item.non_game_reason || 'als Software erkannt' }}
         </div>
       </template>
@@ -138,7 +138,7 @@
       </template>
       <template #item.metadata_updated_at="{ item }">
         <div>{{ item.metadata_source || '-' }}</div>
-        <div class="text-caption text-medium-emphasis">{{ formatDate(item.metadata_updated_at) }}</div>
+        <div class="text-body-small text-medium-emphasis">{{ formatDate(item.metadata_updated_at) }}</div>
       </template>
       <template #item.actions="{ item }">
         <div class="d-flex justify-end ga-1">

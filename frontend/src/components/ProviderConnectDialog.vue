@@ -27,8 +27,8 @@
         </v-alert>
 
         <template v-if="stage === 1">
-          <h2 class="text-h6 mb-3">{{ introTitle }}</h2>
-          <p class="text-body-1 mb-4">{{ introText }}</p>
+          <h2 class="text-title-large mb-3">{{ introTitle }}</h2>
+          <p class="text-body-large mb-4">{{ introText }}</p>
           <v-list density="compact" class="mb-2">
             <v-list-item
               v-for="(item, index) in introSteps"
@@ -41,7 +41,7 @@
 
         <template v-else-if="stage === 2">
           <template v-if="target.platform === 'steam'">
-            <h2 class="text-h6 mb-3">Wie möchtest du Steam verbinden?</h2>
+            <h2 class="text-title-large mb-3">Wie möchtest du Steam verbinden?</h2>
             <v-btn-toggle
               v-model="steamConnectionMode"
               mandatory
@@ -54,7 +54,7 @@
               <v-btn value="openid" prepend-icon="mdi-open-in-new">Browser-Anmeldung</v-btn>
               <v-btn value="community" prepend-icon="mdi-card-account-details-outline">Community-ID</v-btn>
             </v-btn-toggle>
-            <p class="text-caption text-medium-emphasis mb-4">
+            <p class="text-body-small text-medium-emphasis mb-4">
               Einzelheiten zur Speicherung findest du unter
               <a href="/legal" target="_blank" rel="noopener noreferrer">Datenschutz &amp; Hinweise</a>.
             </p>
@@ -101,8 +101,8 @@
                 auf <strong>steamcommunity.com</strong> ein; sie werden nicht an diese Anwendung übermittelt.
                 Nach der Bestätigung erhält die Anwendung nur deine SteamID.
               </v-alert>
-              <p class="text-body-2 mb-2"><strong>Dafür gelten folgende Einschränkungen:</strong></p>
-              <ul class="text-body-2 text-medium-emphasis mb-4 steam-limitations">
+              <p class="text-body-medium mb-2"><strong>Dafür gelten folgende Einschränkungen:</strong></p>
+              <ul class="text-body-medium text-medium-emphasis mb-4 steam-limitations">
                 <li>Dein Steam-Profil und die „Spieldetails“ müssen öffentlich sein.</li>
                 <li>Lizenz- und Erwerbsdaten (z.B. Kaufzeitpunkt) fehlen.</li>
                 <li>Ungenutzte oder deinstallierte Gratisspiele können fehlen.</li>
@@ -116,7 +116,7 @@
               >
                 Bei Steam anmelden
               </v-btn>
-              <p class="text-caption text-medium-emphasis mt-3 mb-0">
+              <p class="text-body-small text-medium-emphasis mt-3 mb-0">
                 Du kehrst danach automatisch hierher zurück und die Bibliothek wird synchronisiert.
               </p>
             </template>
@@ -127,8 +127,8 @@
                 Es wird kein Steam-Zugangs- oder Refresh-Token gespeichert. Spätere Synchronisationen laufen anhand
                 deiner SteamID über die offizielle Steam Web API und benötigen keine erneute Anmeldung.
               </v-alert>
-              <p class="text-body-2 mb-2"><strong>Dafür gelten folgende Einschränkungen:</strong></p>
-              <ul class="text-body-2 text-medium-emphasis mb-4 steam-limitations">
+              <p class="text-body-medium mb-2"><strong>Dafür gelten folgende Einschränkungen:</strong></p>
+              <ul class="text-body-medium text-medium-emphasis mb-4 steam-limitations">
                 <li>Dein Steam-Profil und die „Spieldetails“ müssen öffentlich sein.</li>
                 <li>Lizenz- und Erwerbsdaten (z.B. Kaufzeitpunkt) fehlen</li>
                 <li>Ungenutzte oder deinstallierte Gratisspiele können fehlen.</li>
@@ -151,7 +151,7 @@
                 </v-avatar>
                 <div>
                   <div class="font-weight-bold">{{ steamResolvedProfile.display_name }}</div>
-                  <div class="text-caption text-medium-emphasis">
+                  <div class="text-body-small text-medium-emphasis">
                     <template v-if="steamResolvedProfile.library_accessible">
                       {{ steamResolvedProfile.game_count }} Spiele öffentlich sichtbar
                     </template>
@@ -167,8 +167,8 @@
           </template>
 
           <template v-else-if="target.platform === 'epic'">
-            <h2 class="text-h6 mb-2">Bei Epic Games anmelden</h2>
-            <p class="text-body-2 mb-4">
+            <h2 class="text-title-large mb-2">Bei Epic Games anmelden</h2>
+            <p class="text-body-medium mb-4">
               Öffne die Loginseite, melde dich bei Epic an und kopiere anschließend den gesamten Inhalt der angezeigten Seite.
             </p>
             <v-btn
@@ -195,8 +195,8 @@
           </template>
 
           <template v-else-if="target.platform === 'gog'">
-            <h2 class="text-h6 mb-2">Bei GOG anmelden</h2>
-            <p class="text-body-2 mb-4">
+            <h2 class="text-title-large mb-2">Bei GOG anmelden</h2>
+            <p class="text-body-medium mb-4">
               Öffne GOG und melde dich an. Danach erscheint normalerweise eine leere weiße Seite. Das ist richtig:
               Kopiere die vollständige Adresse dieser weißen Seite aus der Browserzeile und füge sie unten ein.
             </p>
@@ -224,8 +224,8 @@
           </template>
 
           <template v-else-if="target.platform === 'ubisoft'">
-            <h2 class="text-h6 mb-2">{{ needs2fa ? 'Zwei-Faktor-Code eingeben' : 'Bei Ubisoft anmelden' }}</h2>
-            <p class="text-body-2 text-medium-emphasis mb-4">
+            <h2 class="text-title-large mb-2">{{ needs2fa ? 'Zwei-Faktor-Code eingeben' : 'Bei Ubisoft anmelden' }}</h2>
+            <p class="text-body-medium text-medium-emphasis mb-4">
               {{ needs2fa ? 'Öffne deine Authenticator-App oder E-Mail und gib den aktuellen Code ein.' : 'Die Anmeldung erfolgt direkt. Deine Zugangsdaten werden nicht in der Datenbank gespeichert.' }}
             </p>
             <v-text-field
@@ -260,8 +260,8 @@
           </template>
 
           <template v-else-if="target.platform === 'xbox'">
-            <h2 class="text-h6 mb-2">Bei Microsoft anmelden</h2>
-            <p class="text-body-2 mb-4">
+            <h2 class="text-title-large mb-2">Bei Microsoft anmelden</h2>
+            <p class="text-body-medium mb-4">
               Öffne die Microsoft-Seite und melde dich mit dem Konto an, das zu deinem Xbox-Profil gehört.
               Gib dort diesen einmaligen Code ein:
             </p>
@@ -297,8 +297,8 @@
           </template>
 
           <template v-else-if="target.platform === 'amazon'">
-            <h2 class="text-h6 mb-2">Bei Amazon anmelden</h2>
-            <p class="text-body-2 mb-4">
+            <h2 class="text-title-large mb-2">Bei Amazon anmelden</h2>
+            <p class="text-body-medium mb-4">
               Melde dich auf der geöffneten Amazon-Seite an. Kopiere danach die vollständige Adresse aus der Browserzeile,
               auch wenn dort nur die normale Amazon-Seite erscheint.
             </p>
@@ -326,7 +326,7 @@
           </template>
 
           <template v-else-if="isBrowserSessionPlatform">
-            <h2 class="text-h6 mb-2">{{ platformTitle(target.platform) }}-Sitzung übernehmen</h2>
+            <h2 class="text-title-large mb-2">{{ platformTitle(target.platform) }}-Sitzung übernehmen</h2>
             <v-alert type="warning" variant="tonal" class="mb-4">
               Diese direkte Anbindung nutzt eine inoffizielle Browser-Sitzung. Sie kann nach Änderungen des Anbieters
               vorübergehend ausfallen und muss nach Ablauf der Sitzung erneut verbunden werden.
@@ -390,10 +390,10 @@
             <v-progress-circular v-if="busy" indeterminate color="primary" size="48" />
             <v-icon v-else-if="error" color="error" size="48">mdi-alert-circle-outline</v-icon>
             <v-icon v-else color="primary" size="48">mdi-cloud-download-outline</v-icon>
-            <h2 class="text-h6 mt-4">
+            <h2 class="text-title-large mt-4">
               Spiele werden geladen
             </h2>
-            <p class="text-body-2 text-medium-emphasis">
+            <p class="text-body-medium text-medium-emphasis">
               Die Verbindung steht. Jetzt wird die Bibliothek einmal vollständig synchronisiert.
             </p>
           </div>
@@ -402,8 +402,8 @@
         <template v-else>
           <div class="sync-state">
             <v-icon color="success" size="56">mdi-check-circle-outline</v-icon>
-            <h2 class="text-h6 mt-4">Alles erledigt</h2>
-            <p class="text-body-1">
+            <h2 class="text-title-large mt-4">Alles erledigt</h2>
+            <p class="text-body-large">
               {{ resultMessage }}
             </p>
           </div>

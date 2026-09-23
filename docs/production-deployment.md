@@ -48,6 +48,12 @@ git checkout <release-tag>
 Fuer produktive Updates sollte immer ein getesteter Release-Tag statt eines
 beweglichen Branches verwendet werden.
 
+Das Dependency-Upgrade vom September 2026 installiert Python 3.14.7 im
+Docker-Build ueber uv. Auf dem Host ist dafuer keine neue Python-Installation
+noetig. PostgreSQL bleibt bei Major-Version 17; bestehende Volumes und
+`.env.production` bleiben unveraendert. Die neuen Laufzeiten werden beim
+normalen Image-Neubau und anschliessenden `up -d` uebernommen.
+
 ## 3. Produktionsvariablen anlegen
 
 ```bash

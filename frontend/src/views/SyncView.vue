@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="page">
     <div class="d-flex align-center justify-space-between mb-4">
-      <h1 class="text-h4">Synchronisation</h1>
+      <h1 class="text-headline-large">Synchronisation</h1>
       <div class="d-flex ga-2 flex-wrap">
         <v-btn
           color="secondary"

@@ -1,3 +1,4 @@
+import './layers.css'
 import 'vuetify/styles'
 import './styles.css'
 

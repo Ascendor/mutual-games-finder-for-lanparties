@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="page">
-    <h1 class="text-h4 mb-4">Was können wir spielen?</h1>
+    <h1 class="text-headline-large mb-4">Was können wir spielen?</h1>
     <v-row class="mb-4">
       <v-col cols="12" md="9">
         <v-select
@@ -13,7 +13,7 @@
           chips
           density="compact"
         >
-          <template #item="{ props: itemProps, item }">
+          <template #item="{ props: itemProps, internalItem: item }">
             <v-list-item
               v-bind="itemProps"
               :title="participantOptionLabel(item.raw)"
@@ -47,7 +47,7 @@
     <v-window v-model="tab" class="mt-4">
       <v-window-item value="common">
         <div class="availability-filter mb-3">
-          <span class="text-body-2 font-weight-medium">Mindestens verfügbar für</span>
+          <span class="text-body-medium font-weight-medium">Mindestens verfügbar für</span>
           <v-btn-toggle
             v-model="minimumCoverage"
             color="primary"

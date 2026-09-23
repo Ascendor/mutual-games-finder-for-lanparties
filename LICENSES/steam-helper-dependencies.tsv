@@ -13,7 +13,7 @@ package	version	license	source
 @protobufjs/path	1.1.2	BSD-3-Clause	-
 @protobufjs/pool	1.1.0	BSD-3-Clause	-
 @protobufjs/utf8	1.1.2	BSD-3-Clause	-
-@types/node	26.6.1	MIT	-
+@types/node	26.6.2	MIT	-
 adm-zip	0.6.1	MIT	-
 agent-base	6.0.2	MIT	-
 ansi-regex	5.0.1	MIT	-
@@ -48,7 +48,7 @@ p-try	2.2.0	MIT	-
 path-exists	4.0.0	MIT	-
 permessage-deflate	0.1.7	Apache-2.0	-
 pngjs	5.0.0	MIT	-
-protobufjs	7.6.5	BSD-3-Clause	-
+protobufjs	7.6.6	BSD-3-Clause	-
 psl	1.15.0	MIT	-
 punycode	2.3.1	MIT	-
 qrcode	1.5.4	MIT	-

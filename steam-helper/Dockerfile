@@ -1,4 +1,4 @@
-FROM mirror.gcr.io/library/node:20-alpine
+FROM mirror.gcr.io/library/node:24.21.0-alpine
 
 LABEL org.opencontainers.image.source="https://github.com/Ascendor/mutual-games-finder-for-lanparties"
 LABEL org.opencontainers.image.licenses="MIT"
