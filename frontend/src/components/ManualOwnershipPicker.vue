@@ -1,8 +1,8 @@
 <template>
   <section class="manual-library">
     <div>
-      <h3 class="text-subtitle-1 font-weight-bold">Fehlende Spiele ergänzen</h3>
-      <p class="text-body-2 text-medium-emphasis mb-3">
+      <h3 class="text-body-large font-weight-bold">Fehlende Spiele ergänzen</h3>
+      <p class="text-body-medium text-medium-emphasis mb-3">
         Suche ein bereits bekanntes Spiel und ergänze es dauerhaft in deiner Bibliothek.
       </p>
     </div>
@@ -30,7 +30,7 @@
       <div v-for="game in results" :key="game.id" class="manual-result">
         <div class="manual-game-info">
           <strong>{{ game.title }}</strong>
-          <div class="text-caption text-medium-emphasis">
+          <div class="text-body-small text-medium-emphasis">
             {{ gameMeta(game) }}
           </div>
         </div>
@@ -61,7 +61,7 @@
         </div>
       </div>
     </div>
-    <p v-else-if="searched && !loading" class="text-body-2 text-medium-emphasis mt-3 mb-0">
+    <p v-else-if="searched && !loading" class="text-body-medium text-medium-emphasis mt-3 mb-0">
       Kein passendes bekanntes Spiel gefunden.
     </p>
 
@@ -69,7 +69,7 @@
       <v-card>
         <v-card-title>Plattform auswählen</v-card-title>
         <v-card-text>
-          <p class="text-body-2 mb-4">Wo besitzt du „{{ selectedGame?.title }}“?</p>
+          <p class="text-body-medium mb-4">Wo besitzt du „{{ selectedGame?.title }}“?</p>
           <v-select
             v-model="selectedPlatform"
             :items="platformChoices"

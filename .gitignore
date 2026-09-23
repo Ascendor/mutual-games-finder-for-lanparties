@@ -4,6 +4,8 @@
 .venv/
 lan_party_game_finder.db
 node_modules/
+playwright-report/
+test-results/
 dist/
 .env
 .env.production

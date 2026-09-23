@@ -4,7 +4,7 @@
 
     <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-h4">Orga-Dashboard</h1>
+        <h1 class="text-headline-large">Orga-Dashboard</h1>
         <p class="text-medium-emphasis">
           Aktuelle Nutzung, Datenqualität und Synchronisationszustand für das LAN-Wochenende.
         </p>

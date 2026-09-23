@@ -9,7 +9,7 @@ scope and do not weaken its data-safety guarantees.
 2. Do not commit real participant names, account identifiers, library exports,
    databases, credentials, tokens, logs, or screenshots containing such data.
 3. Add focused tests for behavioural changes.
-4. Run backend tests, frontend build, Steam-helper syntax check, dependency
+4. Run backend tests, frontend build and browser tests, Steam-helper syntax check, dependency
    audits, and license inventory generation described in
    `docs/open-source-compliance.md`.
 5. Update user, operator, privacy, and provider documentation when behaviour or
@@ -27,12 +27,22 @@ an isolated PostgreSQL test database without production credentials or volumes.
 See `docs/open-source-compliance.md` for dependency updates using the pinned uv
 tooling image. Refresh runtime license inventories and SBOMs after changes.
 
+Python is installed by uv using `backend/.python-version` (3.14.7). Only stable
+Python and package releases are allowed; the uv resolver explicitly disallows
+prereleases. Frontend and helper builds use Node.js 24.21.0 LTS.
+
 Dependabot groups monthly frontend minor and patch updates. Frontend major
 versions are excluded from automatic version updates and require a separate
 migration with a Docker build and UI verification. For example, TypeScript 7
 does not expose the compiler path required by vue-tsc 3.3.11; rebasing a dependency
 PR does not make that combination compatible. Review security alerts even when
-the required fix involves a major upgrade.
+the required fix involves a major upgrade. TypeScript 6.0.3 is the tested
+compatible stable version for the current toolchain.
+
+After `npm ci` and `npm run build` in `frontend`, run
+`npx playwright install --with-deps chromium firefox` and `npm run test:e2e`.
+The tests mock the API and cover desktop Chromium, Firefox and mobile Chromium
+without accessing private libraries. CI runs the same browser suite.
 
 The frontend Docker build prints the installed direct dependency versions before
 type checking. Reproduce a failing dependency PR using its actual package.json

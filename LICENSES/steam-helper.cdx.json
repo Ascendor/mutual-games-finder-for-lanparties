@@ -195,8 +195,8 @@
     {
       "type": "library",
       "name": "@types/node",
-      "version": "26.6.1",
-      "purl": "pkg:npm/%40types%2Fnode@26.6.1",
+      "version": "26.6.2",
+      "purl": "pkg:npm/%40types%2Fnode@26.6.2",
       "licenses": [
         {
           "license": {
@@ -650,8 +650,8 @@
     {
       "type": "library",
       "name": "protobufjs",
-      "version": "7.6.5",
-      "purl": "pkg:npm/protobufjs@7.6.5",
+      "version": "7.6.6",
+      "purl": "pkg:npm/protobufjs@7.6.6",
       "licenses": [
         {
           "license": {

@@ -10,9 +10,9 @@
     </v-btn>
 
     <header class="mb-8">
-      <div class="text-overline text-primary">Transparenz</div>
-      <h1 class="text-h3 mb-3">Datenschutz &amp; Hinweise</h1>
-      <p class="text-body-1 text-medium-emphasis">
+      <div class="text-label-medium text-primary">Transparenz</div>
+      <h1 class="text-display-medium mb-3">Datenschutz &amp; Hinweise</h1>
+      <p class="text-body-large text-medium-emphasis">
         Diese Anwendung ist für eine private, nichtkommerzielle LAN-Gruppe
         gedacht. Sie enthält keine Werbung und keine externe
         Nutzungsanalyse. Die interne Statistik dient ausschließlich der

@@ -2,7 +2,7 @@
   <div class="page usage-page">
     <div class="usage-header mb-5">
       <div>
-        <h1 class="text-h4">Nutzungsanalyse</h1>
+        <h1 class="text-headline-large">Nutzungsanalyse</h1>
         <p class="text-medium-emphasis mb-0">Lokale Auswertung der tatsächlichen App-Nutzung.</p>
       </div>
       <div class="date-controls">
@@ -33,8 +33,8 @@
       <v-row class="mb-5">
         <v-col v-for="metric in metrics" :key="metric.label" cols="6" md="3">
           <v-card variant="flat" class="metric-card">
-            <div class="text-h4 font-weight-bold">{{ metric.value }}</div>
-            <div class="metric-label text-body-2 text-medium-emphasis">
+            <div class="text-headline-large font-weight-bold">{{ metric.value }}</div>
+            <div class="metric-label text-body-medium text-medium-emphasis">
               <span>{{ metric.label }}</span>
               <v-icon
                 v-if="metric.tooltip"
@@ -53,14 +53,14 @@
 
       <section class="usage-section">
         <div class="section-heading mb-1">
-          <h2 class="text-h6">Aktivität nach Datum</h2>
+          <h2 class="text-title-large">Aktivität nach Datum</h2>
           <v-icon icon="mdi-help-circle-outline" size="18" class="help-icon">
             <v-tooltip activator="parent" location="top" max-width="360">
               Gezählt werden alle App-Ereignisse pro Kalendertag im ausgewählten Zeitraum.
             </v-tooltip>
           </v-icon>
         </div>
-        <p class="text-body-2 text-medium-emphasis mb-3">
+        <p class="text-body-medium text-medium-emphasis mb-3">
           Jede Zeile fasst die App-Nutzung dieses Kalendertags zusammen.
         </p>
         <v-data-table
@@ -79,7 +79,7 @@
         <v-col cols="12" lg="6">
           <section class="usage-section">
             <div class="section-heading mb-3">
-              <h2 class="text-h6">Meistgesuchte Spiele</h2>
+              <h2 class="text-title-large">Meistgesuchte Spiele</h2>
               <v-icon icon="mdi-help-circle-outline" size="18" class="help-icon">
                 <v-tooltip activator="parent" location="top" max-width="360">
                   Suchen aus "Ich will Spiel X spielen": Wer besitzt dieses Spiel und könnte mitspielen?
@@ -99,7 +99,7 @@
         <v-col cols="12" lg="6">
           <section class="usage-section">
             <div class="section-heading mb-3">
-              <h2 class="text-h6">Häufig als Mitspieler:in ausgewählt</h2>
+              <h2 class="text-title-large">Häufig als Mitspieler:in ausgewählt</h2>
               <v-icon icon="mdi-help-circle-outline" size="18" class="help-icon">
                 <v-tooltip activator="parent" location="top" max-width="360">
                   Suchen aus "Ich will mit X, Y, Z spielen": Welche gemeinsamen Spiele passen zu dieser Gruppe?
@@ -119,7 +119,7 @@
       </v-row>
 
       <section class="usage-section">
-        <h2 class="text-h6 mb-3">Nutzung nach Teilnehmer:in</h2>
+        <h2 class="text-title-large mb-3">Nutzung nach Teilnehmer:in</h2>
         <v-data-table
           class="compact-table"
           density="compact"
@@ -173,7 +173,7 @@
               <div><strong>{{ eventCount('page_view') }}</strong><span>Seitenaufrufe</span></div>
             </div>
 
-            <h3 class="text-subtitle-1 font-weight-bold mb-2">Gesuchte Spiele</h3>
+            <h3 class="text-body-large font-weight-bold mb-2">Gesuchte Spiele</h3>
             <v-data-table
               class="compact-table mb-5"
               density="compact"
@@ -183,7 +183,7 @@
               no-data-text="Keine Mitspielersuchen."
             />
 
-            <h3 class="text-subtitle-1 font-weight-bold mb-2">Letzte Aktivitäten</h3>
+            <h3 class="text-body-large font-weight-bold mb-2">Letzte Aktivitäten</h3>
             <v-data-table
               class="compact-table"
               density="compact"
@@ -204,7 +204,7 @@
       <v-card>
         <v-card-title>Partyzeitraum festlegen</v-card-title>
         <v-card-text>
-          <p class="text-body-2 text-medium-emphasis mb-4">
+          <p class="text-body-medium text-medium-emphasis mb-4">
             Der Beginn trennt Vorbereitung und Party. Das Ende kann offenbleiben, solange die Party läuft.
           </p>
           <v-text-field

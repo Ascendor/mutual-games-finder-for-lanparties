@@ -18,11 +18,11 @@ gedacht. Sie ersetzt keine Rechtsberatung.
      python /scripts/generate_backend_license_inventory.py
    docker run --rm -v "$PWD/frontend:/app" -v "$PWD/LICENSES:/out" \
      -v "$PWD/scripts:/scripts:ro" -w /app \
-     mirror.gcr.io/library/node:20-alpine \
+     mirror.gcr.io/library/node:24.21.0-alpine \
      sh -c "npm ci && node /scripts/generate_frontend_license_inventory.mjs /app /out"
    docker run --rm -v "$PWD/steam-helper:/app" -v "$PWD/LICENSES:/out" \
      -v "$PWD/scripts:/scripts:ro" -w /app \
-     mirror.gcr.io/library/node:20-alpine \
+     mirror.gcr.io/library/node:24.21.0-alpine \
      sh -c "npm ci && node /scripts/generate_frontend_license_inventory.mjs /app /out steam-helper lan-party-steam-helper"
    ```
    Danach muessen auch die drei `*.cdx.json`-Dateien als CycloneDX-SBOMs

@@ -1,21 +1,21 @@
 package	version	license	source
 alembic	1.20.0	MIT	https://github.com/sqlalchemy/alembic/
-annotated-doc	0.0.4	MIT	https://github.com/fastapi/annotated-doc
-annotated-types	0.7.0	OSI Approved :: MIT License	https://github.com/annotated-types/annotated-types
+annotated-doc	0.0.5	MIT	https://github.com/fastapi/annotated-doc
+annotated-types	0.8.0	MIT	https://github.com/annotated-types/annotated-types
 anyio	4.15.1	MIT	-
-certifi	2026.6.17	MPL-2.0	https://github.com/certifi/python-certifi
-charset-normalizer	3.4.7	MIT	-
-click	8.4.2	BSD-3-Clause	https://github.com/pallets/click/
+certifi	2026.7.22	MPL-2.0	https://github.com/certifi/python-certifi
+charset-normalizer	3.5.1	MIT	-
+click	8.5.0	BSD-3-Clause	https://github.com/pallets/click/
 fastapi	0.141.1	MIT	https://github.com/fastapi/fastapi
-filelock	3.29.4	MIT	https://github.com/tox-dev/py-filelock
-greenlet	3.5.3	MIT AND PSF-2.0	https://github.com/python-greenlet/greenlet
+filelock	4.0.1	MIT	https://github.com/tox-dev/py-filelock
+greenlet	3.5.6	MIT AND PSF-2.0	https://github.com/python-greenlet/greenlet
 h11	0.16.0	MIT	https://github.com/python-hyper/h11
 httpcore	1.0.9	BSD-3-Clause	https://github.com/encode/httpcore
 httptools	0.8.0	MIT	https://github.com/MagicStack/httptools
 httpx	0.28.1	BSD-3-Clause	https://github.com/encode/httpx
-idna	3.18	BSD-3-Clause	https://github.com/kjd/idna
+idna	3.20	BSD-3-Clause	https://github.com/kjd/idna
 legendary-gl	0.21.1	GPL-3.0-or-later	https://github.com/derrod/legendary
-Mako	1.3.12	MIT	https://www.makotemplates.org/
+Mako	1.4.3	MIT	https://www.makotemplates.org/
 MarkupSafe	3.0.3	BSD-3-Clause	https://github.com/pallets/markupsafe/
 psycopg	3.3.6	LGPL-3.0-only	https://psycopg.org/
 psycopg-binary	3.3.6	LGPL-3.0-only	https://psycopg.org/
@@ -24,18 +24,18 @@ pydantic	2.13.5	MIT	https://github.com/pydantic/pydantic
 pydantic-settings	2.15.0	MIT	https://github.com/pydantic/pydantic-settings
 pydantic_core	2.46.5	MIT	https://github.com/pydantic/pydantic/tree/main/pydantic-core
 python-dateutil	2.9.0.post0	Dual License	https://github.com/dateutil/dateutil
-python-dotenv	1.2.2	BSD-3-Clause	https://github.com/theskumar/python-dotenv
+python-dotenv	1.2.3	BSD-3-Clause	https://github.com/theskumar/python-dotenv
 python-multipart	0.0.32	Apache-2.0	https://github.com/Kludex/python-multipart
 PyYAML	6.0.3	MIT	https://pyyaml.org/
 RapidFuzz	3.14.6	MIT	https://github.com/rapidfuzz/RapidFuzz.git
 requests	2.34.2	Apache-2.0	https://github.com/psf/requests
 six	1.17.0	MIT	https://github.com/benjaminp/six
 SQLAlchemy	2.0.54	MIT	https://www.sqlalchemy.org
-starlette	1.3.1	BSD-3-Clause	https://github.com/Kludex/starlette
-typing-inspection	0.4.2	MIT	https://github.com/pydantic/typing-inspection
+starlette	1.6.0	BSD-3-Clause	https://github.com/Kludex/starlette
+typing-inspection	0.4.4	MIT	https://github.com/pydantic/typing-inspection
 typing_extensions	4.16.0	PSF-2.0	https://github.com/python/typing_extensions
-urllib3	2.7.0	MIT	-
+urllib3	2.8.0	MIT	-
 uvicorn	0.53.0	BSD-3-Clause	https://github.com/Kludex/uvicorn
 uvloop	0.22.1	MIT License	-
-watchfiles	1.2.0	MIT	https://github.com/samuelcolvin/watchfiles
-websockets	16.0	BSD-3-Clause	https://github.com/python-websockets/websockets
+watchfiles	1.3.0	MIT	https://github.com/samuelcolvin/watchfiles
+websockets	17.1	BSD-3-Clause	https://github.com/python-websockets/websockets
